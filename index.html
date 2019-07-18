@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport"
+	content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="description" content="Heather is a online Markdown Editor">
+  <meta name="keywords" content="Markdown, Heather, Editor, CodeMirror, Github, Open Source">
+ <style>
+ #loading{
+	font-size:120px;
+	color: #fff;
+    margin: 0px;
+    text-align: center;
+	top:calc(50% - 120px);
+	width:100%;
+ }
+ @media (max-width: 768px){
+   #loading{
+	font-size:80px;
+	top:calc(50% - 80px)
+   }    
+}
+ </style>
+</head>
+<body>
+<textarea id="editor" style="display:none"></textarea>
+<div id="bg" style="position: absolute;top: 0;left: 0;z-index: 9999999; width: 100vw; height: 100vh;background-color: rgb(40, 33, 28)">
+	
+</div> 
+<div id="loading" style=";position:absolute;left:0;z-index: 9999999;">Heather</div>
+<script src="iframe.js"></script>
+<script>
+
+	window.onload = function(){
+		setTimeout(function(){
+			Editor.create(document.getElementById("editor"),{render_allowHtml:true},function(wrapper){
+				var loading = document.getElementById("loading");
+				loading.parentNode.removeChild(loading);
+				var bg = document.getElementById("bg");
+				bg.parentNode.removeChild(document.getElementById("bg"));
+			});
+		},0)
+	}
+	
+</script>
+</body>
+</html>
