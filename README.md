@@ -1,7 +1,7 @@
 # heather
 ## 说明
 markdown编辑器，特性如下：
-1. 支持mermaid图表
+1. 支持mermaid图表、katex
 2. 自定义工具条|辅助工具条
 3. 支持拖曳html|md文件，自动将html转化为markdown
 4. 本地存储(localStorage)支持
@@ -9,6 +9,7 @@ markdown编辑器，特性如下：
 6. 主题设置
 7. 支持手机端
 8. 离线访问
+9. mermaid、katex懒加载
 
 ### 在线demo
 https://md.qyh.me
