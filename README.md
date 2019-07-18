@@ -77,7 +77,7 @@ Editor.create(document.getElementById("editor"),config,function(wrapper){
 
 ## 方法
 
-## 编辑器
+### 编辑器
 `wrapper.editor`
 
 获取codemirror对象
