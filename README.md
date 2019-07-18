@@ -72,7 +72,7 @@ Editor.create(document.getElementById("editor"),config,function(wrapper){
 |  `stat_formatter`  | 当启用状态条时，用于获取状态条渲染内容的方法  |  |
 |  `sync_animateMs`  | 配置同步滚动时滚动动画时间  | 0 |
 |  `sync_enable`  | 是否启用同步滚动  |  |
-|  `swipe_animateMs`  | 预览|编辑|toc切换时动画时间  | 500 |
+|  `swipe_animateMs`  | 预览、编辑、toc切换时动画时间  | 500 |
 
 ## 方法
 
