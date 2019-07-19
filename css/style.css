@@ -154,7 +154,7 @@ width:100%
 	white-space: nowrap !important;
 }
 
-.CodeMirror {
+#wrapper .CodeMirror {
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -162,12 +162,15 @@ width:100%
 	bottom: 0;
 	width: auto;
 	height: auto;
-	background-color: #f9f9f7;
 	font-size: 15px;
 	padding-top: 30px;
 }
 
-.CodeMirror-scroll {
+.CodeMirror{
+	background-color:#f9f9f7
+}
+
+#wrapper .CodeMirror-scroll {
 	padding: 10px;
 	box-sizing: border-box;
 	overflow-x: hidden !important;
@@ -192,15 +195,11 @@ width:100%
 	width: 100%;
 	text-align: right;
 	display: none;
-	z-index: 99999;
+	z-index: 999;
 }
 
 .styled-background {
 	background-color: #ff7 !important;
-}
-
-body {
-	background-color: #f9f9f7
 }
 
 .wrap {
@@ -234,7 +233,13 @@ body {
 	bottom: 0;
 	width: 100%;
 	height: auto;
-	overflow-x: hidden
+	overflow-x: hidden;
+	z-index: 9999998;
+	background-color:#f9f9f7
+}
+
+.swal2-container.swal2-shown {
+	z-index: 9999999
 }
 
 #docs {
@@ -286,7 +291,7 @@ body {
 	overflow: auto;
 	padding: 10px;
 	width: 200px;
-	padding: 10px
+	word-break: break-word;
 }
 
 #toc h1,
@@ -347,14 +352,14 @@ h6 {
 }
 
 @media (min-width:768px) {
-	 ::-webkit-scrollbar {
+	#wrapper ::-webkit-scrollbar {
 		width: 6px;
 	}
-	 ::-webkit-scrollbar-track {
+	#wrapper ::-webkit-scrollbar-track {
 		box-shadow: none;
 		border-radius: 3px;
 	}
-	 ::-webkit-scrollbar-thumb {
+	#wrapper ::-webkit-scrollbar-thumb {
 		border-radius: 10px;
 		background-color: #bcd;
 	}
@@ -383,10 +388,10 @@ h6 {
 	.icon {
 		font-size: 30px
 	}
-	.CodeMirror-scroll {
+	#wrapper .CodeMirror-scroll {
 		margin-top: 10px
 	}
-	.CodeMirror {
+	#wrapper .CodeMirror {
 		font-size: 1.5rem;
 		padding-top: 40px;
 	}

@@ -623,6 +623,14 @@ var EditorWrapper = (function() {
                 var ms = getDefault(config.render_ms, 500);
                 var autoRenderTimer;
                 var stat_timer;
+				wrapper.eventHandlers.push({name:'remove',handler:function(){
+					if (autoRenderTimer) {
+                        clearTimeout(autoRenderTimer);
+                    }
+					if (stat_timer) {
+                        clearTimeout(stat_timer);
+                    }
+				}})
                 editor.on('change', function() {
                     if (autoRenderTimer) {
                         clearTimeout(autoRenderTimer);
@@ -633,7 +641,7 @@ var EditorWrapper = (function() {
                     var statEnable = config.stat_enable !== false;
                     if (statEnable) {
                         var formatter = config.stat_formatter || function(wrapper) {
-                            return "当前字数：" + wrapper.editor.getValue().length
+                            return "当前字数：" + wrapper.getValue().length
                         }
                         $("#stat").html(formatter(wrapper)).show();
                         if (stat_timer) {
@@ -652,10 +660,6 @@ var EditorWrapper = (function() {
                 var syncEnable = config.sync_enable !== false;
                 if (syncEnable) {
                     editor.on('scroll', scrollHandler);
-                    editor.on('update', function handler() {
-                        editor.off('update', handler);
-                        editor.renderAllDoc(0);
-                    });
                 }
                 this.syncEnable = syncEnable;
                 this.scrollHandler = scrollHandler;
@@ -688,13 +692,21 @@ var EditorWrapper = (function() {
                     max_move_y: 5
                 });
             }
+			
+			var tocClickTimer;
+			wrapper.eventHandlers.push({name:'remove',handler:function(){
+				if (tocClickTimer) {
+					clearTimeout(tocClickTimer);
+				}
+			}});
+			
             $("#toc").on('click', '[data-line]', function() {
                 var line = parseInt($(this).data('line'));
 
                 editor.scrollIntoView({
                     line: line
                 });
-                setTimeout(function() {
+                tocClickTimer = setTimeout(function() {
                     var top = editor.charCoords({
                         line: line,
                         ch: 0
@@ -711,18 +723,32 @@ var EditorWrapper = (function() {
             initToolbar(this);
 			this.fullscreen = false;
             if (screenfull.enabled) {
-				//TODO check remove
-                screenfull.on('change', function() {
+				var screenFullChangeHandler = function() {
 					wrapper.fullscreen = screenfull.isFullscreen;
                     changeStyleWhenFullScreenChange(wrapper, screenfull.isFullscreen);
-					
 					if(!screenfull.isFullscreen){
 						wrapper.toEditor(undefined,0);
 						wrapper.doSync();
 					}
-                });
+                }
+				wrapper.eventHandlers.push({name:'remove',handler:function(){
+					 screenfull.off('change',screenFullChangeHandler);
+				}})
+                screenfull.on('change',screenFullChangeHandler);
             }
+			triggerEvent(this,'load');
         }
+		
+		function triggerEvent(wrapper,name,args){
+			for(var i=0;i<wrapper.eventHandlers.length;i++){
+				var evtHandler= wrapper.eventHandlers[i];
+				if(evtHandler.name == name){
+					try{
+						evtHandler.handler.call(this,args);
+					}catch(e){}
+				}
+			}
+		}
 
         function changeStyleWhenFullScreenChange(wrapper, isFullscreen) {
             if (!CodeMirror.browser.mobile) {
@@ -761,17 +787,11 @@ var EditorWrapper = (function() {
         }
 		
 		EditorWrapper.prototype.remove = function(patch) {
-			for(var i=0;i<this.eventHandlers.length;i++){
-				var evtHandler= this.eventHandlers[i];
-				if(evtHandler.name == 'remove'){
-					try{
-						evtHandler.handler(this);
-					}catch(e){}
-				}
-			}
+			triggerEvent(this,'remove');
             $(this.getFullScreenElement()).removeClass('fullscreen');
-            $("#wrapper").remove();
-			wrapper = undefined;
+            this.wrapperElement.parentNode.removeChild(this.wrapperElement);
+			wrapperInstance.wrapper = undefined;
+			delete wrapperInstance.wrapper;
         }
 		
         EditorWrapper.prototype.doSync = function() {
@@ -807,6 +827,14 @@ var EditorWrapper = (function() {
 
         EditorWrapper.prototype.getHtml = function() {
             return this.render.getHtml(this.editor.getValue());
+        }
+		
+		EditorWrapper.prototype.getValue = function() {
+            return this.editor.getValue();
+        }
+		
+		EditorWrapper.prototype.setValue = function(text) {
+            return this.editor.setValue(text);
         }
 
         EditorWrapper.prototype.disableSync = function() {
@@ -1241,6 +1269,11 @@ var EditorWrapper = (function() {
             }
 
             var keyboardTimer;
+			wrapper.eventHandlers.push({name:'remove',handler:function(){
+				if(keyboardTimer){
+					clearInterval(keyboardTimer);
+				}
+			}})
             var mobileCursorActivityHandler = function(bar) {
                 var lh = editor.defaultTextHeight();
                 var top = editor.cursorCoords(true, 'local').top;
@@ -1367,10 +1400,11 @@ var EditorWrapper = (function() {
                         isOpen: keyboardOpen
                     }
                 })();
-
+				
                 editor.on('cursorActivity', function() {
                     mobileCursorActivityHandler(innerBar);
                 });
+				
                 editor.getScrollerElement().addEventListener('touchmove', function(evt) {
                     innerBar.hide();
                 });
@@ -1382,12 +1416,37 @@ var EditorWrapper = (function() {
             var theme = wrapper.theme;
             var cm = editor;
             var config = wrapper.config;
-            ////////////////////store 
-            var Store = (function() {
-                function Store(key) {
-                    this.key = key;
-                }
-                Store.prototype.addDocument = function(title, content) {
+            ////////////////////backup 
+			var Backup = (function(){
+				
+				function Backup(key){
+					this.key = key;
+					var me = this;
+					wrapper.editor.on('change', function() {
+						if (me.autoSaveTimer) {
+							clearTimeout(me.autoSaveTimer);
+						}
+						me.autoSaveTimer = setTimeout(function() {
+							if (me.docName) {
+								me.addDocument(me.docName, wrapper.getValue());
+							} else {
+								me.addDocument('default', wrapper.getValue());
+							}
+						}, getDefault(config.toolbar_autoSaveMs, 500));
+					});
+					wrapper.eventHandlers.push({name:'remove',handler:function(){
+						if (me.autoSaveTimer) {
+							clearTimeout(me.autoSaveTimer);
+						}
+					}});
+					wrapper.eventHandlers.push({name:'load',handler:function(){
+						setTimeout(function(){
+							me.loadLastDocument();
+						},100)
+					}});
+				}
+				
+				Backup.prototype.addDocument = function(title, content) {
                     var documents = this.getDocuments();
                     deleteDocumentByTitle(documents, title);
                     documents.push({
@@ -1397,14 +1456,18 @@ var EditorWrapper = (function() {
                     });
                     storeDocuments(this.key, documents);
                 }
-
-                Store.prototype.deleteDocument = function(title) {
+				
+				Backup.prototype.deleteDocument = function(title) {
+					var doc = this.getDocument(title);
+					if(doc != null && this.docName == doc.title){
+						this.newDocument();
+					}
                     var documents = this.getDocuments();
                     deleteDocumentByTitle(documents, title);
                     storeDocuments(this.key, documents);
                 }
 
-                Store.prototype.getDocument = function(title) {
+                Backup.prototype.getDocument = function(title) {
                     var documents = this.getDocuments();
                     for (var i = documents.length - 1; i >= 0; i--) {
                         if (documents[i].title == title) {
@@ -1414,7 +1477,7 @@ var EditorWrapper = (function() {
                     return null;
                 }
 
-                Store.prototype.getDocuments = function() {
+                Backup.prototype.getDocuments = function() {
                     var content = localStorage.getItem(this.key);
                     if (content == null) {
                         return [];
@@ -1422,7 +1485,7 @@ var EditorWrapper = (function() {
                     return $.parseJSON(content);
                 }
 
-                Store.prototype.getLastDocument = function() {
+                Backup.prototype.getLastDocument = function() {
                     var documents = this.getDocuments();
                     documents.sort(function(a, b) {
                         var ta = a.time;
@@ -1431,7 +1494,62 @@ var EditorWrapper = (function() {
                     });
                     return documents.length > 0 ? documents[0] : null;
                 }
-
+				
+				Backup.prototype.loadLastDocument = function() {
+					var doc = this.getLastDocument();
+					loadDocument(this,doc);
+                }
+				
+				Backup.prototype.loadDocument = function(title) {
+					var doc = this.getDocument(title);
+					loadDocument(this,doc);
+                }
+				
+				function loadDocument(backup,doc){
+					if (doc != null) {
+						if (doc.title != 'default')
+							backup.docName = doc.title;
+						else
+							backup.docName = undefined;
+						wrapper.setValue(doc.content);
+						//代码高亮的同步预览中，由于codemirror只渲染当前视窗，因此会出现不同步的现象
+						//可以调用CodeMirror.renderAllDoc，但是这个方法在大文本中速度很慢，可以选择关闭
+						if(wrapper.syncEnable !== false && config.renderAllDocEnable !== false){
+							wrapper.editor.renderAllDoc(0);
+						}
+					}
+				}
+				
+				Backup.prototype.newDocument = function() {
+					this.docName = undefined;
+					wrapper.setValue("");
+                }
+				
+				Backup.prototype.backup = function() {
+					if(this.docName){
+						this.addDocument(this.docName,wrapper.getValue());
+						this.deleteDocument('default');
+						swal('保存成功');
+					} else {
+						var me = this;
+						async function requestName() {
+							const {
+								value: name
+							} = await Swal.fire({
+								title: '标题',
+								input: 'text',
+								showCancelButton: true
+							})
+							if (name) {
+								me.addDocument(name, wrapper.getValue());
+								me.docName = name;
+								me.deleteDocument('default');
+								swal('保存成功');
+							}
+						}
+						requestName();
+					}
+                }
 
                 function deleteDocumentByTitle(documents, title) {
                     for (var i = documents.length - 1; i >= 0; i--) {
@@ -1446,14 +1564,12 @@ var EditorWrapper = (function() {
                     var json = JSON.stringify(documents);
                     localStorage.setItem(key, json);
                 }
-
-                return {
-                    create: function(key) {
-                        return new Store(key);
-                    }
-                }
-            })();
-
+				
+				return {create : function(key){
+					return new Backup(key);
+				}}
+			})();
+			
             var themeMode = (function() {
                 var toolbarHandler = function(e) {
                     if ($(e.target).hasClass('fa-cog')) {
@@ -1664,12 +1780,12 @@ var EditorWrapper = (function() {
                         const {
                             value: color
                         } = await Swal.fire({
-                            html: '<div></div>',
+                            html: '<div class="_colorpicker"></div>',
                             showCancelButton: true
                         });
                     }
                     getColor();
-					var colorpickerElement = $(Swal.getContent()).find('div');
+					var colorpickerElement = $(Swal.getContent()).find('._colorpicker');
                     colorpickerElement.colorpicker({
                         inline: true,
                         container: true,
@@ -1968,8 +2084,7 @@ var EditorWrapper = (function() {
             })();
 
             var configIcon;
-            var icons = config.toolbar_icons || ['toc', 'innerBar', 'backup', 'new', 'search', 'config', 'expand'];
-            var store;
+            var icons = config.toolbar_icons || ['toc', 'innerBar', 'backup', 'search', 'config', 'expand'];
             for (var i = 0; i < icons.length; i++) {
                 var icon = icons[i];
                 if (icon == 'toc') {
@@ -1986,12 +2101,6 @@ var EditorWrapper = (function() {
                     });
                 }
 
-                if (icon == 'new') {
-                    wrapper.toolbar.addIcon('far fa-file icon nofullscreen', function(ele) {
-                        newDocument();
-                    });
-                }
-
                 if (icon == 'search') {
                     wrapper.toolbar.addIcon('fas fa-search icon', function() {
                         editor.setOption('readOnly', true)
@@ -2000,15 +2109,17 @@ var EditorWrapper = (function() {
                 }
 
                 if (icon == 'backup') {
-                    store = Store.create('markdown-documents');
-                    loadLastDocument();
-                    autoSave();
+                    var backup = Backup.create('markdown-documents');
                     wrapper.toolbar.addIcon('fas icon fa-upload ', function(ele) {
-                        backup();
+                        backup.backup();
                     });
                     wrapper.toolbar.addIcon('fas icon fa-download ', function(ele) {
-                        selectDocuments();
+                        selectDocuments(backup);
                     });
+					wrapper.toolbar.addIcon('far fa-file icon nofullscreen', function(ele) {
+                        newDocument(backup);
+                    });
+					wrapper.backup = backup;
                 }
 
                 if (icon == 'config') {
@@ -2040,13 +2151,18 @@ var EditorWrapper = (function() {
 						}
                     }, function(ele) {
                         if (screenfull.enabled) {
-                            screenfull.on('change', function() {
+							
+							var toggleHandler = function() {
                                 if (screenfull.isFullscreen) {
                                     $(ele).removeClass('fa-expand').addClass('fa-compress');
                                 } else {
                                     $(ele).removeClass('fa-compress').addClass('fa-expand');
                                 }
-                            });
+                            };
+							wrapper.eventHandlers.push({name:'remove',handler:function(){
+								 screenfull.off('change',toggleHandler);
+							}})
+                            screenfull.on('change', toggleHandler);
                         }
                     });
                 }
@@ -2078,33 +2194,73 @@ var EditorWrapper = (function() {
                     $(ele).addClass("fa-check-square").removeClass("fa-square");
                 }
             }
+			
+			function selectDocuments(backup) {
+				var documents = backup.getDocuments();
+				for (var i = documents.length - 1; i >= 0; i--) {
+					if (documents[i].title == 'default') {
+						documents.splice(i, 1);
+						break;
+					}
+				}
+				if (documents.length == 0) {
+					swal('没有保存的文档');
+				} else {
+					var html = '<table class="table">';
+					for (var i = 0; i < documents.length; i++) {
+						var doc = documents[i];
+						html += '<tr><td>' + doc.title + '</td><td><i class="fas fa-times" data-title="' + doc.title + '" style="margin-right:20px;cursor:pointer"></i><i data-title="' + doc.title + '" class="fas fa-arrow-down" style=";cursor:pointer"></i></td><tr>';
+					}
+					html += '</table>';
+					swal({
+						html: html
+					});
+					$(Swal.getContent()).find('.fa-times').click(function() {
+						var title = $(this).data('title');
+						Swal.fire({
+							title: '确定要删除吗?',
+							type: 'warning',
+							showCancelButton: true,
+							confirmButtonColor: '#3085d6',
+							cancelButtonColor: '#d33'
+						}).then((result) => {
+							if (result.value) {
+								backup.deleteDocument(title);
+								selectDocuments(backup);
+							}
+						})
+					})
+					
+					$(Swal.getContent()).find('.fa-arrow-down').click(function() {
+						var title = $(this).data('title');
+						Swal.fire({
+							title: '确定要加载吗?',
+							type: 'warning',
+							showCancelButton: true,
+							confirmButtonColor: '#3085d6',
+							cancelButtonColor: '#d33'
+						}).then((result) => {
+							if (result.value) {
+								backup.loadDocument(title);
+							}
+						})
+					})
+				}
+			}
 
-            var docName;
-
-            function backup() {
-                if (!docName) {
-                    async function save() {
-                        const {
-                            value: name
-                        } = await Swal.fire({
-                            title: '标题',
-                            input: 'text',
-                            showCancelButton: true
-                        })
-                        if (name) {
-                            store.addDocument(name, wrapper.editor.getValue());
-                            docName = name;
-                            store.deleteDocument('default');
-                            swal('保存成功');
-                        }
-                    }
-                    save();
-                } else {
-                    store.addDocument(docName, wrapper.editor.getValue());
-                    store.deleteDocument('default');
-                    swal('保存成功');
-                }
-            }
+			function newDocument(backup) {
+				Swal.fire({
+					title: '要打开一篇新文档吗?',
+					type: 'warning',
+					showCancelButton: true,
+					confirmButtonColor: '#3085d6',
+					cancelButtonColor: '#d33'
+				}).then((result) => {
+					if (result.value) {
+						backup.newDocument();
+					}
+				})
+			}
 
             function writeCustomCss() {
                 async function write() {
@@ -2125,120 +2281,6 @@ var EditorWrapper = (function() {
                 write();
             }
 
-            var autoSaveTimer;
-
-            function autoSave() {
-                wrapper.editor.on('change', function() {
-                    if (autoSaveTimer) {
-                        clearTimeout(autoSaveTimer);
-                    }
-                    autoSaveTimer = setTimeout(function() {
-                        if (docName) {
-                            store.addDocument(docName, wrapper.editor.getValue());
-                        } else {
-                            store.addDocument('default', wrapper.editor.getValue());
-                        }
-                    }, getDefault(config.toolbar_autoSaveMs, 500));
-                });
-            }
-
-            function loadLastDocument() {
-                var doc = store.getLastDocument();
-                if (doc != null) {
-                    if (doc.title != 'default')
-                        docName = doc.title;
-                    wrapper.editor.setValue(doc.content);
-                    wrapper.editor.renderAllDoc(0);
-                }
-            }
-
-
-
-
-            function selectDocuments() {
-                var documents = store.getDocuments();
-                for (var i = documents.length - 1; i >= 0; i--) {
-                    if (documents[i].title == 'default') {
-                        documents.splice(i, 1);
-                        break;
-                    }
-                }
-                if (documents.length == 0) {
-                    swal('没有保存的文档');
-                } else {
-                    var html = '<table class="table">';
-                    for (var i = 0; i < documents.length; i++) {
-                        var doc = documents[i];
-                        html += '<tr><td>' + doc.title + '</td><td><i class="fas fa-times" data-title="' + doc.title + '" style="margin-right:20px;cursor:pointer"></i><i data-title="' + doc.title + '" class="fas fa-arrow-down" style=";cursor:pointer"></i></td><tr>';
-                    }
-                    html += '</table>';
-                    swal({
-                        html: html
-                    });
-					$(Swal.getContent()).find('.fa-times').click(function() {
-						var title = $(this).data('title');
-						Swal.fire({
-							title: '确定要删除吗?',
-							type: 'warning',
-							showCancelButton: true,
-							confirmButtonColor: '#3085d6',
-							cancelButtonColor: '#d33'
-						}).then((result) => {
-							if (result.value) {
-								store.deleteDocument(title);
-								if (title == docName) {
-									var doc = store.getLastDocument();
-									docName = undefined;
-									if (doc == null) {
-										wrapper.editor.setValue('');
-									} else {
-										if (doc.title != 'default')
-											docName = doc.title;
-										wrapper.editor.setValue(doc.content);
-									}
-								}
-								selectDocuments();
-							}
-						})
-					})
-					
-					$(Swal.getContent()).find('.fa-arrow-down').click(function() {
-						var title = $(this).data('title');
-						Swal.fire({
-							title: '确定要加载吗?',
-							type: 'warning',
-							showCancelButton: true,
-							confirmButtonColor: '#3085d6',
-							cancelButtonColor: '#d33'
-						}).then((result) => {
-							if (result.value) {
-								var doc = store.getDocument(title);
-								if (doc != null) {
-									docName = doc.title;
-									wrapper.editor.setValue(doc.content);
-								} else {
-									swal('要加载的文档不存在');
-								}
-							}
-						})
-					})
-                }
-            }
-
-            function newDocument() {
-                Swal.fire({
-                    title: '要打开一篇新文档吗?',
-                    type: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
-                    cancelButtonColor: '#d33'
-                }).then((result) => {
-                    if (result.value) {
-                        docName = undefined;
-                        wrapper.editor.setValue('');
-                    }
-                })
-            }
         }
 
         function renderToc() {
@@ -2296,14 +2338,14 @@ var EditorWrapper = (function() {
             };
         }
 		
-		var wrapper;
+		var wrapperInstance = {};
         return {
             create: function(config) {
-				if(wrapper){
-					wrapper.remove();
+				if(wrapperInstance.wrapper){
+					wrapperInstance.wrapper.remove();
 				}
-				wrapper = new EditorWrapper(config)
-                return wrapper;
+				wrapperInstance.wrapper = new EditorWrapper(config)
+                return wrapperInstance.wrapper;
             }
         }
     })();
