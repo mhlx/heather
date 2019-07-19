@@ -36,7 +36,7 @@
 
 	window.onload = function(){
 		setTimeout(function(){
-			Editor.create(document.getElementById("editor"),{render_allowHtml:true},function(wrapper){
+			Editor.create(document.getElementById("editor"),{render_allowHtml:true},function(wrapper,contentWindow){
 				var loading = document.getElementById("loading");
 				loading.parentNode.removeChild(loading);
 				var bg = document.getElementById("bg");

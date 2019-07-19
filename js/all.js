@@ -1,4 +1,32 @@
 var EditorWrapper = (function() {
+	
+	'use strict';
+	CodeMirror.prototype.renderAllDoc = function(scrollToTop) {
+		var editor = this;
+		editor.setOption('readOnly', true);
+		var viewport = editor.getViewport();
+		var lastLine = editor.lineCount() - 1;
+		while (viewport.to < lastLine && viewport.to > 0) {
+			editor.scrollIntoView({
+				line: viewport.to
+			});
+			viewport = editor.getViewport();
+		}
+
+		editor.scrollIntoView({
+			line: lastLine
+		});
+		editor.scrollIntoView({
+			top: scrollToTop
+		});
+		editor.setOption('readOnly', false);
+	}
+
+
+	CodeMirror.keyMap.default["Shift-Tab"] = "indentLess";
+	CodeMirror.keyMap.default["Tab"] = "indentMore";
+	
+	
     function cloneAttributes(element, sourceNode) {
         let attr;
         let attributes = Array.prototype.slice.call(sourceNode.attributes);
@@ -14,36 +42,36 @@ var EditorWrapper = (function() {
     var isUndefined = function(o) {
         return (typeof o == 'undefined')
     }
-	
-	function getDefault(o,dft){
-		return isUndefined(o) ? dft : o;
-	}
+
+    function getDefault(o, dft) {
+        return isUndefined(o) ? dft : o;
+    }
 
     var Render = (function() {
-        'use strict';
 
-        function MarkdownRender(config) {
+        function MarkdownRender(config, theme) {
+            var plugins = ['footnote', 'katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'];
             this.md = createMarkdownParser({
                 html: config.render_allowHtml !== false,
-                plugins: config.render_plugins || ['footnote', 'katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'],
+                plugins: config.render_plugins || plugins,
                 lineNumber: true
             });
-			this.md2 = createMarkdownParser({
+            this.md2 = createMarkdownParser({
                 html: config.render_allowHtml !== false,
-                plugins: config.render_plugins || ['footnote', 'katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'],
+                plugins: config.render_plugins || plugins,
                 lineNumber: false
             });
             this.config = config;
-            this.eventHandlers = [];
+            this.theme = theme;
         }
 
         var mermaidLoading = false;
 
-        function loadMermaid() {
+        function loadMermaid(theme, config) {
             if (mermaidLoading) return;
             mermaidLoading = true;
             $('<script>').appendTo('body').attr({
-                src: 'js/mermaid.min.js'
+                src: config.res_mermaid_js || 'js/mermaid.min.js'
             });
             var t = setInterval(function() {
                 try {
@@ -52,24 +80,22 @@ var EditorWrapper = (function() {
                     });
                     clearInterval(t);
                     mermaid.init({}, '#out .mermaid');
-                } catch (e) {
-
-                }
+                } catch (e) {}
             }, 20)
         }
 
         var katexLoading = false;
 
-        function loadKatex() {
+        function loadKatex(config) {
             if (katexLoading) return;
             katexLoading = true;
             $('<link>').appendTo('head').attr({
                 type: 'text/css',
                 rel: 'stylesheet',
-                href: 'katex/katex.min.css'
+                href: config.res_katex_css || 'katex/katex.min.css'
             });
             $('<script>').appendTo('body').attr({
-                src: 'katex/katex.min.js'
+                src: config.res_katex_js || 'katex/katex.min.js'
             });
             var t = setInterval(function() {
                 try {
@@ -91,19 +117,19 @@ var EditorWrapper = (function() {
             }, 20)
         }
 
-		MarkdownRender.prototype.getHtml = function(markdownText){
-			return this.md2.render(markdownText);
-		}
+        MarkdownRender.prototype.getHtml = function(markdownText) {
+            return this.md2.render(markdownText);
+        }
 
         MarkdownRender.prototype.renderAt = function(markdownText, element, patch) {
             var doc = $.parseHTML2(this.md.render(markdownText));
             var hasMermaid = doc.querySelector('.mermaid') != null;
             if (hasMermaid) {
-                loadMermaid();
+                loadMermaid(this.theme, this.config);
             }
             var hasKatex = doc.querySelector(".katex") != null;
             if (hasKatex) {
-                loadKatex()
+                loadKatex(this.config)
             }
             if (this.config.render_beforeRender) {
                 this.config.render_beforeRender(doc);
@@ -136,22 +162,22 @@ var EditorWrapper = (function() {
             }
             try {
                 mermaid.initialize({
-                    theme: theme.mermaid.theme || 'default'
+                    theme: this.theme.mermaid.theme || 'default'
                 });
                 mermaid.init({}, '#out .mermaid');
             } catch (e) {}
         }
 
         return {
-            create: function(config) {
-                return new MarkdownRender(config)
+            create: function(config, theme) {
+                return new MarkdownRender(config, theme)
             }
         }
     })();
 
 
     var Bar = (function() {
-        'use strict';
+        
 
         function Bar(element, config) {
             this.element = $(element);
@@ -240,7 +266,7 @@ var EditorWrapper = (function() {
 
 
     var Sync = (function(editor) {
-        'use strict';
+        
 
         function Sync(editor, scrollElement, config) {
             this.editor = editor;
@@ -330,204 +356,194 @@ var EditorWrapper = (function() {
     })();
 
 
-    EditorWrapper = (function() {
+    var EditorWrapper = (function() {
 
         var mobile = CodeMirror.browser.mobile;
         var ios = CodeMirror.browser.ios;
-
-        CodeMirror.prototype.renderAllDoc = function(scrollToTop) {
-            var editor = this;
-            editor.setOption('readOnly', true);
-            var viewport = editor.getViewport();
-            var lastLine = editor.lineCount() - 1;
-            while (viewport.to < lastLine && viewport.to > 0) {
-                editor.scrollIntoView({
-                    line: viewport.to
-                });
-                viewport = editor.getViewport();
+		
+        var Theme = (function() {
+            function Theme(config) {
+                this.toolbar = {};
+                this.bar = {};
+                this.stat = {};
+                this.editor = {};
+                this.inCss = {};
+                this.searchHelper = {};
+                this.mermaid = {};
+                this.hljs = {
+                    theme: 'github'
+                };
+                this.customCss = undefined;
+                this.timer = undefined;
+                this.config = config;
             }
 
-            editor.scrollIntoView({
-                line: lastLine
-            });
-            editor.scrollIntoView({
-                top: scrollToTop
-            });
-            editor.setOption('readOnly', false);
-        }
+            var themeKey = "markdown-editor-theme";
 
+            function saveTheme(theme, cb) {
+                var json = JSON.stringify(theme);
+                try {
+                    localStorage.setItem(themeKey, json);
+                    if (cb) cb("success");
+                } catch (e) {
+                    if (cb) cb("fail");
+                }
+            }
 
-        CodeMirror.keyMap.default["Shift-Tab"] = "indentLess";
-        CodeMirror.keyMap.default["Tab"] = "indentMore";
+            function getTheme(cb) {
+                if (!cb) return;
+                var json = localStorage.getItem(themeKey);
+                if (json == null) {
+                    cb(null)
+                } else {
+                    cb($.parseJSON(json));
+                }
+
+            }
+
+            function delTheme(cb) {
+                try {
+                    localStorage.removeItem(themeKey);
+                    if (cb) cb("success");
+                } catch (e) {
+                    if (cb) cb("fail");
+                }
+            }
+
+            Theme.prototype.store = function(callback) {
+                if (this.timer) {
+                    clearTimeout(this.timer);
+                }
+                var theme = this;
+                this.timer = setTimeout(function() {
+                    saveTheme(theme, function(cb) {
+                        if (callback) callback(cb == "success" ? true : false);
+                    });
+                }, 500)
+            }
+
+            Theme.prototype.reset = function() {
+                var theme = new Theme();
+                saveTheme(theme);
+                theme.render();
+                return theme;
+            }
+
+            Theme.prototype.clone = function() {
+                var copy = JSON.parse(JSON.stringify(this));
+                var theme = new Theme();
+                theme.toolbar = copy.toolbar;
+                theme.bar = copy.bar;
+                theme.stat = copy.stat;
+                theme.editor = copy.editor;
+                theme.inCss = copy.inCss;
+                theme.cursorHelper = copy.cursorHelper;
+                theme.searchHelper = copy.searchHelper;
+                theme.mermaid = copy.mermaid;
+                theme.customCss = copy.customCss;
+                return theme;
+            }
+
+            var getCurrentTheme = function(config) {
+                var current;
+                getTheme(function(cb) {
+                    current = cb
+                });
+                if (!current || current == null) {
+                    return new Theme(config);
+                }
+                var theme = new Theme(config);
+                theme.toolbar = current.toolbar;
+                theme.bar = current.bar;
+                theme.stat = current.stat;
+                theme.editor = current.editor;
+                theme.inCss = current.inCss;
+                theme.cursorHelper = current.cursorHelper;
+                theme.searchHelper = current.searchHelper;
+                theme.mermaid = current.mermaid;
+                theme.customCss = current.customCss;
+                return theme;
+            }
+			
+            function loadHljsTheme(theme) {
+                if (theme.hljs.theme) {
+                    var hljsTheme = theme.hljs.theme;
+                    var hljsThemeFunction = theme.config.res_hljsTheme || function(hljsTheme) {
+                        return 'highlight/styles/' + hljsTheme + '.css';
+                    }
+                    if ($('hljs-theme-' + hljsTheme + '').length == 0) {
+                        $('<link id="hljs-theme-' + hljsTheme + '" >').appendTo('head').attr({
+                            type: 'text/css',
+                            rel: 'stylesheet',
+                            href: hljsThemeFunction(hljsTheme)
+                        })
+                    }
+                }
+            }
+
+            Theme.prototype.render = function() {
+				loadEditorTheme(this);
+                loadHljsTheme(this);
+                var css = "";
+                css += "#toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
+                css += "#innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
+                css += "#stat{color:" + (this.stat.color || 'inherit') + "}\n";
+                css += "#in{background:" + (this.inCss.background || 'inherit') + "}\n";
+				var searchHelperColor = (this.searchHelper.color || 'inherit');
+                css += "#searchHelper{color:" + searchHelperColor + "}\n#searchHelper input{color:" + searchHelperColor + "}\n#searchHelper .input-group-text{color:" + searchHelperColor + "}\n#searchHelper input::placeholder {color: "+searchHelperColor+";opacity: 1;}\n#searchHelper input::-ms-input-placeholder {color: "+searchHelperColor+";}\n#searchHelper input::-ms-input-placeholder {color: "+searchHelperColor+";}";                             
+
+			   $("#custom_theme").remove();
+                if ($.trim(css) != '') {
+                    $("head").append("<style type='text/css' id='custom_theme'>" + css + "</style>");
+                }
+                $("#custom_css").remove();
+                $("head").append("<style type='text/css' id='custom_css'>" + (this.customCss || '') + "</style>");
+            }
+			
+            return {
+                current: function(config) {
+                    return getCurrentTheme(config)
+                }
+            };
+        })();
 		
-		var theme = (function(){
-			function Theme(){
-				this.toolbar = {};
-				this.bar = {};
-				this.stat = {};
-				this.editor = {};
-				this.inCss = {};
-				this.searchHelper = {};
-				this.mermaid = {};
-				this.hljs = {theme:'github'};
-				this.customCss = undefined;
-				this.timer = undefined;
-			}
-			
-			var themeKey = "markdown-editor-theme";
-			function saveTheme(theme,cb){
-				var json = JSON.stringify(theme);
-				try{localStorage.setItem(themeKey,json);
-				if(cb) cb("success");
-				}catch(e){
-				if(cb) cb("fail");
+		 function loadEditorTheme(theme,callback) {
+			if (theme.editor.theme) {
+				var editorTheme = theme.editor.theme;
+				var editorThemeFunction = theme.config.res_editorTheme || function(editorTheme) {
+					return 'codemirror/theme/' + editorTheme + '.css';
+				}
+				if ($('#codemirror-theme-' + editorTheme + '').length == 0) {
+					$('<link id="codemirror-theme-' + editorTheme + '" >').appendTo('head').attr({
+						type: 'text/css',
+						rel: 'stylesheet',
+						onload:function(){
+							if(callback){callback(editorTheme)}
+						},
+						href: editorThemeFunction(editorTheme)
+					})
+				} else {
+					if(callback){callback(editorTheme)}
 				}
 			}
-			function getTheme(cb){
-				if(!cb) return ;
-				var json = localStorage.getItem(themeKey);
-				if(json == null ){
-					cb(null)
-				}else{
-					cb($.parseJSON(json));
-				}
-					
-			}
-			function delTheme(cb){
-				try{
-					localStorage.removeItem(themeKey);
-					if(cb) cb("success");
-				}catch(e){if(cb) cb("fail");
-				}
-			}
-			
-			Theme.prototype.store = function(callback){
-				if(this.timer){
-					clearTimeout(this.timer);
-				}
-				var theme = this;
-				this.timer = setTimeout(function(){	
-					saveTheme(theme,function(cb){
-						if(callback) callback(cb == "success" ? true : false);
-					});
-				},500)
-			}
-			
-			Theme.prototype.reset = function(){
-				var theme = new Theme();
-				saveTheme(theme);
-				theme.render();
-				return theme;
-			}
-			
-			Theme.prototype.clone = function(){
-				var copy = JSON.parse(JSON.stringify(this));
-				var theme = new Theme();
-				theme.toolbar = copy.toolbar;
-				theme.bar = copy.bar;
-				theme.stat = copy.stat;
-				theme.editor = copy.editor;
-				theme.inCss = copy.inCss;
-				theme.cursorHelper = copy.cursorHelper;
-				theme.searchHelper = copy.searchHelper;
-				theme.mermaid = copy.mermaid;
-				theme.customCss = copy.customCss;
-				return theme;
-			}
-			
-			var getCurrentTheme = function(){
-				var current;
-				getTheme(function(cb){
-					current = cb
-				});
-				if(!current || current == null){
-					return new Theme();
-				}
-				var theme = new Theme();
-				theme.toolbar = current.toolbar;
-				theme.bar = current.bar;
-				theme.stat = current.stat;
-				theme.editor = current.editor;
-				theme.inCss = current.inCss;
-				theme.cursorHelper = current.cursorHelper;
-				theme.searchHelper = current.searchHelper;
-				theme.mermaid = current.mermaid;
-				theme.customCss = current.customCss;
-				return theme;
-			}
-			
-			Theme.prototype.loadEditorTheme = function(onLoad){
-				if(this.editor.theme){
-					var editorTheme = this.editor.theme;
-					var loadHandler = function(theme){
-						onLoad(theme);
-					}
-					if($('head link[href="codemirror/theme/'+editorTheme+'.css"]').length == 0){
-						$('<link id="codemirror-theme-'+editorTheme+'" >').appendTo('head').attr({
-						  type: 'text/css', 
-						  rel: 'stylesheet',
-						  onload:function(){
-							  loadHandler(editorTheme);
-						  },
-						  href: 'codemirror/theme/'+editorTheme+'.css'
-					   })
-					}else{
-						loadHandler(editorTheme);
-					}
-				}
-			}
-			
-			Theme.prototype.loadHljsTheme = function(onLoad){
-				if(this.hljs.theme){
-					var hljsTheme = this.hljs.theme;
-					var loadHandler = function(theme){
-						onLoad(theme);
-					}
-					if($('head link[href="highlight/styles/'+hljsTheme+'.css"]').length == 0){
-						$('<link id="hljs-theme-'+hljsTheme+'" >').appendTo('head').attr({
-						  type: 'text/css', 
-						  rel: 'stylesheet',
-						  onload:function(){
-							  loadHandler(hljsTheme);
-						  },
-						  href: 'highlight/styles/'+hljsTheme+'.css'
-					   })
-					}else{
-						loadHandler(hljsTheme);
-					}
-				}
-			}
-			
-			
-			Theme.prototype.render = function(pro){
-				var css = "";
-				css += "#toolbar{color:"+(this.toolbar.color || 'inherit')+"}\n";
-				css += "#innerBar{color:"+(this.bar.color || 'inherit')+"}\n"
-				css += "#stat{color:"+(this.stat.color || 'inherit')+"}\n";
-				css += "#in{background:"+(this.inCss.background || 'inherit')+"}\n";
-				css += "#searchHelper{color:"+(this.searchHelper.color || 'inherit')+"}\n#searchHelper input{color:"+(this.searchHelper.color || 'inherit')+"}\n\n#searchHelper .input-group-text{background:#fff;color:"+(this.searchHelper.color || 'inherit')+"}\n";
-				if(this.customCss){
-					css += this.customCss;
-				}
-				var theme = this;
-				this.loadEditorTheme(function(theme){
-					if(pro && pro.editorThemeLoad){pro.editorThemeLoad(theme)}
-				})
-				this.loadHljsTheme(function(theme){
-					if(pro && pro.hljsThemeLoad){pro.hljsThemeLoad(theme)}
-				})
-				$("#custom_theme").remove();
-				if($.trim(css) != ''){
-					$("head").append("<style type='text/css' id='custom_theme'>"+css+"</style>");
-				}
-			}
-			
-			return getCurrentTheme();
-		})();
-		
-		theme.render();
+		}
+
 
         function EditorWrapper(config) {
+			var html = '<div id="wrapper">';
+			html += '<div id="toc" class="noprint">';
+			html += '</div>' ;
+			html += '<div id="in" class="noprint">' ;
+			html += '<div id="toolbar" class="noprint"></div>' ;
+			html += '<textarea  style="width: 100%; height: 100%"></textarea>' ;
+			html += '<div id="stat" class="noprint"></div>' ;
+			html += '<div id="innerBar"></div>' ;
+			html += '</div>' ;
+			html += '<div class="markdown-body " id="out" ></div>';	
+			html += '</div>' ;
+			var $wrapperElement = $(html);
+			$('body').append($wrapperElement);
+			this.wrapperElement = $wrapperElement[0]
             if (!mobile) {
                 $("#in").show();
                 $("#out").css({
@@ -537,25 +553,25 @@ var EditorWrapper = (function() {
             $("#wrapper").animate({
                 scrollLeft: $("#toc").outerWidth()
             }, 0);
+
+			this.eventHandlers = [];
+            var theme = Theme.current(config);
+            theme.render();
             var scrollBarStyle = mobile ? 'native' : 'overlay';
-            var editorTheme = theme.editor.theme ? theme.editor.theme : 'default';
-            var editor = CodeMirror.fromTextArea(document.getElementById('code'), {
-                mode: {
-                    name: "gfm"
-                },
+            var editor = CodeMirror.fromTextArea(document.getElementById('wrapper').querySelector('textarea'), {
+                mode: {name: "gfm"},
                 lineNumbers: false,
                 matchBrackets: true,
                 lineWrapping: true,
                 dragDrop: true,
                 scrollbarStyle: scrollBarStyle,
-                theme: editorTheme,
+                theme: theme.editor.theme || 'default',
                 styleSelectedText: true,
                 extraKeys: {
-                    "Enter": "newlineAndIndentContinueMarkdownList",
-                    "Alt-F": "findPersistent",
-                    "Ctrl-A": "selectAll"
+                    "Enter": "newlineAndIndentContinueMarkdownList"
                 }
             });
+			
             var turndownService = config.turndownService;
 
             if (!turndownService) {
@@ -589,9 +605,13 @@ var EditorWrapper = (function() {
                     return "";
                 });
             }
-
+            $("#wrapper").on('DOMSubtreeModified', '#custom_css', function() {
+                theme.customCss = this.textContent;
+                theme.store();
+            })
+            this.theme = theme;
             this.sync = Sync.create(editor, $("#out")[0], config);
-            this.render = Render.create(config);
+            this.render = Render.create(config, theme);
             this.toolbar = Bar.create($("#toolbar")[0]);
             var innerBar = Bar.create($("#innerBar")[0]);
             innerBar.hide();
@@ -600,7 +620,7 @@ var EditorWrapper = (function() {
             var wrapper = this;
             if (!mobile) {
                 //auto render
-                var ms =  getDefault(config.render_ms,500);
+                var ms = getDefault(config.render_ms, 500);
                 var autoRenderTimer;
                 var stat_timer;
                 editor.on('change', function() {
@@ -634,7 +654,7 @@ var EditorWrapper = (function() {
                     editor.on('scroll', scrollHandler);
                     editor.on('update', function handler() {
                         editor.off('update', handler);
-                        editor.renderAllDoc();
+                        editor.renderAllDoc(0);
                     });
                 }
                 this.syncEnable = syncEnable;
@@ -686,19 +706,96 @@ var EditorWrapper = (function() {
                 }, 500)
             })
             this.editor = editor;
-			this.theme = theme;
-			this.config = config;
+            this.config = config;
             initInnerBar(this);
             initToolbar(this);
+			this.fullscreen = false;
+            if (screenfull.enabled) {
+				//TODO check remove
+                screenfull.on('change', function() {
+					wrapper.fullscreen = screenfull.isFullscreen;
+                    changeStyleWhenFullScreenChange(wrapper, screenfull.isFullscreen);
+					
+					if(!screenfull.isFullscreen){
+						wrapper.toEditor(undefined,0);
+						wrapper.doSync();
+					}
+                });
+            }
+        }
+
+        function changeStyleWhenFullScreenChange(wrapper, isFullscreen) {
+            if (!CodeMirror.browser.mobile) {
+                var cm = wrapper.editor;
+                var wrap = cm.getWrapperElement();
+                if (isFullscreen) {
+                    $(wrapper.getFullScreenElement()).addClass('fullscreen');
+                    //from CodeMirror display fullscreen.js
+                    cm.state.fullScreenRestore = {
+                        scrollTop: window.pageYOffset,
+                        scrollLeft: window.pageXOffset,
+                        width: wrap.style.width,
+                        height: wrap.style.height
+                    };
+                    wrap.style.width = "";
+                    wrap.style.height = "auto";
+                    wrap.className += " CodeMirror-fullscreen";
+                    document.documentElement.style.overflow = "hidden";
+                    cm.refresh();
+                } else {
+                    $(wrapper.getFullScreenElement()).removeClass('fullscreen');
+                    wrap.className = wrap.className.replace(/\s*CodeMirror-fullscreen\b/, "");
+                    document.documentElement.style.overflow = "";
+                    var info = cm.state.fullScreenRestore;
+                    wrap.style.width = info.width;
+                    wrap.style.height = info.height;
+                    window.scrollTo(info.scrollLeft, info.scrollTop);
+                    cm.refresh();
+                }
+            }
         }
 
         EditorWrapper.prototype.doRender = function(patch) {
             this.render.renderAt(this.editor.getValue(), $("#out")[0], patch);
             renderToc();
         }
-
+		
+		EditorWrapper.prototype.remove = function(patch) {
+			for(var i=0;i<this.eventHandlers.length;i++){
+				var evtHandler= this.eventHandlers[i];
+				if(evtHandler.name == 'remove'){
+					try{
+						evtHandler.handler(this);
+					}catch(e){}
+				}
+			}
+            $(this.getFullScreenElement()).removeClass('fullscreen');
+            $("#wrapper").remove();
+			wrapper = undefined;
+        }
+		
         EditorWrapper.prototype.doSync = function() {
             this.sync.doSync();
+        }
+		
+		EditorWrapper.prototype.requestFullScreen = function() {
+            if(!mobile){
+				 if (screenfull.enabled) {
+					screenfull.request(this.getFullScreenElement());
+				} else {
+					swal("当前浏览器不支持全屏模式")
+				}
+			}
+        }
+		
+		EditorWrapper.prototype.getFullScreenElement = function() {
+            return document.body;
+        }
+		
+		EditorWrapper.prototype.exitFullScreen  = function() {
+			if(!mobile && screenfull.enabled){
+				screenfull.exit();
+			}
         }
 
         EditorWrapper.prototype.enableSync = function() {
@@ -707,8 +804,8 @@ var EditorWrapper = (function() {
                 this.syncEnable = true;
             }
         }
-		
-		EditorWrapper.prototype.getHtml = function() {
+
+        EditorWrapper.prototype.getHtml = function() {
             return this.render.getHtml(this.editor.getValue());
         }
 
@@ -719,8 +816,8 @@ var EditorWrapper = (function() {
             }
         }
 
-        EditorWrapper.prototype.toEditor = function(callback) {
-            var ms = getDefault(this.config.swipe_animateMs,500);
+        EditorWrapper.prototype.toEditor = function(callback,_ms) {
+            var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
             if (mobile) {
                 $("#wrapper").animate({
                     scrollLeft: $("#in").width()
@@ -737,12 +834,12 @@ var EditorWrapper = (function() {
         }
 
 
-        EditorWrapper.prototype.toToc = function(callback) {
+        EditorWrapper.prototype.toToc = function(callback,_ms) {
             this.editor.getInputField().blur();
             if (mobile) {
                 this.doRender(true);
             }
-            var ms = getDefault(this.config.swipe_animateMs,500);
+            var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
             $("#wrapper").animate({
                 scrollLeft: 0
             }, ms, function() {
@@ -750,12 +847,12 @@ var EditorWrapper = (function() {
             });
         }
 
-        EditorWrapper.prototype.toPreview = function(callback) {
+        EditorWrapper.prototype.toPreview = function(callback,_ms) {
             if (mobile) {
                 this.editor.getInputField().blur();
                 this.doRender(true);
                 this.doSync();
-				var ms = getDefault(this.config.swipe_animateMs,500);
+				var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
                 $("#wrapper").animate({
                     scrollLeft: $("#out")[0].offsetLeft
                 }, ms, function() {
@@ -769,16 +866,16 @@ var EditorWrapper = (function() {
         function initInnerBar(wrapper) {
             var innerBar = wrapper.innerBar;
             var editor = wrapper.editor;
-			var config = wrapper.config;
+            var config = wrapper.config;
 
             var innerBarElement = $("#innerBar");
-            var icons = config.innerBar_icons || ['emoji','heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table', 'undo', 'redo', 'close'];
+            var icons = config.innerBar_icons || ['emoji', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table', 'undo', 'redo', 'close'];
             var ios = CodeMirror.browser.ios;
             for (var i = 0; i < icons.length; i++) {
                 var icon = icons[i];
-				if (icon == 'emoji'){
-					addEmoji();
-				}
+                if (icon == 'emoji') {
+                    addEmoji();
+                }
                 if (icon == 'heading') {
                     addHeading();
                 }
@@ -822,31 +919,31 @@ var EditorWrapper = (function() {
                     addTable();
                 }
             }
-			
-			function addEmoji(){
-				innerBar.addIcon('far fa-grin-alt icon', function() {
-					var emojiArray = config.emojiArray || $.trim("😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 ☺️ 🙂 🤗 🤔 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🤑 😲 ☹️ 🙁 😖 😞 😟 😤 😢 😭 😦 😧 😨 😩 😬 😰 😱 😳 😵 😡 😠 😷 🤒 🤕 🤢 🤧 😇 🤠 🤡 🤥 🤓 😈 👿 👹 👺 💀 👻 👽 🤖 💩 😺 😸 😹 😻 😼 😽 🙀 😿 😾").split(' ');
-					var html = '';
-					for (var i = 0; i < emojiArray.length; i++) {
-						html += '<span data-emoji style="cursor:pointer">' + emojiArray[i]
-						+ '</span>';
-					}
-					swal({
-						html : html
-					})
-					$(Swal.getContent()).find('[data-emoji]').click(function(){
-						var emoji = $(this).text();
-						var text = editor.getSelection();
-						if (text == '') {
-							editor.replaceRange(emoji, editor.getCursor());
-						} else {
-							editor.replaceSelection(emoji);
-						}
-						Swal.close();
-					})
-				});
-				
-			}
+
+            function addEmoji() {
+                innerBar.addIcon('far fa-grin-alt icon', function() {
+                    var emojiArray = config.emojiArray || $.trim("😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 ☺️ 🙂 🤗 🤔 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🤑 😲 ☹️ 🙁 😖 😞 😟 😤 😢 😭 😦 😧 😨 😩 😬 😰 😱 😳 😵 😡 😠 😷 🤒 🤕 🤢 🤧 😇 🤠 🤡 🤥 🤓 😈 👿 👹 👺 💀 👻 👽 🤖 💩 😺 😸 😹 😻 😼 😽 🙀 😿 😾").split(' ');
+                    var html = '';
+                    for (var i = 0; i < emojiArray.length; i++) {
+                        html += '<span data-emoji style="cursor:pointer">' + emojiArray[i] +
+                            '</span>';
+                    }
+                    swal({
+                        html: html
+                    })
+                    $(Swal.getContent()).find('[data-emoji]').click(function() {
+                        var emoji = $(this).text();
+                        var text = editor.getSelection();
+                        if (text == '') {
+                            editor.replaceRange(emoji, editor.getCursor());
+                        } else {
+                            editor.replaceSelection(emoji);
+                        }
+                        Swal.close();
+                    })
+                });
+
+            }
 
             function addHeading() {
                 innerBar.addIcon('fas fa-heading icon', function() {
@@ -1091,18 +1188,16 @@ var EditorWrapper = (function() {
                 innerBar.addIcon('fas fa-table icon', function() {
                     innerBar.hide();
                     swal({
-                        html: '<input id="swal-input1" class="swal2-input" placeholder="行">' +
-                            '<input id="swal-input2" class="swal2-input" placeholder="列">',
+                        html: '<input class="swal2-input" placeholder="行">' +
+                            '<input class="swal2-input" placeholder="列">',
                         preConfirm: function() {
                             return new Promise(function(resolve) {
+								var inputs = $(Swal.getContent()).find('input');
                                 resolve([
-                                    $('#swal-input1').val(),
-                                    $('#swal-input2').val()
+                                    inputs.eq(0).val(),  
+									inputs.eq(1).val()
                                 ])
                             })
-                        },
-                        onOpen: function() {
-                            $('#swal-input1').focus()
                         }
                     }).then(function(result) {
                         var value = result.value;
@@ -1147,7 +1242,6 @@ var EditorWrapper = (function() {
 
             var keyboardTimer;
             var mobileCursorActivityHandler = function(bar) {
-                $("html, body").scrollTop(0);
                 var lh = editor.defaultTextHeight();
                 var top = editor.cursorCoords(true, 'local').top;
                 var scrollTo = top -
@@ -1252,29 +1346,28 @@ var EditorWrapper = (function() {
                     }
                     var applyAfterResize = function() {
                         if (!ios && originalPotion !== false) {
-                            var wasWithKeyboard = $('body').hasClass('view-withKeyboard');
+                            var wasWithKeyboard = $(wrapper.wrapperElement).hasClass('view-withKeyboard');
                             var nowWithKeyboard = false;
                             var diff = Math.abs(originalPotion - ($(window).width() + $(window).height()));
                             if (diff > 100) nowWithKeyboard = true;
-                            $('body').toggleClass('view-withKeyboard', nowWithKeyboard);
+                            $(wrapper.wrapperElement).toggleClass('view-withKeyboard', nowWithKeyboard);
                             if (wasWithKeyboard != nowWithKeyboard) {
                                 onKeyboardOnOff(nowWithKeyboard);
                             }
                         }
                     }
+					
+					wrapper.eventHandlers.push({name:'remove',handler:function(){
+						 $(window).off('resize orientationchange', applyAfterResize);
+					}})
 
-                    $(window).on('resize orientationchange', function() {
-                        applyAfterResize();
-                    });
+                    $(window).on('resize orientationchange', applyAfterResize);
 
                     return {
                         isOpen: keyboardOpen
                     }
                 })();
 
-                editor.on('scroll', function() {
-                    $("html, body").scrollTop(0);
-                })
                 editor.on('cursorActivity', function() {
                     mobileCursorActivityHandler(innerBar);
                 });
@@ -1286,9 +1379,9 @@ var EditorWrapper = (function() {
 
         function initToolbar(wrapper) {
             var editor = wrapper.editor;
-			var theme = wrapper.theme;
+            var theme = wrapper.theme;
             var cm = editor;
-			var config = wrapper.config;
+            var config = wrapper.config;
             ////////////////////store 
             var Store = (function() {
                 function Store(key) {
@@ -1360,6 +1453,7 @@ var EditorWrapper = (function() {
                     }
                 }
             })();
+
             var themeMode = (function() {
                 var toolbarHandler = function(e) {
                     if ($(e.target).hasClass('fa-cog')) {
@@ -1464,10 +1558,11 @@ var EditorWrapper = (function() {
                         });
                         if (_theme) {
                             theme.editor.theme = _theme;
-                            theme.loadEditorTheme(function(_theme) {
+							theme.render();
+                            loadEditorTheme(theme,function(_theme) {
                                 setTimeout(function() {
                                     editor.setOption("theme", _theme);
-                                    var bgColor = window.getComputedStyle(document.body.querySelector('.CodeMirror'), null).getPropertyValue('background-color');
+                                    var bgColor = window.getComputedStyle(editor.getWrapperElement(), null).getPropertyValue('background-color');
                                     theme.inCss.background = bgColor;
                                     theme.render();
                                     theme.store();
@@ -1519,11 +1614,11 @@ var EditorWrapper = (function() {
                         id: 'colorpicker-css',
                         type: 'text/css',
                         rel: 'stylesheet',
-                        href: 'colorpicker/dist/css/bootstrap-colorpicker.min.css'
+                        href: config.res_colorpickerCss || 'colorpicker/dist/css/bootstrap-colorpicker.min.css'
                     });
                     $('<script>').appendTo('body').attr({
                         id: 'colorpicker-js',
-                        src: 'colorpicker/dist/js/bootstrap-colorpicker.min.js'
+                        src: config.res_colorpickerJs || 'colorpicker/dist/js/bootstrap-colorpicker.min.js'
                     });
                     editor.setOption('readOnly', true);
                     $("#searchHelper input").attr('value', '点击设置字体颜色');
@@ -1569,12 +1664,13 @@ var EditorWrapper = (function() {
                         const {
                             value: color
                         } = await Swal.fire({
-                            html: '<div id="colorpicker"></div>',
+                            html: '<div></div>',
                             showCancelButton: true
                         });
                     }
                     getColor();
-                    $('#colorpicker').colorpicker({
+					var colorpickerElement = $(Swal.getContent()).find('div');
+                    colorpickerElement.colorpicker({
                         inline: true,
                         container: true,
                         template: '<div class="colorpicker">' +
@@ -1587,9 +1683,9 @@ var EditorWrapper = (function() {
                             '</div>'
                     });
                     if (currentColor) {
-                        $('#colorpicker').colorpicker('setValue', currentColor);
+                        colorpickerElement.colorpicker('setValue', currentColor);
                     }
-                    $('#colorpicker').on('colorpickerChange', function(event) {
+                    colorpickerElement.on('colorpickerChange', function(event) {
                         if (event.color && callback) {
                             callback(event.color.toString());
                         }
@@ -1617,24 +1713,24 @@ var EditorWrapper = (function() {
                 html += '<div style="width:100%;text-align:right;margin-bottom:5px"><i class="fas fa-times icon"  style="cursor:pointer;margin-right:0px"></i></div>';
                 html += ' <form>';
                 html += '<div class="input-group mb-3">';
-                html += '<input type="text" style="outline: 0;border-width: 0 0 2px;" class="form-control" placeholder="查找内容" >';
+                html += '<input type="text" style="border:none" class="form-control" placeholder="查找内容" >';
                 html += '<div class="input-group-append" data-search>';
-                html += ' <span class="input-group-text" style="outline: 0;border-width: 0 0 2px;"><i class="fas fa-search " style="cursor:pointer"></i></span>';
+                html += ' <span class="input-group-text" ><i class="fas fa-search " style="cursor:pointer"></i></span>';
                 html += ' </div>';
                 html += '</div>';
                 html += '<div class="input-group mb-3" style="display:none">';
-                html += '<input type="text" style="outline: 0;border-width: 0 0 2px;" class="form-control" placeholder="替换内容" >';
+                html += '<input type="text" style="border:none" class="form-control" placeholder="替换内容" >';
                 html += '<div class="input-group-append" data-replace style="cursor:pointer">';
-                html += ' <span class="input-group-text" style="outline: 0;border-width: 0 0 2px;"><i class="fas fa-exchange-alt" ></i></span>';
+                html += ' <span class="input-group-text" ><i class="fas fa-exchange-alt" ></i></span>';
                 html += ' </div>';
                 html += '<div class="input-group-append" data-replace-all style="cursor:pointer">';
-                html += ' <span class="input-group-text" style="outline: 0;border-width: 0 0 2px;"><i class="fas fa-sync-alt" ></i></span>';
+                html += ' <span class="input-group-text" ><i class="fas fa-sync-alt" ></i></span>';
                 html += ' </div>';
                 html += '<div class="input-group-append" data-up style="cursor:pointer">';
-                html += ' <span class="input-group-text" style="outline: 0;border-width: 0 0 2px;"><i class="fas fa-arrow-up" ></i></span>';
+                html += ' <span class="input-group-text" ><i class="fas fa-arrow-up" ></i></span>';
                 html += ' </div>';
                 html += '<div class="input-group-append" data-down style="cursor:pointer">';
-                html += ' <span class="input-group-text" style="outline: 0;border-width: 0 0 2px;"><i class="fas fa-arrow-down" ></i></span>';
+                html += ' <span class="input-group-text" ><i class="fas fa-arrow-down" ></i></span>';
                 html += ' </div>';
                 html += '</div>';
                 html += '</form>';
@@ -1662,7 +1758,6 @@ var EditorWrapper = (function() {
                     ele.find('input').val('');
                     ele.find(".input-group").eq(0).show();
                     ele.find(".input-group").eq(1).hide();
-                    innerBar.keepHidden = false;
                     editor.setOption('readOnly', false)
                 });
 
@@ -1873,12 +1968,12 @@ var EditorWrapper = (function() {
             })();
 
             var configIcon;
-            var icons = config.toolbar_icons || ['toc', 'innerBar', 'backup', 'new', 'search', 'config'];
+            var icons = config.toolbar_icons || ['toc', 'innerBar', 'backup', 'new', 'search', 'config', 'expand'];
             var store;
             for (var i = 0; i < icons.length; i++) {
                 var icon = icons[i];
                 if (icon == 'toc') {
-                    wrapper.toolbar.addIcon('fas fa-book icon mobile-hide', function() {
+                    wrapper.toolbar.addIcon('fas fa-book icon mobile-hide nofullscreen', function() {
                         toggleToc();
                     });
                 }
@@ -1892,15 +1987,13 @@ var EditorWrapper = (function() {
                 }
 
                 if (icon == 'new') {
-                    wrapper.toolbar.addIcon('far fa-file icon', function(ele) {
+                    wrapper.toolbar.addIcon('far fa-file icon nofullscreen', function(ele) {
                         newDocument();
                     });
                 }
 
                 if (icon == 'search') {
                     wrapper.toolbar.addIcon('fas fa-search icon', function() {
-                        innerBar.keepHidden = true;
-                        innerBar.hide();
                         editor.setOption('readOnly', true)
                         searchHelper.show();
                     });
@@ -1910,18 +2003,19 @@ var EditorWrapper = (function() {
                     store = Store.create('markdown-documents');
                     loadLastDocument();
                     autoSave();
-                    wrapper.toolbar.addIcon('fas icon fa-upload', function(ele) {
+                    wrapper.toolbar.addIcon('fas icon fa-upload ', function(ele) {
                         backup();
                     });
-                    wrapper.toolbar.addIcon('fas icon fa-download', function(ele) {
+                    wrapper.toolbar.addIcon('fas icon fa-download ', function(ele) {
                         selectDocuments();
                     });
                 }
 
                 if (icon == 'config') {
-                    wrapper.toolbar.addIcon('fas icon fa-cog', function() {
-                        swal({
-                            html: '<input type="checkbox"  />主题编辑模式 <p style="margin-top:0.5rem"><button style="margin-bottom:0.5rem" class="alert alert-info">自定义css</button></p>'
+                    wrapper.toolbar.addIcon('fas icon fa-cog nofullscreen', function() {
+                        
+						swal({
+                            html: '<input type="checkbox"  />主题编辑模式 <p style="margin-top:0.5rem"><button style="margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;">自定义css</button></p>'
                         });
                         var cb = $(Swal.getContent().querySelector('input'));
                         cb.prop('checked', themeMode.isThemeMode);
@@ -1934,6 +2028,27 @@ var EditorWrapper = (function() {
                     }, function(ele) {
                         configIcon = ele;
                     })
+                }
+
+
+                if (icon == 'expand') {
+                    wrapper.toolbar.addIcon('fas fa-expand icon mobile-hide', function(ele) {
+						if ($(ele).hasClass('fa-expand')) {
+							wrapper.requestFullScreen();
+						} else {
+							wrapper.exitFullScreen();
+						}
+                    }, function(ele) {
+                        if (screenfull.enabled) {
+                            screenfull.on('change', function() {
+                                if (screenfull.isFullscreen) {
+                                    $(ele).removeClass('fa-expand').addClass('fa-compress');
+                                } else {
+                                    $(ele).removeClass('fa-compress').addClass('fa-expand');
+                                }
+                            });
+                        }
+                    });
                 }
 
             }
@@ -2023,7 +2138,7 @@ var EditorWrapper = (function() {
                         } else {
                             store.addDocument('default', wrapper.editor.getValue());
                         }
-                    }, getDefault(config.toolbar_autoSaveMs,500));
+                    }, getDefault(config.toolbar_autoSaveMs, 500));
                 });
             }
 
@@ -2033,6 +2148,7 @@ var EditorWrapper = (function() {
                     if (doc.title != 'default')
                         docName = doc.title;
                     wrapper.editor.setValue(doc.content);
+                    wrapper.editor.renderAllDoc(0);
                 }
             }
 
@@ -2050,7 +2166,7 @@ var EditorWrapper = (function() {
                 if (documents.length == 0) {
                     swal('没有保存的文档');
                 } else {
-                    var html = '<table class="table" id="doc-table">';
+                    var html = '<table class="table">';
                     for (var i = 0; i < documents.length; i++) {
                         var doc = documents[i];
                         html += '<tr><td>' + doc.title + '</td><td><i class="fas fa-times" data-title="' + doc.title + '" style="margin-right:20px;cursor:pointer"></i><i data-title="' + doc.title + '" class="fas fa-arrow-down" style=";cursor:pointer"></i></td><tr>';
@@ -2059,7 +2175,53 @@ var EditorWrapper = (function() {
                     swal({
                         html: html
                     });
-
+					$(Swal.getContent()).find('.fa-times').click(function() {
+						var title = $(this).data('title');
+						Swal.fire({
+							title: '确定要删除吗?',
+							type: 'warning',
+							showCancelButton: true,
+							confirmButtonColor: '#3085d6',
+							cancelButtonColor: '#d33'
+						}).then((result) => {
+							if (result.value) {
+								store.deleteDocument(title);
+								if (title == docName) {
+									var doc = store.getLastDocument();
+									docName = undefined;
+									if (doc == null) {
+										wrapper.editor.setValue('');
+									} else {
+										if (doc.title != 'default')
+											docName = doc.title;
+										wrapper.editor.setValue(doc.content);
+									}
+								}
+								selectDocuments();
+							}
+						})
+					})
+					
+					$(Swal.getContent()).find('.fa-arrow-down').click(function() {
+						var title = $(this).data('title');
+						Swal.fire({
+							title: '确定要加载吗?',
+							type: 'warning',
+							showCancelButton: true,
+							confirmButtonColor: '#3085d6',
+							cancelButtonColor: '#d33'
+						}).then((result) => {
+							if (result.value) {
+								var doc = store.getDocument(title);
+								if (doc != null) {
+									docName = doc.title;
+									wrapper.editor.setValue(doc.content);
+								} else {
+									swal('要加载的文档不存在');
+								}
+							}
+						})
+					})
                 }
             }
 
@@ -2077,56 +2239,6 @@ var EditorWrapper = (function() {
                     }
                 })
             }
-
-            $(document).on('click', '#doc-table .fa-times', function() {
-                var title = $(this).data('title');
-                Swal.fire({
-                    title: '确定要删除吗?',
-                    type: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
-                    cancelButtonColor: '#d33'
-                }).then((result) => {
-                    if (result.value) {
-                        store.deleteDocument(title);
-                        if (title == docName) {
-                            var doc = store.getLastDocument();
-                            docName = undefined;
-                            if (doc == null) {
-                                wrapper.editor.setValue('');
-                            } else {
-                                if (doc.title != 'default')
-                                    docName = doc.title;
-                                wrapper.editor.setValue(doc.content);
-                            }
-                        }
-                        selectDocuments();
-                    }
-                })
-
-            })
-
-            $(document).on('click', '#doc-table .fa-arrow-down', function() {
-                var title = $(this).data('title');
-                Swal.fire({
-                    title: '确定要加载吗?',
-                    type: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
-                    cancelButtonColor: '#d33'
-                }).then((result) => {
-                    if (result.value) {
-                        var doc = store.getDocument(title);
-                        if (doc != null) {
-                            docName = doc.title;
-                            wrapper.editor.setValue(doc.content);
-                        } else {
-                            swal('要加载的文档不存在');
-                        }
-                    }
-                })
-
-            })
         }
 
         function renderToc() {
@@ -2183,10 +2295,15 @@ var EditorWrapper = (function() {
                 $("#toc").html(html)
             };
         }
-
+		
+		var wrapper;
         return {
             create: function(config) {
-                return new EditorWrapper(config);
+				if(wrapper){
+					wrapper.remove();
+				}
+				wrapper = new EditorWrapper(config)
+                return wrapper;
             }
         }
     })();
