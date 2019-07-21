@@ -79,7 +79,7 @@ var EditorWrapper = (function() {
                         theme: theme.mermaid.theme || 'default'
                     });
                     clearInterval(t);
-                    mermaid.init({}, '#out .mermaid');
+                    mermaid.init({}, '#editor_out .mermaid');
                 } catch (e) {}
             }, 20)
         }
@@ -103,7 +103,7 @@ var EditorWrapper = (function() {
                         throwOnError: false
                     })
                     clearInterval(t);
-                    var katexs = document.getElementById("out").querySelectorAll(".katex");
+                    var katexs = document.getElementById("editor_out").querySelectorAll(".katex");
                     for (var i = 0; i < katexs.length; i++) {
                         var block = katexs[i];
                         block.innerHTML = katex.renderToString(block.textContent, {
@@ -164,7 +164,7 @@ var EditorWrapper = (function() {
                 mermaid.initialize({
                     theme: this.theme.mermaid.theme || 'default'
                 });
-                mermaid.init({}, '#out .mermaid');
+                mermaid.init({}, '#editor_out .mermaid');
             } catch (e) {}
         }
 
@@ -485,12 +485,12 @@ var EditorWrapper = (function() {
 				loadEditorTheme(this);
                 loadHljsTheme(this);
                 var css = "";
-                css += "#toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
-                css += "#innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
-                css += "#stat{color:" + (this.stat.color || 'inherit') + "}\n";
-                css += "#in{background:" + (this.inCss.background || 'inherit') + "}\n";
+                css += "#editor_toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
+                css += "#editor_innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
+                css += "#editor_stat{color:" + (this.stat.color || 'inherit') + "}\n";
+                css += "#editor_in{background:" + (this.inCss.background || 'inherit') + "}\n";
 				var searchHelperColor = (this.searchHelper.color || 'inherit');
-                css += "#searchHelper{color:" + searchHelperColor + "}\n#searchHelper input{color:" + searchHelperColor + "}\n#searchHelper .input-group-text{color:" + searchHelperColor + "}\n#searchHelper input::placeholder {color: "+searchHelperColor+";opacity: 1;}\n#searchHelper input::-ms-input-placeholder {color: "+searchHelperColor+";}\n#searchHelper input::-ms-input-placeholder {color: "+searchHelperColor+";}";                             
+                css += "#editor_searchHelper{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control{color:" + searchHelperColor + "}\n#editor_searchHelper .input-group-text{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control::placeholder {color: "+searchHelperColor+";opacity: 1;}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: "+searchHelperColor+";}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: "+searchHelperColor+";}";                             
 
 			   $("#custom_theme").remove();
                 if ($.trim(css) != '') {
@@ -530,35 +530,36 @@ var EditorWrapper = (function() {
 
 
         function EditorWrapper(config) {
-			var html = '<div id="wrapper">';
-			html += '<div id="toc" class="noprint">';
+			var html = '<div id="editor_wrapper">';
+			html += '<div id="editor_toc">';
 			html += '</div>' ;
-			html += '<div id="in" class="noprint">' ;
-			html += '<div id="toolbar" class="noprint"></div>' ;
+			html += '<div id="editor_in">' ;
+			html += '<div id="editor_toolbar"></div>' ;
 			html += '<textarea  style="width: 100%; height: 100%"></textarea>' ;
-			html += '<div id="stat" class="noprint"></div>' ;
-			html += '<div id="innerBar"></div>' ;
+			html += '<div id="editor_stat"></div>' ;
+			html += '<div id="editor_innerBar"></div>' ;
 			html += '</div>' ;
-			html += '<div class="markdown-body " id="out" ></div>';	
+			html += '<div class="markdown-body" id="editor_out"></div>';	
 			html += '</div>' ;
 			var $wrapperElement = $(html);
 			$('body').append($wrapperElement);
+			$('body').addClass('editor_noscroll')
 			this.wrapperElement = $wrapperElement[0]
             if (!mobile) {
-                $("#in").show();
-                $("#out").css({
+                $("#editor_in").show();
+                $("#editor_out").css({
                     'visibility': 'visible'
                 });
             }
-            $("#wrapper").animate({
-                scrollLeft: $("#toc").outerWidth()
+            $("#editor_wrapper").animate({
+                scrollLeft: $("#editor_toc").outerWidth()
             }, 0);
 
 			this.eventHandlers = [];
             var theme = Theme.current(config);
             theme.render();
             var scrollBarStyle = mobile ? 'native' : 'overlay';
-            var editor = CodeMirror.fromTextArea(document.getElementById('wrapper').querySelector('textarea'), {
+            var editor = CodeMirror.fromTextArea(document.getElementById('editor_wrapper').querySelector('textarea'), {
                 mode: {name: "gfm"},
                 lineNumbers: false,
                 matchBrackets: true,
@@ -605,15 +606,15 @@ var EditorWrapper = (function() {
                     return "";
                 });
             }
-            $("#wrapper").on('DOMSubtreeModified', '#custom_css', function() {
+            $("#editor_wrapper").on('DOMSubtreeModified', '#custom_css', function() {
                 theme.customCss = this.textContent;
                 theme.store();
             })
             this.theme = theme;
-            this.sync = Sync.create(editor, $("#out")[0], config);
+            this.sync = Sync.create(editor, $("#editor_out")[0], config);
             this.render = Render.create(config, theme);
-            this.toolbar = Bar.create($("#toolbar")[0]);
-            var innerBar = Bar.create($("#innerBar")[0]);
+            this.toolbar = Bar.create($("#editor_toolbar")[0]);
+            var innerBar = Bar.create($("#editor_innerBar")[0]);
             innerBar.hide();
             this.innerBar = innerBar;
             //sync 
@@ -643,12 +644,12 @@ var EditorWrapper = (function() {
                         var formatter = config.stat_formatter || function(wrapper) {
                             return "当前字数：" + wrapper.getValue().length
                         }
-                        $("#stat").html(formatter(wrapper)).show();
+                        $("#editor_stat").html(formatter(wrapper)).show();
                         if (stat_timer) {
                             clearTimeout(stat_timer);
                         }
                         stat_timer = setTimeout(function() {
-                            $("#stat").hide();
+                            $("#editor_stat").hide();
                         }, 1000);
                     }
 
@@ -667,7 +668,7 @@ var EditorWrapper = (function() {
 
             if (mobile) {
                 //swipe
-                $("#toc").touchwipe({
+                $("#editor_toc").touchwipe({
                     wipeLeft: function() {
                         wrapper.toEditor()
                     },
@@ -678,15 +679,35 @@ var EditorWrapper = (function() {
                     wipeLeft: function() {
                         wrapper.toPreview()
                     },
-                    wipeRight: function() {
-                        wrapper.toToc()
+                    wipeRight: function(e) {
+                        wrapper.toToc();
                     },
                     min_move_x: 10,
                     max_move_y: 5
                 });
-                $("#out").touchwipe({
-                    wipeRight: function() {
-                        wrapper.toEditor()
+				
+				function hasXScrollBar(element){
+				  var overflowX = window.getComputedStyle(element)['overflow-x'];
+				  return (overflowX === 'scroll' || overflowX === 'auto') && element.scrollWidth > element.clientWidth;
+				}
+				
+				//if an element has a x scrollbar and scrollLeft > 0 then can not wipe
+				function canWipe(element){
+					if(isUndefined(element) || element == null){
+						return true;
+					}
+					if(hasXScrollBar(element) && $(element).scrollLeft() > 0){
+						return false;
+					}
+					return canWipe(element.parentElement);
+				}
+				
+				
+                $("#editor_out").touchwipe({
+                    wipeRight: function(e) {
+						if(canWipe(e.target)){
+							wrapper.toEditor()
+						}
                     },
                     min_move_x: 10,
                     max_move_y: 5
@@ -700,7 +721,7 @@ var EditorWrapper = (function() {
 				}
 			}});
 			
-            $("#toc").on('click', '[data-line]', function() {
+            $("#editor_toc").on('click', '[data-line]', function() {
                 var line = parseInt($(this).data('line'));
 
                 editor.scrollIntoView({
@@ -755,7 +776,7 @@ var EditorWrapper = (function() {
                 var cm = wrapper.editor;
                 var wrap = cm.getWrapperElement();
                 if (isFullscreen) {
-                    $(wrapper.getFullScreenElement()).addClass('fullscreen');
+                    $(wrapper.getFullScreenElement()).addClass('editor_fullscreen');
                     //from CodeMirror display fullscreen.js
                     cm.state.fullScreenRestore = {
                         scrollTop: window.pageYOffset,
@@ -769,7 +790,7 @@ var EditorWrapper = (function() {
                     document.documentElement.style.overflow = "hidden";
                     cm.refresh();
                 } else {
-                    $(wrapper.getFullScreenElement()).removeClass('fullscreen');
+                    $(wrapper.getFullScreenElement()).removeClass('editor_fullscreen');
                     wrap.className = wrap.className.replace(/\s*CodeMirror-fullscreen\b/, "");
                     document.documentElement.style.overflow = "";
                     var info = cm.state.fullScreenRestore;
@@ -782,13 +803,14 @@ var EditorWrapper = (function() {
         }
 
         EditorWrapper.prototype.doRender = function(patch) {
-            this.render.renderAt(this.editor.getValue(), $("#out")[0], patch);
+            this.render.renderAt(this.editor.getValue(), $("#editor_out")[0], patch);
             renderToc();
         }
 		
 		EditorWrapper.prototype.remove = function(patch) {
 			triggerEvent(this,'remove');
             $(this.getFullScreenElement()).removeClass('fullscreen');
+			$('body').removeClass('editor_noscroll')
             this.wrapperElement.parentNode.removeChild(this.wrapperElement);
 			wrapperInstance.wrapper = undefined;
 			delete wrapperInstance.wrapper;
@@ -847,14 +869,14 @@ var EditorWrapper = (function() {
         EditorWrapper.prototype.toEditor = function(callback,_ms) {
             var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
             if (mobile) {
-                $("#wrapper").animate({
-                    scrollLeft: $("#in").width()
+                $("#editor_wrapper").animate({
+                    scrollLeft: $("#editor_in").width()
                 }, ms, function() {
                     if (callback) callback();
                 });
             } else {
-                $("#wrapper").animate({
-                    scrollLeft: $("#in").offset().left
+                $("#editor_wrapper").animate({
+                    scrollLeft: $("#editor_in").offset().left
                 }, ms, function() {
                     if (callback) callback();
                 });
@@ -868,7 +890,7 @@ var EditorWrapper = (function() {
                 this.doRender(true);
             }
             var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
-            $("#wrapper").animate({
+            $("#editor_wrapper").animate({
                 scrollLeft: 0
             }, ms, function() {
                 if (callback) callback();
@@ -881,8 +903,8 @@ var EditorWrapper = (function() {
                 this.doRender(true);
                 this.doSync();
 				var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
-                $("#wrapper").animate({
-                    scrollLeft: $("#out")[0].offsetLeft
+                $("#editor_wrapper").animate({
+                    scrollLeft: $("#editor_out")[0].offsetLeft
                 }, ms, function() {
                     if (callback) callback();
                 });
@@ -896,7 +918,7 @@ var EditorWrapper = (function() {
             var editor = wrapper.editor;
             var config = wrapper.config;
 
-            var innerBarElement = $("#innerBar");
+            var innerBarElement = $("#editor_innerBar");
             var icons = config.innerBar_icons || ['emoji', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table', 'undo', 'redo', 'close'];
             var ios = CodeMirror.browser.ios;
             for (var i = 0; i < icons.length; i++) {
@@ -1290,7 +1312,7 @@ var EditorWrapper = (function() {
                     if (elem[0].scrollHeight - elem.scrollTop() -
                         elem.outerHeight() < 0) {
                         var top = editor.cursorCoords(true).top - 2 * lh -
-                            bar.height() - $("#toolbar").height();
+                            bar.height() - $("#editor_toolbar").height();
                         if (top > 0) {
                             innerBarElement.css({
                                 "top": (editor.cursorCoords(true).top - 2 *
@@ -1737,24 +1759,24 @@ var EditorWrapper = (function() {
                         src: config.res_colorpickerJs || 'colorpicker/dist/js/bootstrap-colorpicker.min.js'
                     });
                     editor.setOption('readOnly', true);
-                    $("#searchHelper input").attr('value', '点击设置字体颜色');
-                    $("#searchHelper").children().addClass('noclick');
+                    $("#editor_searchHelper input").attr('value', '点击设置字体颜色');
+                    $("#editor_searchHelper").children().addClass('noclick');
                     searchHelper.show();
-                    $("#searchHelper").on('click', searchHelprHandler);
-                    $("#toolbar").children().addClass('noclick');
+                    $("#editor_searchHelper").on('click', searchHelprHandler);
+                    $("#editor_toolbar").children().addClass('noclick');
                     $(configIcon).removeClass('noclick');
-                    $("#toolbar").on('click', toolbarHandler);
-                    $("#stat").text("点击设置字体颜色").show();
-                    $("#stat").on('click', statHandler);
+                    $("#editor_toolbar").on('click', toolbarHandler);
+                    $("#editor_stat").text("点击设置字体颜色").show();
+                    $("#editor_stat").on('click', statHandler);
                     editor.on('cursorActivity', changeThemeHandler);
-                    $("#out").on('click', '.mermaid', changeMemaidThemeHandler);
-                    cloneBar = $("#innerBar").clone();
+                    $("#editor_out").on('click', '.mermaid', changeMemaidThemeHandler);
+                    cloneBar = $("#editor_innerBar").clone();
                     cloneBar.css({
                         'visibility': 'visible',
                         'top': '100px'
                     });
                     cloneBar.children().addClass('noclick');
-                    $("#in").append(cloneBar);
+                    $("#editor_in").append(cloneBar);
                     cloneBar.on('click', barHandler);
                 }
 
@@ -1762,14 +1784,14 @@ var EditorWrapper = (function() {
                     isThemeMode = false;
                     cloneBar.off('click', barHandler);
                     cloneBar.remove();
-                    $("#searchHelper").off('click', searchHelprHandler);
-                    $("#searchHelper input").removeAttr('value');
+                    $("#editor_searchHelper").off('click', searchHelprHandler);
+                    $("#editor_searchHelper input").removeAttr('value');
                     searchHelper.hide();
                     editor.off('cursorActivity', changeThemeHandler);
-                    $("#toolbar").off('click', toolbarHandler);
-                    $("#stat").off('click', statHandler);
-                    $("#out").off('click', '.mermaid', changeMemaidThemeHandler);
-                    $("#stat").text("").hide();
+                    $("#editor_toolbar").off('click', toolbarHandler);
+                    $("#editor_stat").off('click', statHandler);
+                    $("#editor_out").off('click', '.mermaid', changeMemaidThemeHandler);
+                    $("#editor_stat").text("").hide();
                     $('.noclick').removeClass('noclick');
                     editor.setOption('readOnly', false);
                 }
@@ -1825,7 +1847,7 @@ var EditorWrapper = (function() {
 
             var searchHelper = (function() {
                 var html = '';
-                html += '<div id="searchHelper" style="position:absolute;bottom:0px;width:100%;z-index:99;display:none;padding:20px;padding-bottom:5px">';
+                html += '<div id="editor_searchHelper" style="position:absolute;bottom:10px;width:100%;z-index:99;display:none;padding:20px;padding-bottom:5px">';
                 html += '<div style="width:100%;text-align:right;margin-bottom:5px"><i class="fas fa-times icon"  style="cursor:pointer;margin-right:0px"></i></div>';
                 html += ' <form>';
                 html += '<div class="input-group mb-3">';
@@ -1853,7 +1875,7 @@ var EditorWrapper = (function() {
                 html += '  </div>';
 
                 var ele = $(html);
-                $("#in").append(ele);
+                $("#editor_in").append(ele);
 
 
                 ele.on('click', '[data-search]', function() {
@@ -2024,14 +2046,15 @@ var EditorWrapper = (function() {
                     });
                 }
 
-                function parseString(string) {
-                    return string.replace(/\\(.)/g,
-                        function(_, ch) {
-                            if (ch == "n") return "\n"
-                            if (ch == "r") return "\r"
-                            return ch
-                        })
-                }
+				function parseString(string) {
+					return string.replace(/\\([nrt\\])/g, function(match, ch) {
+					  if (ch == "n") return "\n"
+					  if (ch == "r") return "\r"
+					  if (ch == "t") return "\t"
+					  if (ch == "\\") return "\\"
+					  return match
+					})
+				}
 
                 function parseQuery(query) {
                     if (query == '') return query;
@@ -2284,7 +2307,7 @@ var EditorWrapper = (function() {
         }
 
         function renderToc() {
-            var headings = document.getElementById('out').querySelectorAll("h1, h2, h3, h4, h5, h6");
+            var headings = document.getElementById('editor_out').querySelectorAll("h1, h2, h3, h4, h5, h6");
             var toc = [];
             for (var i = 0; i < headings.length; i++) {
                 var head = headings[i];
@@ -2330,11 +2353,11 @@ var EditorWrapper = (function() {
             }
             try {
                 var div = document.createElement("div");
-                div.setAttribute('id', "toc");
+                div.setAttribute('id', "editor_toc");
                 div.innerHTML = html;
-                morphdom($("#toc")[0], div);
+                morphdom($("#editor_toc")[0], div);
             } catch (e) {
-                $("#toc").html(html)
+                $("#editor_toc").html(html)
             };
         }
 		

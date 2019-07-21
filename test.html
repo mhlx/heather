@@ -299,7 +299,7 @@ It converts "HTML", but keep intact partial entries like "xxxHTMLyyy" and so on.
 	  }
 	  
 	  $("#click1").click(function(){
-		var wrapper = createEditor({render_allowHtml:false,renderAllDocEnable:false});
+		var wrapper = createEditor({render_allowHtml:true,renderAllDocEnable:false});
 			wrapper.toolbar.addIcon('fas fa-times icon nofullscreen',function(){
 				var markdown = htmlEntities(wrapper.getValue());
 				var html = htmlEntities(wrapper.getHtml())
