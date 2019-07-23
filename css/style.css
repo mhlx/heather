@@ -220,13 +220,13 @@
 	left: 0;
 	bottom: 0;
 	width: 100%;
-	height: auto;
+	height: 100%;
 	overflow-x: hidden;
 	z-index: 9999998;
 	background-color:#f9f9f7
 }
 
-.swal2-container.swal2-shown {
+.swal2-container {
 	z-index: 99999999 !important
 }
 
@@ -429,8 +429,10 @@ h6 {
 	position: absolute;
 }
 
+.editor_fullscreen #editor_toc,
+.editor_fullscreen #editor_out,
 .editor_fullscreen #editor_in{
-	position: fixed !important;
+	position: absoulte !important;
     top: 0px !important;
     right: 0px !important;
     bottom: 0px !important;
@@ -446,12 +448,19 @@ h6 {
     margin: 0px !important;
 }
 
+.editor_fullscreen #editor_in{
+	left:100% !important;
+}
+
 .editor_fullscreen #editor_out{
-	display:none
+	left:200% !important;
+	padding-left:15% !important;
+	padding-right:15% !important;
 }
 
 .editor_fullscreen #editor_toc{
-	display:none
+	padding-left:15% !important;
+	padding-right:15% !important;
 }
 
 .editor_fullscreen #editor_toolbar{
@@ -479,5 +488,7 @@ h6 {
 }
 
 .editor_noscroll{
+	margin: 0 !important; 
+	height: 100% !important; 
 	overflow:hidden !important;
 }

@@ -7,15 +7,35 @@
          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       <meta name="description" content="Heather is a online Markdown Editor">
       <meta name="keywords" content="Markdown, Heather, Editor, CodeMirror, Github, Open Source">
-      <link rel="stylesheet"  href="codemirror/lib/codemirror.css">
+      <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport"
+         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <meta name="description" content="Heather is a online Markdown Editor">
+      <meta name="keywords" content="Markdown, Heather, Editor, CodeMirror, Github, Open Source">
+      <link rel="stylesheet"  href="codemirror/lib/codemirror.css" media="screen">
       <link rel="stylesheet" 
-         href="codemirror/addon/scroll/simplescrollbars.css">
-      <link rel="stylesheet"  href="css/markdown.css">
-      <link href="fontawesome-free/css/all.min.css" rel="stylesheet">
-      <link rel="stylesheet" href="css/style.css">
+         href="codemirror/addon/scroll/simplescrollbars.css" media="screen">
+      <link rel="stylesheet"  href="css/markdown.css" media="all">
+      <link href="fontawesome-free/css/all.min.css"  media="all" rel="stylesheet">
+      <link rel="stylesheet" href="css/style.css" media="screen">
+      <link rel="stylesheet" href="css/print.css" media="print">
    </head>
+  
    <body>
-	
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
+	<h1>test</h1>
 		<button id="click1">click me</button>
 		
 		<textarea id="editor" cols="100" rows="20">---
@@ -265,7 +285,7 @@ It converts "HTML", but keep intact partial entries like "xxxHTMLyyy" and so on.
 :::
 </textarea>
 	  
-      <script src="jquery/jquery.min.js"></script>
+         <script src="jquery/jquery.min.js"></script>
       <script src="js/htmlparser.js"></script>
       <script src="js/morphdom-umd.min.js"></script>
       <script src="codemirror/lib/codemirror.js"></script>
@@ -276,7 +296,6 @@ It converts "HTML", but keep intact partial entries like "xxxHTMLyyy" and so on.
       <script src="codemirror/mode/gfm/gfm.js"></script>
       <script src="codemirror/addon/selection/mark-selection.js"></script>
       <script src="codemirror/addon/search/searchcursor.js"></script>
-      <script src="codemirror/addon/search/search.js"></script>
       <script src="codemirror/addon/edit/continuelist.js"></script>
       <script src="codemirror/addon/scroll/simplescrollbars.js"></script>
       <script src="sweet2alert/dist/sweetalert2.all.min.js"></script>
@@ -286,7 +305,7 @@ It converts "HTML", but keep intact partial entries like "xxxHTMLyyy" and so on.
       <script src="js/jquery.touchwipe.min.js"></script>
       <script src="js/fullscreen.js"></script>
       <script src="js/md.js"></script>
-      <script src="js/all.js"></script>
+      <script src="js/all.min.js"></script>
 	  <script>
 	  function createEditor(config){
 		var wrapper = EditorWrapper.create(config || {});
@@ -316,14 +335,15 @@ It converts "HTML", but keep intact partial entries like "xxxHTMLyyy" and so on.
 	  
 	   $("#editor").click(function(){
 			var editor = $(this);
-			var wrapper = createEditor({toolbar_icons:['toc', 'innerBar', 'search', 'config', 'expand']});
+			var wrapper = createEditor({toolbar_icons:['toc', 'innerBar', 'search', 'config', 'expand','preview']});
 			var codeMirrorEditor = wrapper.editor;
 			codeMirrorEditor.setValue(editor.val());
 			codeMirrorEditor.focus();
 			var cursor = getPos(editor[0]);
 			codeMirrorEditor.setCursor(cursor);
 			codeMirrorEditor.scrollTo(null,codeMirrorEditor.heightAtLine(cursor.line,'local'))
-			wrapper.toolbar.addIcon('fas fa-times icon nofullscreen',function(){
+			wrapper.onRemove(function(){swal("good bye")})
+			wrapper.toolbar.addIcon('fas fa-times icon ',function(){
 				editor.val(wrapper.getValue());
 				wrapper.remove();
 			})

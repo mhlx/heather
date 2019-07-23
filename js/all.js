@@ -50,16 +50,39 @@ var EditorWrapper = (function() {
     var Render = (function() {
 
         function MarkdownRender(config, theme) {
-            var plugins = ['footnote', 'katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'];
-            this.md = createMarkdownParser({
+            var plugins = config.render_plugins || ['footnote', 'katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'];
+            var hasMermaid = $.inArray('mermaid', plugins) != -1;
+			this.md = createMarkdownParser({
                 html: config.render_allowHtml !== false,
-                plugins: config.render_plugins || plugins,
-                lineNumber: true
+                plugins: plugins,
+                lineNumber: true,
+				highlight : function(str, lang) {
+					if(hasMermaid && lang == 'mermaid'){
+						return '<div class="mermaid-block"><div class="mermaid">'+str+'</div><div class="mermaid-source" style="display:none">'+str+'</div></div>';					
+					}
+					if (lang && hljs.getLanguage(lang)) {
+						try {
+							return '<pre class="hljs"><code>' +
+					   hljs.highlight(lang, str, true).value +
+					   '</code></pre>';
+						} catch (__) {}
+					}
+					return '';
+				}
             });
             this.md2 = createMarkdownParser({
                 html: config.render_allowHtml !== false,
-                plugins: config.render_plugins || plugins,
-                lineNumber: false
+                plugins: plugins,
+                lineNumber: false,
+				highlight : function(str, lang) {
+					if(hasMermaid && lang == 'mermaid'){
+						return '<div class="mermaid">'+str+'</div>';
+					}
+					if (lang && hljs.getLanguage(lang)) {
+						return '<pre><code class="'+lang+'">'+str+'</code></pre>'
+					}
+					return '';
+				}
             });
             this.config = config;
             this.theme = theme;
@@ -79,8 +102,12 @@ var EditorWrapper = (function() {
                         theme: theme.mermaid.theme || 'default'
                     });
                     clearInterval(t);
-                    mermaid.init({}, '#editor_out .mermaid');
-                } catch (e) {}
+                    try{
+						mermaid.init({}, '#editor_out .mermaid');
+					}catch(e){
+						console.log(e);
+					}
+                } catch (__) {}
             }, 20)
         }
 
@@ -106,12 +133,16 @@ var EditorWrapper = (function() {
                     var katexs = document.getElementById("editor_out").querySelectorAll(".katex");
                     for (var i = 0; i < katexs.length; i++) {
                         var block = katexs[i];
-                        block.innerHTML = katex.renderToString(block.textContent, {
-                            throwOnError: false,
-                            displayMode: true
-                        });
+                        try{
+							block.innerHTML = katex.renderToString(block.textContent, {
+								throwOnError: false,
+								displayMode: true
+							});
+						}catch(e){
+							console.log(e);
+						}
                     }
-                } catch (e) {
+                } catch (__) {
 
                 }
             }, 20)
@@ -165,7 +196,7 @@ var EditorWrapper = (function() {
                     theme: this.theme.mermaid.theme || 'default'
                 });
                 mermaid.init({}, '#editor_out .mermaid');
-            } catch (e) {}
+            } catch (e) {if(!isUndefined(window.mermaid)) console.log(e)}
         }
 
         return {
@@ -543,7 +574,9 @@ var EditorWrapper = (function() {
 			html += '</div>' ;
 			var $wrapperElement = $(html);
 			$('body').append($wrapperElement);
-			$('body').addClass('editor_noscroll')
+			this.scrollTop = $(window).scrollTop();
+			$('body').addClass('editor_noscroll');
+			$('html').addClass('editor_noscroll');
 			this.wrapperElement = $wrapperElement[0]
             if (!mobile) {
                 $("#editor_in").show();
@@ -554,7 +587,7 @@ var EditorWrapper = (function() {
             $("#editor_wrapper").animate({
                 scrollLeft: $("#editor_toc").outerWidth()
             }, 0);
-
+			
 			this.eventHandlers = [];
             var theme = Theme.current(config);
             theme.render();
@@ -606,10 +639,17 @@ var EditorWrapper = (function() {
                     return "";
                 });
             }
-            $("#editor_wrapper").on('DOMSubtreeModified', '#custom_css', function() {
+			var customChangeCssHandler = function() {
                 theme.customCss = this.textContent;
                 theme.store();
-            })
+            };
+            $('head').on('DOMSubtreeModified', '#custom_css', customChangeCssHandler);
+			this.eventHandlers.push({
+				name : 'remove',
+				handler : function(){
+					$('head').off('DOMSubtreeModified', '#custom_css', customChangeCssHandler)
+				}
+			})
             this.theme = theme;
             this.sync = Sync.create(editor, $("#editor_out")[0], config);
             this.render = Render.create(config, theme);
@@ -624,14 +664,14 @@ var EditorWrapper = (function() {
                 var ms = getDefault(config.render_ms, 500);
                 var autoRenderTimer;
                 var stat_timer;
-				wrapper.eventHandlers.push({name:'remove',handler:function(){
+				wrapper.onRemove(function(){
 					if (autoRenderTimer) {
                         clearTimeout(autoRenderTimer);
                     }
 					if (stat_timer) {
                         clearTimeout(stat_timer);
                     }
-				}})
+				})
                 editor.on('change', function() {
                     if (autoRenderTimer) {
                         clearTimeout(autoRenderTimer);
@@ -715,11 +755,11 @@ var EditorWrapper = (function() {
             }
 			
 			var tocClickTimer;
-			wrapper.eventHandlers.push({name:'remove',handler:function(){
+			wrapper.onRemove(function(){
 				if (tocClickTimer) {
 					clearTimeout(tocClickTimer);
 				}
-			}});
+			});
 			
             $("#editor_toc").on('click', '[data-line]', function() {
                 var line = parseInt($(this).data('line'));
@@ -733,8 +773,9 @@ var EditorWrapper = (function() {
                         ch: 0
                     }, "local").top;
                     editor.scrollTo(null, top);
-                    if (mobile) {
+                    if (mobile || wrapper.fullscreen) {
                         wrapper.toEditor();
+						wrapper.editor.focus();
                     }
                 }, 500)
             })
@@ -746,17 +787,18 @@ var EditorWrapper = (function() {
             if (screenfull.enabled) {
 				var screenFullChangeHandler = function() {
 					wrapper.fullscreen = screenfull.isFullscreen;
-                    changeStyleWhenFullScreenChange(wrapper, screenfull.isFullscreen);
+                    changeWhenFullScreenChange(wrapper, screenfull.isFullscreen);
 					if(!screenfull.isFullscreen){
 						wrapper.toEditor(undefined,0);
 						wrapper.doSync();
 					}
                 }
-				wrapper.eventHandlers.push({name:'remove',handler:function(){
+				wrapper.onRemove(function(){
 					 screenfull.off('change',screenFullChangeHandler);
-				}})
+				});
                 screenfull.on('change',screenFullChangeHandler);
             }
+			
 			triggerEvent(this,'load');
         }
 		
@@ -771,12 +813,65 @@ var EditorWrapper = (function() {
 			}
 		}
 
-        function changeStyleWhenFullScreenChange(wrapper, isFullscreen) {
+        function changeWhenFullScreenChange(wrapper, isFullscreen) {
             if (!CodeMirror.browser.mobile) {
                 var cm = wrapper.editor;
                 var wrap = cm.getWrapperElement();
+				
+				var cursor;
+				var extraKeys = cm.getOption('extraKeys');
+				
+				var outToEditorHandler = function(e){
+					var keyCode = e.which || e.keyCode;
+					if(e.ctrlKey && keyCode == 37){
+						$("#editor_out").removeAttr("tabindex");
+						wrapper.toEditor(function(){
+							if(cursor){
+								cm.focus();
+								var info = cm.state.fullScreenRestore;
+								window.scrollTo(info.scrollLeft, info.scrollTop);
+							}
+						});
+					}
+				}
+				
+				var tocToEditorHandler = function(e){
+					var keyCode = e.which || e.keyCode;
+					if(e.ctrlKey && keyCode == 39){
+						$("#editor_toc").removeAttr("tabindex");
+						wrapper.toEditor(function(){
+							if(cursor){
+								cm.focus();
+								var info = cm.state.fullScreenRestore;
+								window.scrollTo(info.scrollLeft, info.scrollTop);
+							}
+						});
+					}
+				}
+				
                 if (isFullscreen) {
+					extraKeys['Ctrl-Right'] = function(){
+						cursor = wrapper.editor.getCursor();
+						wrapper.toPreview(function(){
+							$("#editor_out").prop('tabindex',0);
+							$("#editor_out").focus();
+						});
+					}
+					
+					extraKeys['Ctrl-Left'] = function(){
+						cursor = wrapper.editor.getCursor();
+						wrapper.toToc(function(){
+							$("#editor_toc").prop('tabindex',0);
+							$("#editor_toc").focus();
+						});
+					}
+					
+					cm.setOption('extraKeys',extraKeys);
+					$("#editor_out").on('keydown',outToEditorHandler);
+					$("#editor_toc").on('keydown',tocToEditorHandler);
+					
                     $(wrapper.getFullScreenElement()).addClass('editor_fullscreen');
+					
                     //from CodeMirror display fullscreen.js
                     cm.state.fullScreenRestore = {
                         scrollTop: window.pageYOffset,
@@ -790,15 +885,24 @@ var EditorWrapper = (function() {
                     document.documentElement.style.overflow = "hidden";
                     cm.refresh();
                 } else {
+					
+					delete extraKeys['Ctrl-Left'];
+					delete extraKeys['Ctrl-Right'];
+					cm.setOption('extraKeys',extraKeys);
+					$("#editor_out").off('keydown',outToEditorHandler);
+					$("#editor_toc").off('keydown',tocToEditorHandler);
+					
                     $(wrapper.getFullScreenElement()).removeClass('editor_fullscreen');
                     wrap.className = wrap.className.replace(/\s*CodeMirror-fullscreen\b/, "");
-                    document.documentElement.style.overflow = "";
-                    var info = cm.state.fullScreenRestore;
-                    wrap.style.width = info.width;
-                    wrap.style.height = info.height;
-                    window.scrollTo(info.scrollLeft, info.scrollTop);
-                    cm.refresh();
+					document.documentElement.style.overflow = "";
+					var info = cm.state.fullScreenRestore;
+					wrap.style.width = info.width; wrap.style.height = info.height;
+					window.scrollTo(info.scrollLeft, info.scrollTop);
+					cm.refresh();
                 }
+				wrapper.toEditor(function(){
+					wrapper.doRender(false);
+				},0);
             }
         }
 
@@ -808,12 +912,25 @@ var EditorWrapper = (function() {
         }
 		
 		EditorWrapper.prototype.remove = function(patch) {
-			triggerEvent(this,'remove');
-            $(this.getFullScreenElement()).removeClass('fullscreen');
-			$('body').removeClass('editor_noscroll')
-            this.wrapperElement.parentNode.removeChild(this.wrapperElement);
-			wrapperInstance.wrapper = undefined;
-			delete wrapperInstance.wrapper;
+			var me = this;
+			var removeHandler = function(){
+				Swal.close();
+				triggerEvent(me,'remove');
+				$(me.getFullScreenElement()).removeClass('editor_fullscreen');
+				$('body').removeClass('editor_noscroll');
+				$('html').removeClass('editor_noscroll');
+				$('html,body').scrollTop(me.scrollTop);
+				me.wrapperElement.parentNode.removeChild(me.wrapperElement);
+				wrapperInstance.wrapper = undefined;
+				delete wrapperInstance.wrapper;
+			}
+			if(this.fullscreen){
+				this.exitFullScreen().then(function(){
+					removeHandler();
+				});
+			} else {
+				removeHandler();
+			}
         }
 		
         EditorWrapper.prototype.doSync = function() {
@@ -836,7 +953,7 @@ var EditorWrapper = (function() {
 		
 		EditorWrapper.prototype.exitFullScreen  = function() {
 			if(!mobile && screenfull.enabled){
-				screenfull.exit();
+				return screenfull.exit();
 			}
         }
 
@@ -865,10 +982,27 @@ var EditorWrapper = (function() {
                 this.syncEnable = false;
             }
         }
+		
+		EditorWrapper.prototype.onRemove = function(fun) {
+			this.eventHandlers.push({
+				name : 'remove',
+				handler : fun
+			})
+        }
+		
+		EditorWrapper.prototype.offRemove = function(fun) {
+			for(var i=0;i<this.eventHandlers.length;i++){
+				var handler = this.eventHandlers[i];
+				if(handler.name == 'remove' && handler.handler == fun){
+					this.eventHandlers.splice(i,1);
+					break;
+				}
+			}
+        }
 
         EditorWrapper.prototype.toEditor = function(callback,_ms) {
             var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
-            if (mobile) {
+            if (mobile || this.fullscreen) {
                 $("#editor_wrapper").animate({
                     scrollLeft: $("#editor_in").width()
                 }, ms, function() {
@@ -898,10 +1032,13 @@ var EditorWrapper = (function() {
         }
 
         EditorWrapper.prototype.toPreview = function(callback,_ms) {
-            if (mobile) {
+			var me = this;
+            if (mobile || me.fullscreen) {
                 this.editor.getInputField().blur();
-                this.doRender(true);
-                this.doSync();
+				if(mobile){
+					this.doRender(true);
+					this.doSync();
+				}
 				var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
                 $("#editor_wrapper").animate({
                     scrollLeft: $("#editor_out")[0].offsetLeft
@@ -1290,12 +1427,6 @@ var EditorWrapper = (function() {
                 bar.show();
             }
 
-            var keyboardTimer;
-			wrapper.eventHandlers.push({name:'remove',handler:function(){
-				if(keyboardTimer){
-					clearInterval(keyboardTimer);
-				}
-			}})
             var mobileCursorActivityHandler = function(bar) {
                 var lh = editor.defaultTextHeight();
                 var top = editor.cursorCoords(true, 'local').top;
@@ -1341,34 +1472,7 @@ var EditorWrapper = (function() {
                             }, 50)
                         }
 
-                        if (ios) {
-                            showBar();
-                        } else {
-                            if (keyboardDetector.isOpen) {
-                                showBar();
-                            } else {
-                                if (keyboardTimer) {
-                                    waitTime = 0;
-                                    clearInterval(keyboardTimer);
-                                }
-                                keyboardTimer = setInterval(function() {
-                                    if (keyboardDetector.isOpen) {
-                                        waitTime = 0;
-                                        clearInterval(keyboardTimer);
-                                        showBar();
-                                    } else {
-                                        waitTime += 20;
-                                        if (waitTime >= 1020) {
-                                            waitTime = 0;
-                                            clearInterval(keyboardTimer);
-                                            showBar();
-                                        }
-                                    }
-                                }, 20);
-                            }
-                        }
-
-
+                        showBar();
                     }
 
                 }
@@ -1412,9 +1516,9 @@ var EditorWrapper = (function() {
                         }
                     }
 					
-					wrapper.eventHandlers.push({name:'remove',handler:function(){
+					wrapper.onRemove(function(){
 						 $(window).off('resize orientationchange', applyAfterResize);
-					}})
+					})
 
                     $(window).on('resize orientationchange', applyAfterResize);
 
@@ -1456,11 +1560,11 @@ var EditorWrapper = (function() {
 							}
 						}, getDefault(config.toolbar_autoSaveMs, 500));
 					});
-					wrapper.eventHandlers.push({name:'remove',handler:function(){
+					wrapper.onRemove(function(){
 						if (me.autoSaveTimer) {
 							clearTimeout(me.autoSaveTimer);
 						}
-					}});
+					});
 					wrapper.eventHandlers.push({name:'load',handler:function(){
 						setTimeout(function(){
 							me.loadLastDocument();
@@ -2139,7 +2243,7 @@ var EditorWrapper = (function() {
                     wrapper.toolbar.addIcon('fas icon fa-download ', function(ele) {
                         selectDocuments(backup);
                     });
-					wrapper.toolbar.addIcon('far fa-file icon nofullscreen', function(ele) {
+					wrapper.toolbar.addIcon('far fa-file icon', function(ele) {
                         newDocument(backup);
                     });
 					wrapper.backup = backup;
@@ -2182,9 +2286,9 @@ var EditorWrapper = (function() {
                                     $(ele).removeClass('fa-compress').addClass('fa-expand');
                                 }
                             };
-							wrapper.eventHandlers.push({name:'remove',handler:function(){
+							wrapper.onRemove(function(){
 								 screenfull.off('change',toggleHandler);
-							}})
+							})
                             screenfull.on('change', toggleHandler);
                         }
                     });

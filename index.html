@@ -7,7 +7,15 @@
 <meta name="viewport"
 	content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="description" content="Heather is a online Markdown Editor">
-  <meta name="keywords" content="Markdown, Heather, Editor, CodeMirror, Github, Open Source">
+<meta name="keywords" content="Markdown, Heather, Editor, CodeMirror, Github, Open Source">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<link rel="stylesheet"  href="codemirror/lib/codemirror.css" media="screen">
+<link rel="stylesheet" 
+ href="codemirror/addon/scroll/simplescrollbars.css" media="screen">
+<link rel="stylesheet"  href="css/markdown.css" media="all">
+<link href="fontawesome-free/css/all.min.css"  media="all" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" media="screen">
+<link rel="stylesheet" href="css/print.css" media="print">
  <style>
  #loading{
 	font-size:120px;
@@ -26,21 +34,68 @@
  </style>
 </head>
 <body>
-<textarea id="editor" style="display:none"></textarea>
-<div id="bg" style="position: absolute;top: 0;left: 0;z-index: 9999999; width: 100vw; height: 100vh;background-color: rgb(40, 33, 28)">
+<!--<div id="bg" style="position: absolute;top: 0;left: 0;z-index: 9999999; width: 100vw; height: 100vh;background-color: rgb(40, 33, 28)">
 	
 </div> 
-<div id="loading" style=";position:absolute;left:0;z-index: 9999999;">Heather</div>
-<script src="iframe.js"></script>
+<div id="loading" style=";position:absolute;left:0;z-index: 9999999;">Heather</div>-->
+<script src="jquery/jquery.min.js"></script>
+<script src="js/htmlparser.js"></script>
+<script src="js/morphdom-umd.min.js"></script>
+<script src="codemirror/lib/codemirror.js"></script>
+<script src="codemirror/addon/mode/overlay.js"></script>
+<script src="codemirror/mode/javascript/javascript.js"></script>
+<script src="codemirror/mode/xml/xml.js"></script>
+<script src="codemirror/mode/markdown/markdown.js"></script>
+<script src="codemirror/mode/gfm/gfm.js"></script>
+<script src="codemirror/addon/selection/mark-selection.js"></script>
+<script src="codemirror/addon/search/searchcursor.js"></script>
+<script src="codemirror/addon/edit/continuelist.js"></script>
+<script src="codemirror/addon/scroll/simplescrollbars.js"></script>
+<script src="sweet2alert/dist/sweetalert2.all.min.js"></script>
+<script src="js/turndown.js"></script>
+<script src="js/turndown-plugin-gfm.js"></script>
+<script src="highlight/highlight.pack.js"></script>
+<script src="js/jquery.touchwipe.min.js"></script>
+<script src="js/fullscreen.js"></script>
+<script src="js/md.js"></script>
+<script src="js/all.min.js"></script>
 <script>
-
+	if ('serviceWorker' in navigator) {
+	   navigator.serviceWorker.register('sw.js', { scope: '/' }).then(function(reg) {
+	 
+		if(reg.installing) {
+		  console.log('Service worker installing');
+		} else if(reg.waiting) {
+		  console.log('Service worker installed');
+		} else if(reg.active) {
+		  console.log('Service worker active');
+		}
+	 
+	   }).catch(function(error) {
+		console.log('Registration failed with ' + error);
+	   });
+	 }
 	window.onload = function(){
 		setTimeout(function(){
-			Editor.create(document.getElementById("editor"),{render_allowHtml:true},function(wrapper,contentWindow){
-				var loading = document.getElementById("loading");
-				loading.parentNode.removeChild(loading);
-				var bg = document.getElementById("bg");
-				bg.parentNode.removeChild(document.getElementById("bg"));
+			var wrapper = EditorWrapper.create({});
+			//https://www.qyh.me/space/web/article/598
+			var userAgent = navigator.userAgent;
+			if(userAgent.indexOf('Windows NT 10.0') != -1 && userAgent.indexOf('Firefox') != -1){
+				var textarea = wrapper.editor.getWrapperElement().querySelector('textarea');
+				textarea.style.width = "1000px";
+			}
+			
+			var beforePrintHandler = function(mql) {
+				if (mql.matches) {
+					wrapper.doRender(false);
+				}
+			}
+			if (window.matchMedia) {
+				var mediaQueryList = window.matchMedia('print');
+				mediaQueryList.addListener(beforePrintHandler);
+			}
+			wrapper.onRemove(function(){
+				mediaQueryList.removeListener(beforePrintHandler);
 			});
 		},0)
 	}
