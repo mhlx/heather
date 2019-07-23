@@ -326,6 +326,29 @@ wrapper.theme.store();//储存配置的主题
 ### 取消监听实例销毁
 `wrapper.offRemove(fun)`
 
+### 事件监听
+`wrapper.on(name,fun)`
+
+### 取消事件监听
+`wrapper.off(name,fun)`
+
+
+## 事件
+
+### remove
+编辑器实例**被销毁前**触发
+
+### resize
+editor_wrapper 元素尺寸改变时触发
+> 这个事件采用了 `ResizeObserver` 来监听元素的变化，浏览器支持请看：https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver#Browser_compatibility 
+
+如果不支持 `ResizeObserver` (`if(window.ResizeObserver)`)，可以通过 [css-element-queries](https://marcj.github.io/css-element-queries/)来自己实现，例如：
+```javascript
+new ResizeSensor(wrapper.wrapperElement, function() {
+    console.log('size changed');
+});
+```
+
 ## 导出PDF
 
 没有直接导出PDF的方法，但是可以通过以下步骤，让chrome浏览器的打印功能来实现
