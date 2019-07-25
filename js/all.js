@@ -1,32 +1,34 @@
 var EditorWrapper = (function() {
-	
-	'use strict';
-	CodeMirror.prototype.renderAllDoc = function(scrollToTop) {
-		var editor = this;
-		editor.setOption('readOnly', true);
-		var viewport = editor.getViewport();
-		var lastLine = editor.lineCount() - 1;
-		while (viewport.to < lastLine && viewport.to > 0) {
-			editor.scrollIntoView({
-				line: viewport.to
-			});
-			viewport = editor.getViewport();
-		}
 
-		editor.scrollIntoView({
-			line: lastLine
-		});
-		editor.scrollIntoView({
-			top: scrollToTop
-		});
-		editor.setOption('readOnly', false);
-	}
+    'use strict';
+    CodeMirror.prototype.renderAllDoc = function(scrollToTop) {
+        var editor = this;
+        editor.setOption('readOnly', true);
+        var viewport = editor.getViewport();
+        var lastLine = editor.lineCount() - 1;
+        while (viewport.to < lastLine && viewport.to > 0) {
+            editor.scrollIntoView({
+                line: viewport.to
+            });
+            viewport = editor.getViewport();
+        }
+
+        editor.scrollIntoView({
+            line: lastLine
+        });
+        editor.scrollIntoView({
+            top: scrollToTop
+        });
+        editor.setOption('readOnly', false);
+    }
 
 
-	CodeMirror.keyMap.default["Shift-Tab"] = "indentLess";
-	CodeMirror.keyMap.default["Tab"] = "indentMore";
+    CodeMirror.keyMap.default["Shift-Tab"] = "indentLess";
+    CodeMirror.keyMap.default["Tab"] = "indentMore";
 	
-	
+	var keyNames = CodeMirror.keyNames;
+
+
     function cloneAttributes(element, sourceNode) {
         let attr;
         let attributes = Array.prototype.slice.call(sourceNode.attributes);
@@ -52,38 +54,34 @@ var EditorWrapper = (function() {
         function MarkdownRender(config, theme) {
             var plugins = config.render_plugins || ['footnote', 'katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'];
             var hasMermaid = $.inArray('mermaid', plugins) != -1;
-			this.md = createMarkdownParser({
+            this.md = createMarkdownParser({
                 html: config.render_allowHtml !== false,
                 plugins: plugins,
                 lineNumber: true,
-				highlight : function(str, lang) {
-					if(hasMermaid && lang == 'mermaid'){
-						return '<div class="mermaid-block"><div class="mermaid">'+str+'</div><div class="mermaid-source" style="display:none">'+str+'</div></div>';					
-					}
-					if (lang && hljs.getLanguage(lang)) {
-						try {
-							return '<pre class="hljs"><code>' +
-					   hljs.highlight(lang, str, true).value +
-					   '</code></pre>';
-						} catch (__) {}
-					}
-					return '';
-				}
+                highlight: function(str, lang) {
+                    if (hasMermaid && lang == 'mermaid') {
+                        return '<div class="mermaid-block"><div class="mermaid">' + str + '</div><div class="mermaid-source" style="display:none">' + str + '</div></div>';
+                    }
+                    if (lang && hljs.getLanguage(lang)) {
+                        try {
+                            return '<pre class="hljs"><code>' +
+                                hljs.highlight(lang, str, true).value +
+                                '</code></pre>';
+                        } catch (__) {}
+                    }
+                }
             });
-            this.md2 = createMarkdownParser({
+            var md2 = createMarkdownParser({
                 html: config.render_allowHtml !== false,
                 plugins: plugins,
                 lineNumber: false,
-				highlight : function(str, lang) {
-					if(hasMermaid && lang == 'mermaid'){
-						return '<div class="mermaid">'+str+'</div>';
-					}
-					if (lang && hljs.getLanguage(lang)) {
-						return '<pre><code class="'+lang+'">'+str+'</code></pre>'
-					}
-					return '';
-				}
+                highlight: function(str, lang) {
+                    if (hasMermaid && lang == 'mermaid') {
+                        return '<div class="mermaid">' + str + '</div>';
+                    }
+                }
             });
+			this.md2 = md2;
             this.config = config;
             this.theme = theme;
         }
@@ -102,11 +100,11 @@ var EditorWrapper = (function() {
                         theme: theme.mermaid.theme || 'default'
                     });
                     clearInterval(t);
-                    try{
-						mermaid.init({}, '#editor_out .mermaid');
-					}catch(e){
-						console.log(e);
-					}
+                    try {
+                        mermaid.init({}, '#editor_out .mermaid');
+                    } catch (e) {
+                        console.log(e);
+                    }
                 } catch (__) {}
             }, 20)
         }
@@ -133,14 +131,14 @@ var EditorWrapper = (function() {
                     var katexs = document.getElementById("editor_out").querySelectorAll(".katex");
                     for (var i = 0; i < katexs.length; i++) {
                         var block = katexs[i];
-                        try{
-							block.innerHTML = katex.renderToString(block.textContent, {
-								throwOnError: false,
-								displayMode: true
-							});
-						}catch(e){
-							console.log(e);
-						}
+                        try {
+                            block.innerHTML = katex.renderToString(block.textContent, {
+                                throwOnError: false,
+                                displayMode: true
+                            });
+                        } catch (e) {
+                            console.log(e);
+                        }
                     }
                 } catch (__) {
 
@@ -177,8 +175,13 @@ var EditorWrapper = (function() {
                         }
                         if (f.classList.contains('mermaid-block') &&
                             t.classList.contains('mermaid-block')) {
-                            var old = f.getElementsByClassName('mermaid-source')[0].textContent;
-                            var now = t.getElementsByClassName('mermaid-source')[0].textContent;
+                            var oldEle = f.getElementsByClassName('mermaid-source')[0];
+                            var nowEle = t.getElementsByClassName('mermaid-source')[0];
+							if(isUndefined(oldEle) || isUndefined(nowEle)){
+								return true;
+							}
+							var old = oldEle.textContent;
+							var now = nowEle.textContent;
                             if (old == now) {
                                 //更新属性
                                 cloneAttributes(f, t);
@@ -191,12 +194,16 @@ var EditorWrapper = (function() {
             } else {
                 element.innerHTML = innerHTML;
             }
+			var logError = false;
             try {
                 mermaid.initialize({
                     theme: this.theme.mermaid.theme || 'default'
                 });
+				logError = true;
                 mermaid.init({}, '#editor_out .mermaid');
-            } catch (e) {if(!isUndefined(window.mermaid)) console.log(e)}
+            } catch (e) {
+                if (logError) console.log(e)
+            }
         }
 
         return {
@@ -208,7 +215,7 @@ var EditorWrapper = (function() {
 
 
     var Bar = (function() {
-        
+
 
         function Bar(element, config) {
             this.element = $(element);
@@ -247,9 +254,11 @@ var EditorWrapper = (function() {
             var i = document.createElement('i');
             i.setAttribute('class', icon);
             i.setAttribute('style', 'cursor: pointer;margin-right:20px');
-            i.addEventListener('click', function() {
-                handler(i);
-            })
+			if(handler){
+				i.addEventListener('click', function() {
+					handler(i);
+				})
+			}
             return i;
         }
 
@@ -297,7 +306,7 @@ var EditorWrapper = (function() {
 
 
     var Sync = (function(editor) {
-        
+
 
         function Sync(editor, scrollElement, config) {
             this.editor = editor;
@@ -392,7 +401,59 @@ var EditorWrapper = (function() {
         var mobile = CodeMirror.browser.mobile;
         var ios = CodeMirror.browser.ios;
 		
-        var Theme = (function() {
+        var ThemeHandler = (function() {
+			
+			function ThemeHandler(config){
+				this.key = config.theme_key || "heather-theme";
+				this.store = {
+					saveJson : function(key,json){
+						localStorage.setItem(key, json);
+					},
+					getJson : function(key){
+						return localStorage.getItem(key);
+					}
+				};
+				this.config = config;
+				this.timer = undefined;
+			}
+			
+			ThemeHandler.prototype.saveTheme = function(theme){
+				if (this.timer) {
+                    clearTimeout(this.timer);
+                }
+                var handler = this;
+                this.timer = setTimeout(function() {
+					var json = JSON.stringify(theme);
+					handler.store.saveJson(handler.key,json);
+                }, 500)
+			}
+			
+			ThemeHandler.prototype.reset = function() {
+                var theme = new Theme(this.config);
+                this.store.saveJson(this.key,JSON.stringify(theme));
+                theme.render();
+                return theme;
+            }
+			
+			ThemeHandler.prototype.getTheme = function(){
+				var json = this.store.getJson(this.key);
+				if(json == null){
+					return new Theme(this.config);
+				} else {
+					var current = $.parseJSON(json);
+					var theme = new Theme(this.config);
+					theme.toolbar = current.toolbar;
+					theme.bar = current.bar;
+					theme.stat = current.stat;
+					theme.editor = current.editor;
+					theme.inCss = current.inCss;
+					theme.cursorHelper = current.cursorHelper;
+					theme.mermaid = current.mermaid;
+					theme.customCss = current.customCss;
+					return theme;
+				}
+			}
+			
             function Theme(config) {
                 this.toolbar = {};
                 this.bar = {};
@@ -409,92 +470,40 @@ var EditorWrapper = (function() {
                 this.config = config;
             }
 
-            var themeKey = "markdown-editor-theme";
-
-            function saveTheme(theme, cb) {
-                var json = JSON.stringify(theme);
-                try {
-                    localStorage.setItem(themeKey, json);
-                    if (cb) cb("success");
-                } catch (e) {
-                    if (cb) cb("fail");
-                }
-            }
-
-            function getTheme(cb) {
-                if (!cb) return;
-                var json = localStorage.getItem(themeKey);
-                if (json == null) {
-                    cb(null)
-                } else {
-                    cb($.parseJSON(json));
-                }
-
-            }
-
-            function delTheme(cb) {
-                try {
-                    localStorage.removeItem(themeKey);
-                    if (cb) cb("success");
-                } catch (e) {
-                    if (cb) cb("fail");
-                }
-            }
-
-            Theme.prototype.store = function(callback) {
-                if (this.timer) {
-                    clearTimeout(this.timer);
-                }
-                var theme = this;
-                this.timer = setTimeout(function() {
-                    saveTheme(theme, function(cb) {
-                        if (callback) callback(cb == "success" ? true : false);
-                    });
-                }, 500)
-            }
-
-            Theme.prototype.reset = function() {
-                var theme = new Theme();
-                saveTheme(theme);
-                theme.render();
-                return theme;
-            }
-
             Theme.prototype.clone = function() {
                 var copy = JSON.parse(JSON.stringify(this));
-                var theme = new Theme();
+                var theme = new Theme(this.config);
                 theme.toolbar = copy.toolbar;
                 theme.bar = copy.bar;
                 theme.stat = copy.stat;
                 theme.editor = copy.editor;
                 theme.inCss = copy.inCss;
-                theme.cursorHelper = copy.cursorHelper;
                 theme.searchHelper = copy.searchHelper;
                 theme.mermaid = copy.mermaid;
                 theme.customCss = copy.customCss;
                 return theme;
             }
 
-            var getCurrentTheme = function(config) {
-                var current;
-                getTheme(function(cb) {
-                    current = cb
-                });
-                if (!current || current == null) {
-                    return new Theme(config);
+            Theme.prototype.render = function(config) {
+				config = config || {};
+                loadEditorTheme(this,config.editorThemeLoad);
+                loadHljsTheme(this);
+                var css = "";
+                css += "#editor_toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
+                css += "#editor_innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
+                css += "#editor_stat{color:" + (this.stat.color || 'inherit') + "}\n";
+                css += "#editor_in{background:" + (this.inCss.background || 'inherit') + "}\n";
+                var searchHelperColor = (this.searchHelper.color || 'inherit');
+                css += "#editor_searchHelper{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control{color:" + searchHelperColor + "}\n#editor_searchHelper .input-group-text{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control::placeholder {color: " + searchHelperColor + ";opacity: 1;}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}";
+
+                $("#custom_theme").remove();
+                if ($.trim(css) != '') {
+                    $("head").append("<style type='text/css' id='custom_theme'>" + css + "</style>");
                 }
-                var theme = new Theme(config);
-                theme.toolbar = current.toolbar;
-                theme.bar = current.bar;
-                theme.stat = current.stat;
-                theme.editor = current.editor;
-                theme.inCss = current.inCss;
-                theme.cursorHelper = current.cursorHelper;
-                theme.searchHelper = current.searchHelper;
-                theme.mermaid = current.mermaid;
-                theme.customCss = current.customCss;
-                return theme;
+                $("#custom_css").remove();
+                $("head").append("<style type='text/css' id='custom_css'>" + (this.customCss || '') + "</style>");
             }
+			
 			
             function loadHljsTheme(theme) {
                 if (theme.hljs.theme) {
@@ -511,73 +520,57 @@ var EditorWrapper = (function() {
                     }
                 }
             }
-
-            Theme.prototype.render = function() {
-				loadEditorTheme(this);
-                loadHljsTheme(this);
-                var css = "";
-                css += "#editor_toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
-                css += "#editor_innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
-                css += "#editor_stat{color:" + (this.stat.color || 'inherit') + "}\n";
-                css += "#editor_in{background:" + (this.inCss.background || 'inherit') + "}\n";
-				var searchHelperColor = (this.searchHelper.color || 'inherit');
-                css += "#editor_searchHelper{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control{color:" + searchHelperColor + "}\n#editor_searchHelper .input-group-text{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control::placeholder {color: "+searchHelperColor+";opacity: 1;}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: "+searchHelperColor+";}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: "+searchHelperColor+";}";                             
-
-			   $("#custom_theme").remove();
-                if ($.trim(css) != '') {
-                    $("head").append("<style type='text/css' id='custom_theme'>" + css + "</style>");
-                }
-                $("#custom_css").remove();
-                $("head").append("<style type='text/css' id='custom_css'>" + (this.customCss || '') + "</style>");
-            }
 			
+			function loadEditorTheme(theme, callback) {
+				if (theme.editor.theme) {
+					var editorTheme = theme.editor.theme;
+					var editorThemeFunction = theme.config.res_editorTheme || function(editorTheme) {
+						return 'codemirror/theme/' + editorTheme + '.css';
+					}
+					if ($('#codemirror-theme-' + editorTheme + '').length == 0) {
+						$('<link id="codemirror-theme-' + editorTheme + '" >').appendTo('head').attr({
+							type: 'text/css',
+							rel: 'stylesheet',
+							onload: function() {
+								if (callback) {
+									callback(editorTheme)
+								}
+							},
+							href: editorThemeFunction(editorTheme)
+						})
+					} else {
+						if (callback) {
+							callback(editorTheme)
+						}
+					}
+				}
+			}
+
             return {
-                current: function(config) {
-                    return getCurrentTheme(config)
+                create: function(config) {
+                    return new ThemeHandler(config);
                 }
             };
         })();
-		
-		 function loadEditorTheme(theme,callback) {
-			if (theme.editor.theme) {
-				var editorTheme = theme.editor.theme;
-				var editorThemeFunction = theme.config.res_editorTheme || function(editorTheme) {
-					return 'codemirror/theme/' + editorTheme + '.css';
-				}
-				if ($('#codemirror-theme-' + editorTheme + '').length == 0) {
-					$('<link id="codemirror-theme-' + editorTheme + '" >').appendTo('head').attr({
-						type: 'text/css',
-						rel: 'stylesheet',
-						onload:function(){
-							if(callback){callback(editorTheme)}
-						},
-						href: editorThemeFunction(editorTheme)
-					})
-				} else {
-					if(callback){callback(editorTheme)}
-				}
-			}
-		}
-
 
         function EditorWrapper(config) {
-			var html = '<div id="editor_wrapper">';
-			html += '<div id="editor_toc">';
-			html += '</div>' ;
-			html += '<div id="editor_in">' ;
-			html += '<div id="editor_toolbar"></div>' ;
-			html += '<textarea  style="width: 100%; height: 100%"></textarea>' ;
-			html += '<div id="editor_stat"></div>' ;
-			html += '<div id="editor_innerBar"></div>' ;
-			html += '</div>' ;
-			html += '<div class="markdown-body" id="editor_out"></div>';	
-			html += '</div>' ;
-			var $wrapperElement = $(html);
-			$('body').append($wrapperElement);
-			this.scrollTop = $(window).scrollTop();
-			$('body').addClass('editor_noscroll');
-			$('html').addClass('editor_noscroll');
-			this.wrapperElement = $wrapperElement[0]
+            var html = '<div id="editor_wrapper">';
+            html += '<div id="editor_toc">';
+            html += '</div>';
+            html += '<div id="editor_in">';
+            html += '<div id="editor_toolbar"></div>';
+            html += '<textarea  style="width: 100%; height: 100%"></textarea>';
+            html += '<div id="editor_stat"></div>';
+            html += '<div id="editor_innerBar"></div>';
+            html += '</div>';
+            html += '<div class="markdown-body" id="editor_out"></div>';
+            html += '</div>';
+            var $wrapperElement = $(html);
+            $('body').append($wrapperElement);
+            this.scrollTop = $(window).scrollTop();
+            $('body').addClass('editor_noscroll');
+            $('html').addClass('editor_noscroll');
+            this.wrapperElement = $wrapperElement[0]
             if (!mobile) {
                 $("#editor_in").show();
                 $("#editor_out").css({
@@ -587,13 +580,17 @@ var EditorWrapper = (function() {
             $("#editor_wrapper").animate({
                 scrollLeft: $("#editor_toc").outerWidth()
             }, 0);
-			
-			this.eventHandlers = [];
-            var theme = Theme.current(config);
+
+            this.eventHandlers = [];
+			this.themeHandler = ThemeHandler.create(config);
+            var theme = this.themeHandler.getTheme();
             theme.render();
+			this.theme = theme;
             var scrollBarStyle = mobile ? 'native' : 'overlay';
             var editor = CodeMirror.fromTextArea(document.getElementById('editor_wrapper').querySelector('textarea'), {
-                mode: {name: "gfm"},
+                mode: {
+                    name: "gfm"
+                },
                 lineNumbers: false,
                 matchBrackets: true,
                 lineWrapping: true,
@@ -605,7 +602,7 @@ var EditorWrapper = (function() {
                     "Enter": "newlineAndIndentContinueMarkdownList"
                 }
             });
-			
+
             var turndownService = config.turndownService;
 
             if (!turndownService) {
@@ -639,17 +636,6 @@ var EditorWrapper = (function() {
                     return "";
                 });
             }
-			var customChangeCssHandler = function() {
-                theme.customCss = this.textContent;
-                theme.store();
-            };
-            $('head').on('DOMSubtreeModified', '#custom_css', customChangeCssHandler);
-			this.eventHandlers.push({
-				name : 'remove',
-				handler : function(){
-					$('head').off('DOMSubtreeModified', '#custom_css', customChangeCssHandler)
-				}
-			})
             this.theme = theme;
             this.sync = Sync.create(editor, $("#editor_out")[0], config);
             this.render = Render.create(config, theme);
@@ -664,14 +650,14 @@ var EditorWrapper = (function() {
                 var ms = getDefault(config.render_ms, 500);
                 var autoRenderTimer;
                 var stat_timer;
-				wrapper.onRemove(function(){
-					if (autoRenderTimer) {
+                wrapper.onRemove(function() {
+                    if (autoRenderTimer) {
                         clearTimeout(autoRenderTimer);
                     }
-					if (stat_timer) {
+                    if (stat_timer) {
                         clearTimeout(stat_timer);
                     }
-				})
+                })
                 editor.on('change', function() {
                     if (autoRenderTimer) {
                         clearTimeout(autoRenderTimer);
@@ -725,42 +711,42 @@ var EditorWrapper = (function() {
                     min_move_x: 10,
                     max_move_y: 5
                 });
-				
-				function hasXScrollBar(element){
-				  var overflowX = window.getComputedStyle(element)['overflow-x'];
-				  return (overflowX === 'scroll' || overflowX === 'auto') && element.scrollWidth > element.clientWidth;
-				}
-				
-				//if an element has a x scrollbar and scrollLeft > 0 then can not wipe
-				function canWipe(element){
-					if(isUndefined(element) || element == null){
-						return true;
-					}
-					if(hasXScrollBar(element) && $(element).scrollLeft() > 0){
-						return false;
-					}
-					return canWipe(element.parentElement);
-				}
-				
-				
+
+                function hasXScrollBar(element) {
+                    var overflowX = window.getComputedStyle(element)['overflow-x'];
+                    return (overflowX === 'scroll' || overflowX === 'auto') && element.scrollWidth > element.clientWidth;
+                }
+
+                //if an element has a x scrollbar and scrollLeft > 0 then can not wipe
+                function canWipe(element) {
+                    if (isUndefined(element) || element == null) {
+                        return true;
+                    }
+                    if (hasXScrollBar(element) && $(element).scrollLeft() > 0) {
+                        return false;
+                    }
+                    return canWipe(element.parentElement);
+                }
+
+
                 $("#editor_out").touchwipe({
                     wipeRight: function(e) {
-						if(canWipe(e.target)){
-							wrapper.toEditor()
-						}
+                        if (canWipe(e.target)) {
+                            wrapper.toEditor()
+                        }
                     },
                     min_move_x: 10,
                     max_move_y: 5
                 });
             }
-			
-			var tocClickTimer;
-			wrapper.onRemove(function(){
-				if (tocClickTimer) {
-					clearTimeout(tocClickTimer);
-				}
-			});
-			
+
+            var tocClickTimer;
+            wrapper.onRemove(function() {
+                if (tocClickTimer) {
+                    clearTimeout(tocClickTimer);
+                }
+            });
+
             $("#editor_toc").on('click', '[data-line]', function() {
                 var line = parseInt($(this).data('line'));
 
@@ -775,7 +761,7 @@ var EditorWrapper = (function() {
                     editor.scrollTo(null, top);
                     if (mobile || wrapper.fullscreen) {
                         wrapper.toEditor();
-						wrapper.editor.focus();
+                        //wrapper.editor.focus();
                     }
                 }, 500)
             })
@@ -783,95 +769,85 @@ var EditorWrapper = (function() {
             this.config = config;
             initInnerBar(this);
             initToolbar(this);
-			this.fullscreen = false;
+            this.fullscreen = false;
             if (screenfull.enabled) {
-				var screenFullChangeHandler = function() {
-					wrapper.fullscreen = screenfull.isFullscreen;
+                var screenFullChangeHandler = function() {
+                    wrapper.fullscreen = screenfull.isFullscreen;
                     changeWhenFullScreenChange(wrapper, screenfull.isFullscreen);
-					if(!screenfull.isFullscreen){
-						wrapper.toEditor(undefined,0);
-						wrapper.doSync();
-					}
                 }
-				wrapper.onRemove(function(){
-					 screenfull.off('change',screenFullChangeHandler);
-				});
-                screenfull.on('change',screenFullChangeHandler);
+                wrapper.onRemove(function() {
+                    screenfull.off('change', screenFullChangeHandler);
+                });
+                screenfull.on('change', screenFullChangeHandler);
             }
-			
-			triggerEvent(this,'load');
+
+            triggerEvent(this, 'load');
         }
-		
-		function triggerEvent(wrapper,name,args){
-			for(var i=0;i<wrapper.eventHandlers.length;i++){
-				var evtHandler= wrapper.eventHandlers[i];
-				if(evtHandler.name == name){
-					try{
-						evtHandler.handler.call(this,args);
-					}catch(e){}
-				}
-			}
-		}
+
+        function triggerEvent(wrapper, name, args) {
+            for (var i = 0; i < wrapper.eventHandlers.length; i++) {
+                var evtHandler = wrapper.eventHandlers[i];
+                if (evtHandler.name == name) {
+                    try {
+                        evtHandler.handler.call(wrapper, args);
+                    } catch (e) {}
+                }
+            }
+        }
 
         function changeWhenFullScreenChange(wrapper, isFullscreen) {
             if (!CodeMirror.browser.mobile) {
                 var cm = wrapper.editor;
                 var wrap = cm.getWrapperElement();
+
+
+                var outToEditorHandler = function(e) {
+                    var keyCode = e.which || e.keyCode;
+                    if (e.ctrlKey && keyCode == 37) {
+                        $("#editor_out").removeAttr("tabindex");
+                        wrapper.toEditor(function() {
+							cm.focus();
+							var info = cm.state.fullScreenRestore;
+							window.scrollTo(info.scrollLeft, info.scrollTop);
+                        });
+                    }
+                }
+
+                var tocToEditorHandler = function(e) {
+                    var keyCode = e.which || e.keyCode;
+                    if (e.ctrlKey && keyCode == 39) {
+                        $("#editor_toc").removeAttr("tabindex");
+                        wrapper.toEditor(function() {
+							cm.focus();
+							var info = cm.state.fullScreenRestore;
+							window.scrollTo(info.scrollLeft, info.scrollTop);
+                        });
+                    }
+                }
 				
-				var cursor;
-				var extraKeys = cm.getOption('extraKeys');
-				
-				var outToEditorHandler = function(e){
-					var keyCode = e.which || e.keyCode;
-					if(e.ctrlKey && keyCode == 37){
-						$("#editor_out").removeAttr("tabindex");
-						wrapper.toEditor(function(){
-							if(cursor){
-								cm.focus();
-								var info = cm.state.fullScreenRestore;
-								window.scrollTo(info.scrollLeft, info.scrollTop);
-							}
-						});
+				var keyMap = {
+					'Ctrl-Right': function(){
+                        wrapper.toPreview(function() {
+                            $("#editor_out").prop('tabindex', 0);
+                            $("#editor_out").focus();
+                        });
+					},
+					'Ctrl-Left' : function(){
+                        wrapper.toToc(function() {
+                            $("#editor_toc").prop('tabindex', 0);
+                            $("#editor_toc").focus();
+                        });
 					}
 				}
-				
-				var tocToEditorHandler = function(e){
-					var keyCode = e.which || e.keyCode;
-					if(e.ctrlKey && keyCode == 39){
-						$("#editor_toc").removeAttr("tabindex");
-						wrapper.toEditor(function(){
-							if(cursor){
-								cm.focus();
-								var info = cm.state.fullScreenRestore;
-								window.scrollTo(info.scrollLeft, info.scrollTop);
-							}
-						});
-					}
-				}
-				
+
                 if (isFullscreen) {
-					extraKeys['Ctrl-Right'] = function(){
-						cursor = wrapper.editor.getCursor();
-						wrapper.toPreview(function(){
-							$("#editor_out").prop('tabindex',0);
-							$("#editor_out").focus();
-						});
-					}
-					
-					extraKeys['Ctrl-Left'] = function(){
-						cursor = wrapper.editor.getCursor();
-						wrapper.toToc(function(){
-							$("#editor_toc").prop('tabindex',0);
-							$("#editor_toc").focus();
-						});
-					}
-					
-					cm.setOption('extraKeys',extraKeys);
-					$("#editor_out").on('keydown',outToEditorHandler);
-					$("#editor_toc").on('keydown',tocToEditorHandler);
-					
+					wrapper.editor.addKeyMap(keyMap);
+
+                    $("#editor_out").on('keydown', outToEditorHandler);
+                    $("#editor_toc").on('keydown', tocToEditorHandler);
+
                     $(wrapper.getFullScreenElement()).addClass('editor_fullscreen');
-					
+
                     //from CodeMirror display fullscreen.js
                     cm.state.fullScreenRestore = {
                         scrollTop: window.pageYOffset,
@@ -884,25 +860,26 @@ var EditorWrapper = (function() {
                     wrap.className += " CodeMirror-fullscreen";
                     document.documentElement.style.overflow = "hidden";
                     cm.refresh();
+
                 } else {
-					
-					delete extraKeys['Ctrl-Left'];
-					delete extraKeys['Ctrl-Right'];
-					cm.setOption('extraKeys',extraKeys);
-					$("#editor_out").off('keydown',outToEditorHandler);
-					$("#editor_toc").off('keydown',tocToEditorHandler);
-					
+
+					wrapper.editor.removeKeyMap(keyMap);
+                    $("#editor_out").off('keydown', outToEditorHandler);
+                    $("#editor_toc").off('keydown', tocToEditorHandler);
+
                     $(wrapper.getFullScreenElement()).removeClass('editor_fullscreen');
                     wrap.className = wrap.className.replace(/\s*CodeMirror-fullscreen\b/, "");
-					document.documentElement.style.overflow = "";
-					var info = cm.state.fullScreenRestore;
-					wrap.style.width = info.width; wrap.style.height = info.height;
-					window.scrollTo(info.scrollLeft, info.scrollTop);
-					cm.refresh();
+                    document.documentElement.style.overflow = "";
+                    var info = cm.state.fullScreenRestore;
+                    wrap.style.width = info.width;
+                    wrap.style.height = info.height;
+                    window.scrollTo(info.scrollLeft, info.scrollTop);
+                    cm.refresh();
+
                 }
-				wrapper.toEditor(function(){
+                wrapper.toEditor(function() {
 					wrapper.doRender(false);
-				},0);
+				}, 0);
             }
         }
 
@@ -910,51 +887,51 @@ var EditorWrapper = (function() {
             this.render.renderAt(this.editor.getValue(), $("#editor_out")[0], patch);
             renderToc();
         }
-		
-		EditorWrapper.prototype.remove = function(patch) {
-			var me = this;
-			var removeHandler = function(){
-				Swal.close();
-				triggerEvent(me,'remove');
-				$(me.getFullScreenElement()).removeClass('editor_fullscreen');
-				$('body').removeClass('editor_noscroll');
-				$('html').removeClass('editor_noscroll');
-				$('html,body').scrollTop(me.scrollTop);
-				me.wrapperElement.parentNode.removeChild(me.wrapperElement);
-				wrapperInstance.wrapper = undefined;
-				delete wrapperInstance.wrapper;
-			}
-			if(this.fullscreen){
-				this.exitFullScreen().then(function(){
-					removeHandler();
-				});
-			} else {
-				removeHandler();
-			}
+
+        EditorWrapper.prototype.remove = function(patch) {
+            var me = this;
+            var removeHandler = function() {
+                Swal.close();
+                triggerEvent(me, 'remove');
+                $(me.getFullScreenElement()).removeClass('editor_fullscreen');
+                $('body').removeClass('editor_noscroll');
+                $('html').removeClass('editor_noscroll');
+                $('html,body').scrollTop(me.scrollTop);
+                me.wrapperElement.parentNode.removeChild(me.wrapperElement);
+                wrapperInstance.wrapper = undefined;
+                delete wrapperInstance.wrapper;
+            }
+            if (this.fullscreen) {
+                this.exitFullScreen().then(function() {
+                    removeHandler();
+                });
+            } else {
+                removeHandler();
+            }
         }
-		
+
         EditorWrapper.prototype.doSync = function() {
             this.sync.doSync();
         }
-		
-		EditorWrapper.prototype.requestFullScreen = function() {
-            if(!mobile){
-				 if (screenfull.enabled) {
-					screenfull.request(this.getFullScreenElement());
-				} else {
-					swal("当前浏览器不支持全屏模式")
-				}
-			}
+
+        EditorWrapper.prototype.requestFullScreen = function() {
+            if (!mobile) {
+                if (screenfull.enabled) {
+                    screenfull.request(this.getFullScreenElement());
+                } else {
+                    swal("当前浏览器不支持全屏模式")
+                }
+            }
         }
-		
-		EditorWrapper.prototype.getFullScreenElement = function() {
+
+        EditorWrapper.prototype.getFullScreenElement = function() {
             return document.body;
         }
-		
-		EditorWrapper.prototype.exitFullScreen  = function() {
-			if(!mobile && screenfull.enabled){
-				return screenfull.exit();
-			}
+
+        EditorWrapper.prototype.exitFullScreen = function() {
+            if (!mobile && screenfull.enabled) {
+                return screenfull.exit();
+            }
         }
 
         EditorWrapper.prototype.enableSync = function() {
@@ -967,12 +944,12 @@ var EditorWrapper = (function() {
         EditorWrapper.prototype.getHtml = function() {
             return this.render.getHtml(this.editor.getValue());
         }
-		
-		EditorWrapper.prototype.getValue = function() {
+
+        EditorWrapper.prototype.getValue = function() {
             return this.editor.getValue();
         }
-		
-		EditorWrapper.prototype.setValue = function(text) {
+
+        EditorWrapper.prototype.setValue = function(text) {
             return this.editor.setValue(text);
         }
 
@@ -982,48 +959,48 @@ var EditorWrapper = (function() {
                 this.syncEnable = false;
             }
         }
-		
-		EditorWrapper.prototype.onRemove = function(fun) {
-			this.eventHandlers.push({
-				name : 'remove',
-				handler : fun
-			})
-        }
-		
-		EditorWrapper.prototype.offRemove = function(fun) {
-			for(var i=0;i<this.eventHandlers.length;i++){
-				var handler = this.eventHandlers[i];
-				if(handler.name == 'remove' && handler.handler == fun){
-					this.eventHandlers.splice(i,1);
-					break;
-				}
-			}
+
+        EditorWrapper.prototype.on = function(name, handler) {
+            this.eventHandlers.push({
+                name: name,
+                handler: handler
+            })
         }
 
-        EditorWrapper.prototype.toEditor = function(callback,_ms) {
-            var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
-            if (mobile || this.fullscreen) {
-                $("#editor_wrapper").animate({
-                    scrollLeft: $("#editor_in").width()
-                }, ms, function() {
-                    if (callback) callback();
-                });
-            } else {
-                $("#editor_wrapper").animate({
-                    scrollLeft: $("#editor_in").offset().left
-                }, ms, function() {
-                    if (callback) callback();
-                });
+        EditorWrapper.prototype.off = function(name, handler) {
+            for (var i = 0; i < this.eventHandlers.length; i++) {
+                var handler = this.eventHandlers[i];
+                if (handler.name == name && handler.handler == handler) {
+                    this.eventHandlers.splice(i, 1);
+                    break;
+                }
             }
         }
 
+        EditorWrapper.prototype.onRemove = function(fun) {
+            this.on('remove', fun)
+        }
 
-        EditorWrapper.prototype.toToc = function(callback,_ms) {
+        EditorWrapper.prototype.offRemove = function(fun) {
+            this.off('remove', fun);
+        }
+
+        EditorWrapper.prototype.toEditor = function(callback, _ms) {
+            var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
+             $("#editor_wrapper").animate({
+				scrollLeft: $("#editor_in").width()
+			}, ms, function() {
+				if (callback) callback();
+			});
+        }
+
+
+        EditorWrapper.prototype.toToc = function(callback, _ms) {
             this.editor.getInputField().blur();
             if (mobile) {
                 this.doRender(true);
             }
-            var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
+            var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
             $("#editor_wrapper").animate({
                 scrollLeft: 0
             }, ms, function() {
@@ -1031,15 +1008,15 @@ var EditorWrapper = (function() {
             });
         }
 
-        EditorWrapper.prototype.toPreview = function(callback,_ms) {
-			var me = this;
+        EditorWrapper.prototype.toPreview = function(callback, _ms) {
+            var me = this;
             if (mobile || me.fullscreen) {
                 this.editor.getInputField().blur();
-				if(mobile){
-					this.doRender(true);
-					this.doSync();
-				}
-				var ms = getDefault(_ms,getDefault(this.config.swipe_animateMs, 500));
+                if (mobile) {
+                    this.doRender(true);
+                    this.doSync();
+                }
+                var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
                 $("#editor_wrapper").animate({
                     scrollLeft: $("#editor_out")[0].offsetLeft
                 }, ms, function() {
@@ -1047,8 +1024,10 @@ var EditorWrapper = (function() {
                 });
             }
         }
-
-
+		
+		EditorWrapper.prototype.saveTheme = function() {
+           this.themeHandler.saveTheme(this.theme);
+        }
 
         function initInnerBar(wrapper) {
             var innerBar = wrapper.innerBar;
@@ -1056,368 +1035,387 @@ var EditorWrapper = (function() {
             var config = wrapper.config;
 
             var innerBarElement = $("#editor_innerBar");
-            var icons = config.innerBar_icons || ['emoji', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table', 'undo', 'redo', 'close'];
             var ios = CodeMirror.browser.ios;
+
+			var emojiHandler = function() {
+				var emojiArray = config.emojiArray || $.trim("😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 ☺️ 🙂 🤗 🤔 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🤑 😲 ☹️ 🙁 😖 😞 😟 😤 😢 😭 😦 😧 😨 😩 😬 😰 😱 😳 😵 😡 😠 😷 🤒 🤕 🤢 🤧 😇 🤠 🤡 🤥 🤓 😈 👿 👹 👺 💀 👻 👽 🤖 💩 😺 😸 😹 😻 😼 😽 🙀 😿 😾").split(' ');
+				var html = '';
+				for (var i = 0; i < emojiArray.length; i++) {
+					html += '<span data-emoji style="cursor:pointer">' + emojiArray[i] +
+						'</span>';
+				}
+				swal({
+					html: html
+				})
+				$(Swal.getContent()).find('[data-emoji]').click(function() {
+					var emoji = $(this).text();
+					var text = editor.getSelection();
+					if (text == '') {
+						editor.replaceRange(emoji, editor.getCursor());
+					} else {
+						editor.replaceSelection(emoji);
+					}
+					Swal.close();
+				})
+			};
+
+            var headingHandler =  function() {
+				async function getHeading() {
+					const {
+						value: heading
+					} = await Swal.fire({
+						input: 'select',
+						inputValue: '1',
+						inputOptions: {
+							'1': 'H1',
+							'2': 'H2',
+							'3': 'H3',
+							'4': 'H4',
+							'5': 'H5',
+							'6': 'H6'
+						},
+						inputPlaceholder: '',
+						showCancelButton: true
+					});
+					if (heading) {
+						var v = parseInt(heading);
+						var text = editor.getSelection();
+						var _text = '\n';
+						for (var i = 0; i < v; i++) {
+							_text += '#';
+						}
+						_text += ' ';
+						if (text == '') {
+							editor.replaceRange(_text, editor.getCursor());
+							editor.focus();
+							var start_cursor = editor.getCursor();
+							var cursorLine = start_cursor.line;
+							var cursorCh = start_cursor.ch;
+							editor.setCursor({
+								line: cursorLine,
+								ch: cursorCh + v
+							});
+						} else {
+							editor.replaceSelection(_text + text);
+						}
+					}
+				}
+				getHeading();
+			};
+
+			var boldHandler = function() {
+				var text = editor.getSelection();
+				if (text == '') {
+					editor.replaceRange("****", editor.getCursor());
+					editor.focus();
+					var str = "**";
+					var mynum = str.length;
+					var start_cursor = editor.getCursor();
+					var cursorLine = start_cursor.line;
+					var cursorCh = start_cursor.ch;
+					editor.setCursor({
+						line: cursorLine,
+						ch: cursorCh - mynum
+					});
+				} else {
+					editor.replaceSelection("**" + text + "**");
+				}
+			}
+
+            var italicHandler = function() {
+				var text = editor.getSelection();
+				if (text == '') {
+					editor.replaceRange("**", editor.getCursor());
+					editor.focus();
+					var str = "*";
+					var mynum = str.length;
+					var start_cursor = editor.getCursor();
+					var cursorLine = start_cursor.line;
+					var cursorCh = start_cursor.ch;
+					editor.setCursor({
+						line: cursorLine,
+						ch: cursorCh - mynum
+					});
+				} else {
+					editor.replaceSelection("*" + text + "*");
+				}
+			};
+
+			var quoteHandler = function() {
+				var text = editor.getSelection();
+				if (text == '') {
+					editor.replaceRange("\n> ", editor.getCursor());
+					editor.focus();
+					var start_cursor = editor.getCursor();
+					var cursorLine = start_cursor.line;
+					var cursorCh = start_cursor.ch;
+					editor.setCursor({
+						line: cursorLine,
+						ch: cursorCh
+					});
+				} else {
+					editor.replaceSelection("> " + text);
+				}
+			}
+
+			var strikethroughHandler = function() {
+				var text = editor.getSelection();
+				if (text == '') {
+					editor.replaceRange("~~~~", editor.getCursor());
+					editor.focus();
+					var str = "~~";
+					var mynum = str.length;
+					var start_cursor = editor.getCursor();
+					var cursorLine = start_cursor.line;
+					var cursorCh = start_cursor.ch;
+					editor.setCursor({
+						line: cursorLine,
+						ch: cursorCh - mynum
+					});
+				} else {
+					editor.replaceSelection("~~" + text + "~~");
+				}
+			};
+
+
+            var linkHandler = function() {
+				var text = editor.getSelection();
+				if (text == '') {
+					editor.replaceRange("[](https://)", editor.getCursor());
+					editor.focus();
+					var start_cursor = editor.getCursor();
+					var cursorLine = start_cursor.line;
+					var cursorCh = start_cursor.ch;
+					editor.setCursor({
+						line: cursorLine,
+						ch: cursorCh - 11
+					});
+				} else {
+					editor.replaceSelection("[" + text + "](https://)");
+				}
+			};
+
+            var codeBlockHandler = function() {
+				var text = "\n```";
+				text += '\n';
+				text += editor.getSelection() + "";
+				text += '\n'
+				text += "```";
+				editor.focus();
+				editor.replaceSelection(text);
+				editor.setCursor({
+					line: editor.getCursor('start').line - 1,
+					ch: 0
+				});
+			};
+
+            var codeHandler = function() {
+				var text = editor.getSelection();
+				if (text == '') {
+					editor.replaceRange("``", editor.getCursor());
+					editor.focus();
+					var start_cursor = editor.getCursor();
+					var cursorLine = start_cursor.line;
+					var cursorCh = start_cursor.ch;
+					editor.setCursor({
+						line: cursorLine,
+						ch: cursorCh - 1
+					});
+				} else {
+					editor.replaceSelection("`" + text + "`");
+				}
+			};
+
+            var uncheckHandler =  function() {
+				var text = editor.getSelection();
+				if (text == '') {
+					editor.replaceRange("\n- [ ] ", editor.getCursor());
+					editor.focus();
+					var start_cursor = editor.getCursor();
+					var cursorLine = start_cursor.line;
+					var cursorCh = start_cursor.ch;
+					editor.setCursor({
+						line: cursorLine,
+						ch: cursorCh
+					});
+				} else {
+					editor.replaceSelection("- [ ] " + text);
+				}
+			};
+
+            var checkHandler = function() {
+				var text = editor.getSelection();
+				if (text == '') {
+					editor.replaceRange("\n- [x] ", editor.getCursor());
+					editor.focus();
+					var start_cursor = editor.getCursor();
+					var cursorLine = start_cursor.line;
+					var cursorCh = start_cursor.ch;
+					editor.setCursor({
+						line: cursorLine,
+						ch: cursorCh
+					});
+				} else {
+					editor.replaceSelection("- [x] " + text);
+				}
+			};
+			
+			var undoHandler = function() {
+				editor.execCommand("undo");
+			}
+			
+			var redoHandler = function() {
+				editor.execCommand("redo");
+			}
+
+            var tableHandler = function() {
+				innerBar.hide();
+				swal({
+					html: '<input class="swal2-input" placeholder="行">' +
+						'<input class="swal2-input" placeholder="列">',
+					preConfirm: function() {
+						return new Promise(function(resolve) {
+							var inputs = $(Swal.getContent()).find('input');
+							resolve([
+								inputs.eq(0).val(),
+								inputs.eq(1).val()
+							])
+						})
+					}
+				}).then(function(result) {
+					var value = result.value;
+					var cols = parseInt(value[0]) || 3;
+					var rows = parseInt(value[1]) || 3;
+					if (rows < 1)
+						rows = 3;
+					if (cols < 1)
+						cols = 3;
+					var text = '';
+					for (var i = 0; i <= cols; i++) {
+						text += '|    ';
+					}
+					text += "\n";
+					for (var i = 0; i < cols; i++) {
+						text += '|  -  ';
+					}
+					text += '|'
+					if (rows > 1) {
+						text += '\n';
+						for (var i = 0; i < rows - 1; i++) {
+							for (var j = 0; j <= cols; j++) {
+								text += '|    ';
+							}
+							text += "\n";
+						}
+					}
+					editor.replaceSelection("\n" + text);
+					innerBar.show();
+				}).catch(swal.noop)
+			};
+
+			
+            var icons = config.innerBar_icons || ['emoji', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table', 'undo', 'redo', 'close'];
             for (var i = 0; i < icons.length; i++) {
                 var icon = icons[i];
-                if (icon == 'emoji') {
-                    addEmoji();
-                }
-                if (icon == 'heading') {
-                    addHeading();
-                }
-                if (icon == 'bold') {
-                    addBold();
-                }
-                if (icon == 'italic') {
-                    addItalic();
-                }
-                if (icon == 'quote') {
-                    addQuote();
-                }
-                if (icon == 'strikethrough') {
-                    addStrikethrough();
-                }
-                if (icon == 'link') {
-                    addLink();
-                }
-                if (icon == 'code') {
-                    addCode();
-                }
-                if (icon == 'code-block') {
-                    addCodeBlock();
-                }
-                if (icon == 'uncheck') {
-                    addUncheckList();
-                }
-                if (icon == 'check') {
-                    addCheckList();
-                }
-                if (icon == 'undo') {
-                    addUndo();
-                }
-                if (icon == 'redo') {
-                    addRedo();
-                }
-                if (icon == 'close') {
-                    addClose();
-                }
-                if (icon == 'table') {
-                    addTable();
-                }
+                if(icon == 'emoji'){
+					innerBar.addIcon('far fa-grin-alt',undefined,function(ele){
+						ele.addEventListener('click',emojiHandler);
+					})
+				}
+				if(icon == 'heading'){
+					innerBar.addIcon('fas fa-heading',undefined,function(ele){
+						ele.addEventListener('click',headingHandler);
+					})
+				}
+				if(icon == 'bold'){
+					innerBar.addIcon('fas fa-bold',undefined,function(ele){
+						ele.addEventListener('click',boldHandler);
+					})
+				}
+				if(icon == 'italic'){
+					innerBar.addIcon('fas fa-italic',undefined,function(ele){
+						ele.addEventListener('click',italicHandler);
+					})
+				}
+				if(icon == 'quote'){
+					innerBar.addIcon('fas fa-quote-left',undefined,function(ele){
+						ele.addEventListener('click',quoteHandler);
+					})
+				}
+				
+				if(icon == 'strikethrough'){
+					innerBar.addIcon('fas fa-strikethrough',undefined,function(ele){
+						ele.addEventListener('click',strikethroughHandler);
+					})
+				}
+				
+				if(icon == 'link'){
+					innerBar.addIcon('fas fa-link',undefined,function(ele){
+						ele.addEventListener('click',linkHandler);
+					})
+				}
+				
+				if(icon == 'code'){
+					innerBar.addIcon('fas fa-code',undefined,function(ele){
+						ele.addEventListener('click',codeHandler);
+					})
+				}
+				
+				if(icon == 'code-block'){
+					innerBar.addIcon('fas fa-file-code',undefined,function(ele){
+						ele.addEventListener('click',codeBlockHandler);
+					})
+				}
+				
+				if(icon == 'uncheck'){
+					innerBar.addIcon('far fa-square',undefined,function(ele){
+						ele.addEventListener('click',uncheckHandler);
+					})
+				}
+				
+				if(icon == 'check'){
+					innerBar.addIcon('far fa-check-square',undefined,function(ele){
+						ele.addEventListener('click',checkHandler);
+					})
+				}
+				
+				if(icon == 'table'){
+					innerBar.addIcon('fas fa-table',undefined,function(ele){
+						ele.addEventListener('click',tableHandler);
+					})
+				}
+				
+				if(icon == 'undo'){
+					innerBar.addIcon('fas fa-undo',undefined,function(ele){
+						ele.addEventListener('click',undoHandler);
+					})
+				}
+				
+				if(icon == 'redo'){
+					innerBar.addIcon('fas fa-redo',undefined,function(ele){
+						ele.addEventListener('click',redoHandler);
+					})
+				}
+				if(icon == 'close'){
+					innerBar.addIcon('fas fa-times',function(){
+						innerBar.hide();
+					})
+				}
             }
-
-            function addEmoji() {
-                innerBar.addIcon('far fa-grin-alt icon', function() {
-                    var emojiArray = config.emojiArray || $.trim("😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 ☺️ 🙂 🤗 🤔 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🤑 😲 ☹️ 🙁 😖 😞 😟 😤 😢 😭 😦 😧 😨 😩 😬 😰 😱 😳 😵 😡 😠 😷 🤒 🤕 🤢 🤧 😇 🤠 🤡 🤥 🤓 😈 👿 👹 👺 💀 👻 👽 🤖 💩 😺 😸 😹 😻 😼 😽 🙀 😿 😾").split(' ');
-                    var html = '';
-                    for (var i = 0; i < emojiArray.length; i++) {
-                        html += '<span data-emoji style="cursor:pointer">' + emojiArray[i] +
-                            '</span>';
-                    }
-                    swal({
-                        html: html
-                    })
-                    $(Swal.getContent()).find('[data-emoji]').click(function() {
-                        var emoji = $(this).text();
-                        var text = editor.getSelection();
-                        if (text == '') {
-                            editor.replaceRange(emoji, editor.getCursor());
-                        } else {
-                            editor.replaceSelection(emoji);
-                        }
-                        Swal.close();
-                    })
-                });
-
-            }
-
-            function addHeading() {
-                innerBar.addIcon('fas fa-heading icon', function() {
-                    async function getHeading() {
-                        const {
-                            value: heading
-                        } = await Swal.fire({
-                            input: 'select',
-                            inputValue: '1',
-                            inputOptions: {
-                                '1': 'H1',
-                                '2': 'H2',
-                                '3': 'H3',
-                                '4': 'H4',
-                                '5': 'H5',
-                                '6': 'H6'
-                            },
-                            inputPlaceholder: '',
-                            showCancelButton: true
-                        });
-                        if (heading) {
-                            var v = parseInt(heading);
-                            var text = editor.getSelection();
-                            var _text = '\n';
-                            for (var i = 0; i < v; i++) {
-                                _text += '#';
-                            }
-                            _text += ' ';
-                            if (text == '') {
-                                editor.replaceRange(_text, editor.getCursor());
-                                editor.focus();
-                                var start_cursor = editor.getCursor();
-                                var cursorLine = start_cursor.line;
-                                var cursorCh = start_cursor.ch;
-                                editor.setCursor({
-                                    line: cursorLine,
-                                    ch: cursorCh + v
-                                });
-                            } else {
-                                editor.replaceSelection(_text + text);
-                            }
-                        }
-                    }
-                    getHeading();
-                })
-            }
-
-            function addBold() {
-                innerBar.addIcon('fas fa-bold icon', function() {
-                    var text = editor.getSelection();
-                    if (text == '') {
-                        editor.replaceRange("****", editor.getCursor());
-                        editor.focus();
-                        var str = "**";
-                        var mynum = str.length;
-                        var start_cursor = editor.getCursor();
-                        var cursorLine = start_cursor.line;
-                        var cursorCh = start_cursor.ch;
-                        editor.setCursor({
-                            line: cursorLine,
-                            ch: cursorCh - mynum
-                        });
-                    } else {
-                        editor.replaceSelection("**" + text + "**");
-                    }
-                });
-            }
-
-            function addItalic() {
-                innerBar.addIcon('fas fa-italic icon', function() {
-                    var text = editor.getSelection();
-                    if (text == '') {
-                        editor.replaceRange("**", editor.getCursor());
-                        editor.focus();
-                        var str = "*";
-                        var mynum = str.length;
-                        var start_cursor = editor.getCursor();
-                        var cursorLine = start_cursor.line;
-                        var cursorCh = start_cursor.ch;
-                        editor.setCursor({
-                            line: cursorLine,
-                            ch: cursorCh - mynum
-                        });
-                    } else {
-                        editor.replaceSelection("*" + text + "*");
-                    }
-                })
-            }
-
-            function addQuote() {
-                innerBar.addIcon('fas fa-quote-left icon', function() {
-                    var text = editor.getSelection();
-                    if (text == '') {
-                        editor.replaceRange("\n> ", editor.getCursor());
-                        editor.focus();
-                        var start_cursor = editor.getCursor();
-                        var cursorLine = start_cursor.line;
-                        var cursorCh = start_cursor.ch;
-                        editor.setCursor({
-                            line: cursorLine,
-                            ch: cursorCh
-                        });
-                    } else {
-                        editor.replaceSelection("> " + text);
-                    }
-                })
-            }
-
-            function addStrikethrough() {
-                innerBar.addIcon('fas fa-strikethrough icon', function() {
-                    var text = editor.getSelection();
-                    if (text == '') {
-                        editor.replaceRange("~~~~", editor.getCursor());
-                        editor.focus();
-                        var str = "~~";
-                        var mynum = str.length;
-                        var start_cursor = editor.getCursor();
-                        var cursorLine = start_cursor.line;
-                        var cursorCh = start_cursor.ch;
-                        editor.setCursor({
-                            line: cursorLine,
-                            ch: cursorCh - mynum
-                        });
-                    } else {
-                        editor.replaceSelection("~~" + text + "~~");
-                    }
-                })
-            }
-
-
-            function addLink() {
-                innerBar.addIcon('fas fa-link icon', function() {
-                    var text = editor.getSelection();
-                    if (text == '') {
-                        editor.replaceRange("[](https://)", editor.getCursor());
-                        editor.focus();
-                        var start_cursor = editor.getCursor();
-                        var cursorLine = start_cursor.line;
-                        var cursorCh = start_cursor.ch;
-                        editor.setCursor({
-                            line: cursorLine,
-                            ch: cursorCh - 11
-                        });
-                    } else {
-                        editor.replaceSelection("[" + text + "](https://)");
-                    }
-                });
-            }
-
-            function addCodeBlock() {
-                innerBar.addIcon('fas fa-file-code icon', function() {
-                    var text = "\n```";
-                    text += '\n';
-                    text += editor.getSelection() + "";
-                    text += '\n'
-                    text += "```";
-                    editor.focus();
-                    editor.replaceSelection(text);
-                    editor.setCursor({
-                        line: editor.getCursor('start').line - 1,
-                        ch: 0
-                    });
-                });
-            }
-
-            function addCode() {
-                innerBar.addIcon('fas fa-code icon', function() {
-                    var text = editor.getSelection();
-                    if (text == '') {
-                        editor.replaceRange("``", editor.getCursor());
-                        editor.focus();
-                        var start_cursor = editor.getCursor();
-                        var cursorLine = start_cursor.line;
-                        var cursorCh = start_cursor.ch;
-                        editor.setCursor({
-                            line: cursorLine,
-                            ch: cursorCh - 1
-                        });
-                    } else {
-                        editor.replaceSelection("`" + text + "`");
-                    }
-                });
-            }
-
-            function addUncheckList() {
-                innerBar.addIcon('far fa-square icon', function() {
-                    var text = editor.getSelection();
-                    if (text == '') {
-                        editor.replaceRange("\n- [ ] ", editor.getCursor());
-                        editor.focus();
-                        var start_cursor = editor.getCursor();
-                        var cursorLine = start_cursor.line;
-                        var cursorCh = start_cursor.ch;
-                        editor.setCursor({
-                            line: cursorLine,
-                            ch: cursorCh
-                        });
-                    } else {
-                        editor.replaceSelection("- [ ] " + text);
-                    }
-                });
-            }
-
-            function addCheckList() {
-                innerBar.addIcon('far fa-check-square icon', function() {
-                    var text = editor.getSelection();
-                    if (text == '') {
-                        editor.replaceRange("\n- [x] ", editor.getCursor());
-                        editor.focus();
-                        var start_cursor = editor.getCursor();
-                        var cursorLine = start_cursor.line;
-                        var cursorCh = start_cursor.ch;
-                        editor.setCursor({
-                            line: cursorLine,
-                            ch: cursorCh
-                        });
-                    } else {
-                        editor.replaceSelection("- [x] " + text);
-                    }
-                });
-            }
-
-            function addUndo() {
-                innerBar.addIcon('fas fa-undo icon', function() {
-                    editor.execCommand("undo");
-                });
-            }
-
-            function addRedo() {
-                innerBar.addIcon('fas fa-redo icon', function() {
-                    editor.execCommand("redo");
-                });
-            }
-
-            function addClose() {
-                innerBar.addIcon('fas fa-times icon', function() {
-                    innerBar.hide();
-                });
-            }
-
-            function addTable() {
-                innerBar.addIcon('fas fa-table icon', function() {
-                    innerBar.hide();
-                    swal({
-                        html: '<input class="swal2-input" placeholder="行">' +
-                            '<input class="swal2-input" placeholder="列">',
-                        preConfirm: function() {
-                            return new Promise(function(resolve) {
-								var inputs = $(Swal.getContent()).find('input');
-                                resolve([
-                                    inputs.eq(0).val(),  
-									inputs.eq(1).val()
-                                ])
-                            })
-                        }
-                    }).then(function(result) {
-                        var value = result.value;
-                        var cols = parseInt(value[0]) || 3;
-                        var rows = parseInt(value[1]) || 3;
-                        if (rows < 1)
-                            rows = 3;
-                        if (cols < 1)
-                            cols = 3;
-                        var text = '';
-                        for (var i = 0; i <= cols; i++) {
-                            text += '|    ';
-                        }
-                        text += "\n";
-                        for (var i = 0; i < cols; i++) {
-                            text += '|  -  ';
-                        }
-                        text += '|'
-                        if (rows > 1) {
-                            text += '\n';
-                            for (var i = 0; i < rows - 1; i++) {
-                                for (var j = 0; j <= cols; j++) {
-                                    text += '|    ';
-                                }
-                                text += "\n";
-                            }
-                        }
-                        editor.replaceSelection("\n" + text);
-                        innerBar.show();
-                    }).catch(swal.noop)
-                })
-            }
-
+			
+			var keyMap = {
+				"Ctrl-B" : boldHandler,
+				"Ctrl-I" : italicHandler,
+				"Alt-T" : tableHandler,
+				"Ctrl-H" : headingHandler,
+				"Ctrl-L" : linkHandler,
+				"Ctrl-Q" : quoteHandler,
+				"Alt-B" : codeBlockHandler,
+				"Alt-U" : uncheckHandler,
+				"Alt-I" : checkHandler
+			}
+			
+			wrapper.editor.addKeyMap(keyMap);
 
             var cursorActivityHandler = function(bar) {
                 var lh = editor.defaultTextHeight();
@@ -1490,47 +1488,10 @@ var EditorWrapper = (function() {
                 })
             } else {
 
-                var keyboardDetector = (function() {
-                    var keyboardOpen = false;
-                    var originalPotion = false;
-                    if (originalPotion === false)
-                        originalPotion = $(window).width() + $(window).height();
-                    var waitTime = 0;
-                    var onKeyboardOnOff = function(isOpen) {
-                        if (isOpen) {
-                            keyboardOpen = true;
-                        } else {
-                            keyboardOpen = false;
-                        }
-                    }
-                    var applyAfterResize = function() {
-                        if (!ios && originalPotion !== false) {
-                            var wasWithKeyboard = $(wrapper.wrapperElement).hasClass('view-withKeyboard');
-                            var nowWithKeyboard = false;
-                            var diff = Math.abs(originalPotion - ($(window).width() + $(window).height()));
-                            if (diff > 100) nowWithKeyboard = true;
-                            $(wrapper.wrapperElement).toggleClass('view-withKeyboard', nowWithKeyboard);
-                            if (wasWithKeyboard != nowWithKeyboard) {
-                                onKeyboardOnOff(nowWithKeyboard);
-                            }
-                        }
-                    }
-					
-					wrapper.onRemove(function(){
-						 $(window).off('resize orientationchange', applyAfterResize);
-					})
-
-                    $(window).on('resize orientationchange', applyAfterResize);
-
-                    return {
-                        isOpen: keyboardOpen
-                    }
-                })();
-				
                 editor.on('cursorActivity', function() {
                     mobileCursorActivityHandler(innerBar);
                 });
-				
+
                 editor.getScrollerElement().addEventListener('touchmove', function(evt) {
                     innerBar.hide();
                 });
@@ -1543,36 +1504,43 @@ var EditorWrapper = (function() {
             var cm = editor;
             var config = wrapper.config;
             ////////////////////backup 
-			var Backup = (function(){
-				
-				function Backup(key){
-					this.key = key;
-					var me = this;
-					wrapper.editor.on('change', function() {
-						if (me.autoSaveTimer) {
-							clearTimeout(me.autoSaveTimer);
-						}
-						me.autoSaveTimer = setTimeout(function() {
-							if (me.docName) {
-								me.addDocument(me.docName, wrapper.getValue());
-							} else {
-								me.addDocument('default', wrapper.getValue());
+            var Backup = (function() {
+
+                function Backup(key) {
+                    this.key = key;
+                    var me = this;
+                    wrapper.editor.on('change', function() {
+                        if (me.autoSaveTimer) {
+                            clearTimeout(me.autoSaveTimer);
+                        }
+                        me.autoSaveTimer = setTimeout(function() {
+							var value = wrapper.getValue();
+							if(value == ''){
+								return ;
 							}
-						}, getDefault(config.toolbar_autoSaveMs, 500));
-					});
-					wrapper.onRemove(function(){
-						if (me.autoSaveTimer) {
-							clearTimeout(me.autoSaveTimer);
-						}
-					});
-					wrapper.eventHandlers.push({name:'load',handler:function(){
-						setTimeout(function(){
-							me.loadLastDocument();
-						},100)
-					}});
-				}
-				
-				Backup.prototype.addDocument = function(title, content) {
+                            if (me.docName) {
+                                me.addDocument(me.docName, value);
+                            } else {
+                                me.addDocument('default', value);
+                            }
+                        }, getDefault(config.toolbar_autoSaveMs, 500));
+                    });
+                    wrapper.onRemove(function() {
+                        if (me.autoSaveTimer) {
+                            clearTimeout(me.autoSaveTimer);
+                        }
+                    });
+                    wrapper.eventHandlers.push({
+                        name: 'load',
+                        handler: function() {
+                            setTimeout(function() {
+                                me.loadLastDocument();
+                            }, 100)
+                        }
+                    });
+                }
+
+                Backup.prototype.addDocument = function(title, content) {
                     var documents = this.getDocuments();
                     deleteDocumentByTitle(documents, title);
                     documents.push({
@@ -1582,12 +1550,12 @@ var EditorWrapper = (function() {
                     });
                     storeDocuments(this.key, documents);
                 }
-				
-				Backup.prototype.deleteDocument = function(title) {
-					var doc = this.getDocument(title);
-					if(doc != null && this.docName == doc.title){
-						this.newDocument();
-					}
+
+                Backup.prototype.deleteDocument = function(title) {
+                    var doc = this.getDocument(title);
+                    if (doc != null && this.docName == doc.title) {
+                        this.newDocument();
+                    }
                     var documents = this.getDocuments();
                     deleteDocumentByTitle(documents, title);
                     storeDocuments(this.key, documents);
@@ -1620,61 +1588,61 @@ var EditorWrapper = (function() {
                     });
                     return documents.length > 0 ? documents[0] : null;
                 }
-				
-				Backup.prototype.loadLastDocument = function() {
-					var doc = this.getLastDocument();
-					loadDocument(this,doc);
+
+                Backup.prototype.loadLastDocument = function() {
+                    var doc = this.getLastDocument();
+                    loadDocument(this, doc);
                 }
-				
-				Backup.prototype.loadDocument = function(title) {
-					var doc = this.getDocument(title);
-					loadDocument(this,doc);
+
+                Backup.prototype.loadDocument = function(title) {
+                    var doc = this.getDocument(title);
+                    loadDocument(this, doc);
                 }
-				
-				function loadDocument(backup,doc){
-					if (doc != null) {
-						if (doc.title != 'default')
-							backup.docName = doc.title;
-						else
-							backup.docName = undefined;
-						wrapper.setValue(doc.content);
-						//代码高亮的同步预览中，由于codemirror只渲染当前视窗，因此会出现不同步的现象
-						//可以调用CodeMirror.renderAllDoc，但是这个方法在大文本中速度很慢，可以选择关闭
-						if(wrapper.syncEnable !== false && config.renderAllDocEnable !== false){
-							wrapper.editor.renderAllDoc(0);
-						}
-					}
-				}
-				
-				Backup.prototype.newDocument = function() {
-					this.docName = undefined;
-					wrapper.setValue("");
+
+                function loadDocument(backup, doc) {
+                    if (doc != null) {
+                        if (doc.title != 'default')
+                            backup.docName = doc.title;
+                        else
+                            backup.docName = undefined;
+                        wrapper.setValue(doc.content);
+                        //代码高亮的同步预览中，由于codemirror只渲染当前视窗，因此会出现不同步的现象
+                        //可以调用CodeMirror.renderAllDoc，但是这个方法在大文本中速度很慢，可以选择关闭
+                        if (wrapper.syncEnable !== false && config.renderAllDocEnable !== false) {
+                            wrapper.editor.renderAllDoc(0);
+                        }
+                    }
                 }
-				
-				Backup.prototype.backup = function() {
-					if(this.docName){
-						this.addDocument(this.docName,wrapper.getValue());
-						this.deleteDocument('default');
-						swal('保存成功');
-					} else {
-						var me = this;
-						async function requestName() {
-							const {
-								value: name
-							} = await Swal.fire({
-								title: '标题',
-								input: 'text',
-								showCancelButton: true
-							})
-							if (name) {
-								me.addDocument(name, wrapper.getValue());
-								me.docName = name;
-								me.deleteDocument('default');
-								swal('保存成功');
-							}
-						}
-						requestName();
-					}
+
+                Backup.prototype.newDocument = function() {
+                    this.docName = undefined;
+                    wrapper.setValue("");
+                }
+
+                Backup.prototype.backup = function() {
+                    if (this.docName) {
+                        this.addDocument(this.docName, wrapper.getValue());
+                        this.deleteDocument('default');
+                        swal('保存成功');
+                    } else {
+                        var me = this;
+                        async function requestName() {
+                            const {
+                                value: name
+                            } = await Swal.fire({
+                                title: '标题',
+                                input: 'text',
+                                showCancelButton: true
+                            })
+                            if (name) {
+                                me.addDocument(name, wrapper.getValue());
+                                me.docName = name;
+                                me.deleteDocument('default');
+                                swal('保存成功');
+                            }
+                        }
+                        requestName();
+                    }
                 }
 
                 function deleteDocumentByTitle(documents, title) {
@@ -1690,12 +1658,14 @@ var EditorWrapper = (function() {
                     var json = JSON.stringify(documents);
                     localStorage.setItem(key, json);
                 }
-				
-				return {create : function(key){
-					return new Backup(key);
-				}}
-			})();
-			
+
+                return {
+                    create: function(key) {
+                        return new Backup(key);
+                    }
+                }
+            })();
+
             var themeMode = (function() {
                 var toolbarHandler = function(e) {
                     if ($(e.target).hasClass('fa-cog')) {
@@ -1704,28 +1674,28 @@ var EditorWrapper = (function() {
                     colorPicker(theme.toolbar.color, function(color) {
                         theme.toolbar.color = color;
                         theme.render();
-                        theme.store();
+                        wrapper.saveTheme();
                     });
                 }
                 var statHandler = function() {
                     colorPicker(theme.stat.color, function(color) {
                         theme.stat.color = color;
                         theme.render();
-                        theme.store();
+                        wrapper.saveTheme();
                     });
                 }
                 var searchHelprHandler = function() {
                     colorPicker(theme.searchHelper.color, function(color) {
                         theme.searchHelper.color = color;
                         theme.render();
-                        theme.store();
+                        wrapper.saveTheme();
                     });
                 }
                 var barHandler = function() {
                     colorPicker(theme.bar.color, function(color) {
                         theme.bar.color = color;
                         theme.render();
-                        theme.store();
+                        wrapper.saveTheme();
                     });
                 }
                 var cloneBar;
@@ -1800,16 +1770,17 @@ var EditorWrapper = (function() {
                         });
                         if (_theme) {
                             theme.editor.theme = _theme;
-							theme.render();
-                            loadEditorTheme(theme,function(_theme) {
-                                setTimeout(function() {
-                                    editor.setOption("theme", _theme);
-                                    var bgColor = window.getComputedStyle(editor.getWrapperElement(), null).getPropertyValue('background-color');
-                                    theme.inCss.background = bgColor;
-                                    theme.render();
-                                    theme.store();
-                                }, 100)
-                            })
+                            theme.render({
+								editorThemeLoad:function(editorTheme){
+									 setTimeout(function() {
+										editor.setOption("theme", editorTheme);
+										var bgColor = window.getComputedStyle(editor.getWrapperElement(), null).getPropertyValue('background-color');
+										theme.inCss.background = bgColor;
+										theme.render();
+										wrapper.saveTheme();
+									}, 100)
+								}
+							});
                         }
                         setTimeout(function() {
                             setTheme = false;
@@ -1837,7 +1808,7 @@ var EditorWrapper = (function() {
                         });
                         if (_theme) {
                             theme.mermaid.theme = _theme;
-                            theme.store();
+							wrapper.saveTheme();
                             wrapper.doRender(false);
                             wrapper.doSync();
                         }
@@ -1911,7 +1882,7 @@ var EditorWrapper = (function() {
                         });
                     }
                     getColor();
-					var colorpickerElement = $(Swal.getContent()).find('._colorpicker');
+                    var colorpickerElement = $(Swal.getContent()).find('._colorpicker');
                     colorpickerElement.colorpicker({
                         inline: true,
                         container: true,
@@ -1980,38 +1951,57 @@ var EditorWrapper = (function() {
 
                 var ele = $(html);
                 $("#editor_in").append(ele);
+				
 
+				var isVisible = false;
 
-                ele.on('click', '[data-search]', function() {
+				var startSearchHandler = function() {
                     startSearch(function(cursor) {
                         if (cursor == null) {
                             swal('没有找到符合条件的搜索内容');
                         } else {
                             ele.find(".input-group").eq(0).hide();
                             ele.find(".input-group").eq(1).show();
-
+							editor.focus();
                         }
                     });
-                });
-
-                ele.on('click', '.fa-times', function() {
-                    clearSearch();
+                };
+				
+				
+				
+				var nextHandler =  function() {
+                    findNext(false);
+                }
+				
+				var previousHandler = function(){
+					findNext(true)
+				}
+				
+				var keyMap = {
+					'Up' : previousHandler,
+					'Down' : nextHandler
+				}
+				
+				var openHandler = function(){
+					editor.setOption('readOnly', true);
+					ele.show();
+					ele.find('.form-control').focus();
+					isVisible = true;
+					editor.addKeyMap(keyMap);
+				}
+				
+				var closeHelper = function(){
+					clearSearch();
                     ele.hide();
                     ele.find('input').val('');
                     ele.find(".input-group").eq(0).show();
                     ele.find(".input-group").eq(1).hide();
                     editor.setOption('readOnly', false)
-                });
-
-                ele.on('click', '[data-down]', function() {
-                    findNext(false);
-                });
-
-                ele.on('click', '[data-up]', function() {
-                    findNext(true);
-                });
-
-                ele.on('click', '[data-replace]', function() {
+					isVisible = false;
+					editor.removeKeyMap(keyMap);
+				}
+				
+				var replaceHandler = function() {
                     var text = ele.find('input').eq(1).val();
                     var state = getSearchState();
                     if (!state.query) {
@@ -2033,7 +2023,29 @@ var EditorWrapper = (function() {
                             function(_, i) {}));
                     };
                     advance();
-                });
+                }
+				
+				
+				ele.find('.form-control').eq(0).on('keydown',function(event){
+					if (keyNames[event.keyCode] == 'Enter') {
+						startSearchHandler();
+						event.preventDefault();
+					}
+				});
+				
+				ele.find('.form-control').eq(1).on('keydown',function(event){
+					if (keyNames[event.keyCode] == 'Enter') {
+						replaceHandler();
+						event.preventDefault();
+					}
+				});
+				
+
+                ele.on('click', '[data-search]',startSearchHandler );
+                ele.on('click', '.fa-times', closeHelper);
+                ele.on('click', '[data-down]',nextHandler);
+                ele.on('click', '[data-up]', previousHandler);
+                ele.on('click', '[data-replace]', replaceHandler);
 
                 ele.on('click', '[data-replace-all]', function() {
                     Swal.fire({
@@ -2150,15 +2162,15 @@ var EditorWrapper = (function() {
                     });
                 }
 
-				function parseString(string) {
-					return string.replace(/\\([nrt\\])/g, function(match, ch) {
-					  if (ch == "n") return "\n"
-					  if (ch == "r") return "\r"
-					  if (ch == "t") return "\t"
-					  if (ch == "\\") return "\\"
-					  return match
-					})
-				}
+                function parseString(string) {
+                    return string.replace(/\\([nrt\\])/g, function(match, ch) {
+                        if (ch == "n") return "\n"
+                        if (ch == "r") return "\r"
+                        if (ch == "t") return "\t"
+                        if (ch == "\\") return "\\"
+                        return match
+                    })
+                }
 
                 function parseQuery(query) {
                     if (query == '') return query;
@@ -2200,19 +2212,27 @@ var EditorWrapper = (function() {
                 }
 
                 return {
-                    'show': function() {
-                        ele.show()
-                    },
-                    'hide': function() {
-                        ele.hide()
-                    }
+                    'show': openHandler,
+                    'hide': closeHelper,
+                    'isVisible': function(){
+						return isVisible;
+					}
                 };
 
             })();
 
             var configIcon;
             var icons = config.toolbar_icons || ['toc', 'innerBar', 'backup', 'search', 'config', 'expand'];
-            for (var i = 0; i < icons.length; i++) {
+            
+			var searchHandler = function() {
+				if(searchHelper.isVisible()){
+					searchHelper.hide();
+				} else {
+					searchHelper.show();
+				}
+			};
+
+			for (var i = 0; i < icons.length; i++) {
                 var icon = icons[i];
                 if (icon == 'toc') {
                     wrapper.toolbar.addIcon('fas fa-book icon mobile-hide nofullscreen', function() {
@@ -2227,32 +2247,30 @@ var EditorWrapper = (function() {
                         toggleInnerbar(ele);
                     });
                 }
-
+				
                 if (icon == 'search') {
-                    wrapper.toolbar.addIcon('fas fa-search icon', function() {
-                        editor.setOption('readOnly', true)
-                        searchHelper.show();
-                    });
+                    wrapper.toolbar.addIcon('fas fa-search icon', searchHandler);
                 }
 
                 if (icon == 'backup') {
-                    var backup = Backup.create('markdown-documents');
+                    var backup = Backup.create('heather-documents');
                     wrapper.toolbar.addIcon('fas icon fa-upload ', function(ele) {
                         backup.backup();
                     });
                     wrapper.toolbar.addIcon('fas icon fa-download ', function(ele) {
                         selectDocuments(backup);
                     });
-					wrapper.toolbar.addIcon('far fa-file icon', function(ele) {
+					var newDocumentHandler = function(ele) {
                         newDocument(backup);
-                    });
-					wrapper.backup = backup;
+                    };
+                    wrapper.toolbar.addIcon('far fa-file icon',newDocumentHandler);
+                    wrapper.backup = backup;
                 }
 
                 if (icon == 'config') {
                     wrapper.toolbar.addIcon('fas icon fa-cog nofullscreen', function() {
-                        
-						swal({
+
+                        swal({
                             html: '<input type="checkbox"  />主题编辑模式 <p style="margin-top:0.5rem"><button style="margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;">自定义css</button></p>'
                         });
                         var cb = $(Swal.getContent().querySelector('input'));
@@ -2271,30 +2289,35 @@ var EditorWrapper = (function() {
 
                 if (icon == 'expand') {
                     wrapper.toolbar.addIcon('fas fa-expand icon mobile-hide', function(ele) {
-						if ($(ele).hasClass('fa-expand')) {
-							wrapper.requestFullScreen();
-						} else {
-							wrapper.exitFullScreen();
-						}
+                        if ($(ele).hasClass('fa-expand')) {
+                            wrapper.requestFullScreen();
+                        } else {
+                            wrapper.exitFullScreen();
+                        }
                     }, function(ele) {
                         if (screenfull.enabled) {
-							
-							var toggleHandler = function() {
+
+                            var toggleHandler = function() {
                                 if (screenfull.isFullscreen) {
                                     $(ele).removeClass('fa-expand').addClass('fa-compress');
                                 } else {
                                     $(ele).removeClass('fa-compress').addClass('fa-expand');
                                 }
                             };
-							wrapper.onRemove(function(){
-								 screenfull.off('change',toggleHandler);
-							})
+                            wrapper.onRemove(function() {
+                                screenfull.off('change', toggleHandler);
+                            })
                             screenfull.on('change', toggleHandler);
                         }
                     });
                 }
-
             }
+			
+			var keyMap = {
+				'Alt-S' : searchHandler
+			}
+			
+			editor.addKeyMap(keyMap);
 
             var isToc = false;
 
@@ -2321,73 +2344,73 @@ var EditorWrapper = (function() {
                     $(ele).addClass("fa-check-square").removeClass("fa-square");
                 }
             }
-			
-			function selectDocuments(backup) {
-				var documents = backup.getDocuments();
-				for (var i = documents.length - 1; i >= 0; i--) {
-					if (documents[i].title == 'default') {
-						documents.splice(i, 1);
-						break;
-					}
-				}
-				if (documents.length == 0) {
-					swal('没有保存的文档');
-				} else {
-					var html = '<table class="table">';
-					for (var i = 0; i < documents.length; i++) {
-						var doc = documents[i];
-						html += '<tr><td>' + doc.title + '</td><td><i class="fas fa-times" data-title="' + doc.title + '" style="margin-right:20px;cursor:pointer"></i><i data-title="' + doc.title + '" class="fas fa-arrow-down" style=";cursor:pointer"></i></td><tr>';
-					}
-					html += '</table>';
-					swal({
-						html: html
-					});
-					$(Swal.getContent()).find('.fa-times').click(function() {
-						var title = $(this).data('title');
-						Swal.fire({
-							title: '确定要删除吗?',
-							type: 'warning',
-							showCancelButton: true,
-							confirmButtonColor: '#3085d6',
-							cancelButtonColor: '#d33'
-						}).then((result) => {
-							if (result.value) {
-								backup.deleteDocument(title);
-								selectDocuments(backup);
-							}
-						})
-					})
-					
-					$(Swal.getContent()).find('.fa-arrow-down').click(function() {
-						var title = $(this).data('title');
-						Swal.fire({
-							title: '确定要加载吗?',
-							type: 'warning',
-							showCancelButton: true,
-							confirmButtonColor: '#3085d6',
-							cancelButtonColor: '#d33'
-						}).then((result) => {
-							if (result.value) {
-								backup.loadDocument(title);
-							}
-						})
-					})
-				}
-			}
 
-			function newDocument(backup) {
-				Swal.fire({
-					title: '要打开一篇新文档吗?',
-					type: 'warning',
-					showCancelButton: true,
-					confirmButtonColor: '#3085d6',
-					cancelButtonColor: '#d33'
-				}).then((result) => {
-					if (result.value) {
-						backup.newDocument();
-					}
-				})
-			}
+            function selectDocuments(backup) {
+                var documents = backup.getDocuments();
+                for (var i = documents.length - 1; i >= 0; i--) {
+                    if (documents[i].title == 'default') {
+                        documents.splice(i, 1);
+                        break;
+                    }
+                }
+                if (documents.length == 0) {
+                    swal('没有保存的文档');
+                } else {
+                    var html = '<table class="table">';
+                    for (var i = 0; i < documents.length; i++) {
+                        var doc = documents[i];
+                        html += '<tr><td>' + doc.title + '</td><td><i class="fas fa-times" data-title="' + doc.title + '" style="margin-right:20px;cursor:pointer"></i><i data-title="' + doc.title + '" class="fas fa-arrow-down" style=";cursor:pointer"></i></td><tr>';
+                    }
+                    html += '</table>';
+                    swal({
+                        html: html
+                    });
+                    $(Swal.getContent()).find('.fa-times').click(function() {
+                        var title = $(this).data('title');
+                        Swal.fire({
+                            title: '确定要删除吗?',
+                            type: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33'
+                        }).then((result) => {
+                            if (result.value) {
+                                backup.deleteDocument(title);
+                                selectDocuments(backup);
+                            }
+                        })
+                    })
+
+                    $(Swal.getContent()).find('.fa-arrow-down').click(function() {
+                        var title = $(this).data('title');
+                        Swal.fire({
+                            title: '确定要加载吗?',
+                            type: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33'
+                        }).then((result) => {
+                            if (result.value) {
+                                backup.loadDocument(title);
+                            }
+                        })
+                    })
+                }
+            }
+
+            function newDocument(backup) {
+                Swal.fire({
+                    title: '要打开一篇新文档吗?',
+                    type: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33'
+                }).then((result) => {
+                    if (result.value) {
+                        backup.newDocument();
+                    }
+                })
+            }
 
             function writeCustomCss() {
                 async function write() {
@@ -2402,7 +2425,7 @@ var EditorWrapper = (function() {
                     if (css) {
                         theme.customCss = css;
                         theme.render();
-                        theme.store();
+                        wrapper.saveTheme();
                     }
                 }
                 write();
@@ -2411,7 +2434,7 @@ var EditorWrapper = (function() {
         }
 
         function renderToc() {
-            var headings = document.getElementById('editor_out').querySelectorAll("h1, h2, h3, h4, h5, h6");
+            var headings = $("#editor_out").children('h1,h2,h3,h4,h5,h6');
             var toc = [];
             for (var i = 0; i < headings.length; i++) {
                 var head = headings[i];
@@ -2442,8 +2465,6 @@ var EditorWrapper = (function() {
                 }
             }
 
-
-
             var html = '<h1>TOC</h1><hr>';
             if (toc.length > 0) {
                 for (var i = 0; i < toc.length; i++) {
@@ -2464,14 +2485,14 @@ var EditorWrapper = (function() {
                 $("#editor_toc").html(html)
             };
         }
-		
-		var wrapperInstance = {};
+
+        var wrapperInstance = {};
         return {
             create: function(config) {
-				if(wrapperInstance.wrapper){
-					wrapperInstance.wrapper.remove();
-				}
-				wrapperInstance.wrapper = new EditorWrapper(config)
+                if (wrapperInstance.wrapper) {
+                    wrapperInstance.wrapper.remove();
+                }
+                wrapperInstance.wrapper = new EditorWrapper(config)
                 return wrapperInstance.wrapper;
             }
         }

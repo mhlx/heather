@@ -233,7 +233,7 @@
 #editor_in {
 	position: absolute;
 	top: 0;
-	left: 200px;
+	left: 20%;
 	bottom: 0;
 	width: 50%;
 	height: auto;
@@ -245,7 +245,7 @@
 	position: absolute;
 	top: 0;
 	right: 0;
-	left: calc(50% + 200px);
+	left: 70%;
 	bottom: 0;
 	overflow: auto;
 	padding: 10px;
@@ -266,8 +266,10 @@
 	height: auto;
 	overflow: auto;
 	padding: 10px;
-	width: 200px;
+	width: 20%;
 	word-break: break-word;
+	scrollbar-color: #bcd transparent;
+	scrollbar-width: thin
 }
 
 #editor_toc h1,

@@ -318,7 +318,7 @@ It converts "HTML", but keep intact partial entries like "xxxHTMLyyy" and so on.
 	  }
 	  
 	  $("#click1").click(function(){
-		var wrapper = createEditor({render_allowHtml:true,renderAllDocEnable:false});
+		var wrapper = createEditor({render_allowHtml:true,renderAllDocEnable:false,theme_key:'editor1'});
 			wrapper.toolbar.addIcon('fas fa-times icon nofullscreen',function(){
 				var markdown = htmlEntities(wrapper.getValue());
 				var html = htmlEntities(wrapper.getHtml())
@@ -335,7 +335,14 @@ It converts "HTML", but keep intact partial entries like "xxxHTMLyyy" and so on.
 	  
 	   $("#editor").click(function(){
 			var editor = $(this);
-			var wrapper = createEditor({toolbar_icons:['toc', 'innerBar', 'search', 'config', 'expand','preview']});
+			var wrapper = createEditor({toolbar_icons:['toc', 'innerBar', 'search', 'config', 'expand','preview'],theme_key:'editor2',theme_store:{
+				saveJson:function(){
+					
+				},
+				getJson:function(key){
+					alert(key)
+				}
+			}});
 			var codeMirrorEditor = wrapper.editor;
 			codeMirrorEditor.setValue(editor.val());
 			codeMirrorEditor.focus();
@@ -347,6 +354,10 @@ It converts "HTML", but keep intact partial entries like "xxxHTMLyyy" and so on.
 				editor.val(wrapper.getValue());
 				wrapper.remove();
 			})
+			//listen resize 
+			wrapper.on('resize',function(){
+				console.log('resize hahaha');
+			});
 	  });
 	  
 	function getPos(textarea) {
