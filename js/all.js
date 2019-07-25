@@ -21,12 +21,16 @@ var EditorWrapper = (function() {
         });
         editor.setOption('readOnly', false);
     }
-
+	
+	CodeMirror.prototype.unfocus = function(){
+		this.getInputField().blur();
+	}
 
     CodeMirror.keyMap.default["Shift-Tab"] = "indentLess";
     CodeMirror.keyMap.default["Tab"] = "indentMore";
 	
 	var keyNames = CodeMirror.keyNames;
+	var mac = CodeMirror.browser.mac;
 
 
     function cloneAttributes(element, sourceNode) {
@@ -394,164 +398,633 @@ var EditorWrapper = (function() {
             }
         }
     })();
+	
+	
+	//TODO
+	var Backup = (function() {
+		function Backup(wrapper) {
+			this.wrapper = wrapper;
+			this.key = wrapper.config.backup_key || 'heather-documents';
+			var me = this;
+			wrapper.editor.on('change', function() {
+				if (me.autoSaveTimer) {
+					clearTimeout(me.autoSaveTimer);
+				}
+				me.autoSaveTimer = setTimeout(function() {
+					var value = wrapper.getValue();
+					if(value == ''){
+						return ;
+					}
+					if (me.docName) {
+						me.addDocument(me.docName, value);
+					} else {
+						me.addDocument('default', value);
+					}
+				}, getDefault(wrapper.config.toolbar_autoSaveMs, 500));
+			});
+			wrapper.onRemove(function() {
+				me.wrapper = null;
+				if (me.autoSaveTimer) {
+					clearTimeout(me.autoSaveTimer);
+				}
+			});
+			wrapper.eventHandlers.push({
+				name: 'load',
+				handler: function() {
+					setTimeout(function() {
+						me.loadLastDocument();
+					}, 100)
+				}
+			});
+		}
+
+		Backup.prototype.addDocument = function(title, content) {
+			var documents = this.getDocuments();
+			deleteDocumentByTitle(documents, title);
+			documents.push({
+				title: title,
+				content: content,
+				time: $.now()
+			});
+			storeDocuments(this.key, documents);
+		}
+
+		Backup.prototype.deleteDocument = function(title) {
+			var doc = this.getDocument(title);
+			if (doc != null && this.docName == doc.title) {
+				this.newDocument();
+			}
+			var documents = this.getDocuments();
+			deleteDocumentByTitle(documents, title);
+			storeDocuments(this.key, documents);
+		}
+
+		Backup.prototype.getDocument = function(title) {
+			var documents = this.getDocuments();
+			for (var i = documents.length - 1; i >= 0; i--) {
+				if (documents[i].title == title) {
+					return documents[i];
+				}
+			}
+			return null;
+		}
+
+		Backup.prototype.getDocuments = function() {
+			var content = localStorage.getItem(this.key);
+			if (content == null) {
+				return [];
+			}
+			return $.parseJSON(content);
+		}
+
+		Backup.prototype.getLastDocument = function() {
+			var documents = this.getDocuments();
+			documents.sort(function(a, b) {
+				var ta = a.time;
+				var tb = b.time;
+				return ta > tb ? -1 : ta == tb ? 0 : 1;
+			});
+			return documents.length > 0 ? documents[0] : null;
+		}
+
+		Backup.prototype.loadLastDocument = function() {
+			var doc = this.getLastDocument();
+			loadDocument(this, doc);
+		}
+
+		Backup.prototype.loadDocument = function(title) {
+			var doc = this.getDocument(title);
+			loadDocument(this, doc);
+		}
+
+		function loadDocument(backup, doc) {
+			if (doc != null) {
+				if (doc.title != 'default')
+					backup.docName = doc.title;
+				else
+					backup.docName = undefined;
+				var wrapper = backup.wrapper;
+				wrapper.setValue(doc.content);
+				//代码高亮的同步预览中，由于codemirror只渲染当前视窗，因此会出现不同步的现象
+				//可以调用CodeMirror.renderAllDoc，但是这个方法在大文本中速度很慢，可以选择关闭
+				if (wrapper.syncEnable !== false && wrapper.config.renderAllDocEnable !== false) {
+					wrapper.editor.renderAllDoc(0);
+				}
+			}
+		}
+
+		Backup.prototype.newDocument = function() {
+			this.docName = undefined;
+			this.wrapper.setValue("");
+		}
+
+		Backup.prototype.backup = function() {
+			if (this.docName) {
+				this.addDocument(this.docName, this.wrapper.getValue());
+				this.deleteDocument('default');
+				swal('保存成功');
+			} else {
+				var me = this;
+				async function requestName() {
+					const {
+						value: name
+					} = await Swal.fire({
+						title: '标题',
+						input: 'text',
+						showCancelButton: true
+					})
+					if (name) {
+						me.addDocument(name, me.wrapper.getValue());
+						me.docName = name;
+						me.deleteDocument('default');
+						swal('保存成功');
+					}
+				}
+				requestName();
+			}
+		}
+
+		function deleteDocumentByTitle(documents, title) {
+			for (var i = documents.length - 1; i >= 0; i--) {
+				if (documents[i].title == title) {
+					documents.splice(i, 1);
+					break;
+				}
+			}
+		}
+
+		function storeDocuments(key, documents) {
+			var json = JSON.stringify(documents);
+			localStorage.setItem(key, json);
+		}
+
+		return {
+			create: function(key) {
+				return new Backup(key);
+			}
+		}
+	})();
+	
+	 var ThemeHandler = (function() {
+		function ThemeHandler(config){
+			this.key = config.theme_key || "heather-theme";
+			this.store = {
+				save : function(key,json){
+					localStorage.setItem(key, json);
+				},
+				get : function(key){
+					return localStorage.getItem(key);
+				}
+			};
+			this.config = config;
+			this.timer = undefined;
+		}
+		
+		ThemeHandler.prototype.saveTheme = function(theme){
+			if (this.timer) {
+				clearTimeout(this.timer);
+			}
+			var handler = this;
+			this.timer = setTimeout(function() {
+				var json = JSON.stringify(theme);
+				handler.store.save(handler.key,json);
+			}, 500)
+		}
+		
+		ThemeHandler.prototype.reset = function() {
+			var theme = new Theme(this.config);
+			this.store.save(this.key,JSON.stringify(theme));
+			theme.render();
+			return theme;
+		}
+		
+		ThemeHandler.prototype.getTheme = function(){
+			var json = this.store.get(this.key);
+			if(json == null){
+				return new Theme(this.config);
+			} else {
+				var current = $.parseJSON(json);
+				var theme = new Theme(this.config);
+				theme.toolbar = current.toolbar;
+				theme.bar = current.bar;
+				theme.stat = current.stat;
+				theme.editor = current.editor;
+				theme.inCss = current.inCss;
+				theme.cursorHelper = current.cursorHelper;
+				theme.mermaid = current.mermaid;
+				theme.customCss = current.customCss;
+				return theme;
+			}
+		}
+		
+		function Theme(config) {
+			this.toolbar = {};
+			this.bar = {};
+			this.stat = {};
+			this.editor = {};
+			this.inCss = {};
+			this.searchHelper = {};
+			this.mermaid = {};
+			this.hljs = {
+				theme: 'github'
+			};
+			this.customCss = undefined;
+			this.timer = undefined;
+			this.config = config;
+		}
+
+		Theme.prototype.clone = function() {
+			var copy = JSON.parse(JSON.stringify(this));
+			var theme = new Theme(this.config);
+			theme.toolbar = copy.toolbar;
+			theme.bar = copy.bar;
+			theme.stat = copy.stat;
+			theme.editor = copy.editor;
+			theme.inCss = copy.inCss;
+			theme.searchHelper = copy.searchHelper;
+			theme.mermaid = copy.mermaid;
+			theme.customCss = copy.customCss;
+			return theme;
+		}
+
+		Theme.prototype.render = function(config) {
+			config = config || {};
+			loadEditorTheme(this,config.editorThemeLoad);
+			loadHljsTheme(this);
+			var css = "";
+			css += "#editor_toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
+			css += "#editor_innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
+			css += "#editor_stat{color:" + (this.stat.color || 'inherit') + "}\n";
+			css += "#editor_in{background:" + (this.inCss.background || 'inherit') + "}\n";
+			var searchHelperColor = (this.searchHelper.color || 'inherit');
+			css += "#editor_searchHelper{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control{color:" + searchHelperColor + "}\n#editor_searchHelper .input-group-text{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control::placeholder {color: " + searchHelperColor + ";opacity: 1;}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}";
+
+			$("#custom_theme").remove();
+			if ($.trim(css) != '') {
+				$("head").append("<style type='text/css' id='custom_theme'>" + css + "</style>");
+			}
+			$("#custom_css").remove();
+			$("head").append("<style type='text/css' id='custom_css'>" + (this.customCss || '') + "</style>");
+		}
+		
+		
+		function loadHljsTheme(theme) {
+			if (theme.hljs.theme) {
+				var hljsTheme = theme.hljs.theme;
+				var hljsThemeFunction = theme.config.res_hljsTheme || function(hljsTheme) {
+					return 'highlight/styles/' + hljsTheme + '.css';
+				}
+				if ($('hljs-theme-' + hljsTheme + '').length == 0) {
+					$('<link id="hljs-theme-' + hljsTheme + '" >').appendTo('head').attr({
+						type: 'text/css',
+						rel: 'stylesheet',
+						href: hljsThemeFunction(hljsTheme)
+					})
+				}
+			}
+		}
+		
+		function loadEditorTheme(theme, callback) {
+			if (theme.editor.theme) {
+				var editorTheme = theme.editor.theme;
+				var editorThemeFunction = theme.config.res_editorTheme || function(editorTheme) {
+					return 'codemirror/theme/' + editorTheme + '.css';
+				}
+				if ($('#codemirror-theme-' + editorTheme + '').length == 0) {
+					$('<link id="codemirror-theme-' + editorTheme + '" >').appendTo('head').attr({
+						type: 'text/css',
+						rel: 'stylesheet',
+						onload: function() {
+							if (callback) {
+								callback(editorTheme)
+							}
+						},
+						href: editorThemeFunction(editorTheme)
+					})
+				} else {
+					if (callback) {
+						callback(editorTheme)
+					}
+				}
+			}
+		}
+
+		return {
+			create: function(config) {
+				return new ThemeHandler(config);
+			}
+		};
+	})();
+	
+	
+	var SearchHelper = (function() {
+		var SearchUtil = (function(){
+			function SearchUtil(cm){
+				this.cm = cm;
+			}
+			
+			SearchUtil.prototype.startSearch = function(query,callback){
+				var cm = this.cm;
+				this.clearSearch();
+				var state = getSearchState(cm);
+				state.queryText = query;
+				state.query = parseQuery(query);
+				cm.removeOverlay(state.overlay, queryCaseInsensitive(state.query));
+				this.findNext(false, callback);
+			}
+			
+			SearchUtil.prototype.clearSearch = function(){
+				var cm = this.cm;
+				var ranges = cm.getAllMarks();
+				for (var i = 0; i < ranges.length; i++) ranges[i].clear();
+				cm.operation(function() {
+					var state = getSearchState(cm);
+					state.lastQuery = state.query;
+					if (!state.query) return;
+					state.query = state.queryText = null;
+				   cm.removeOverlay(state.overlay);
+					if (state.annotate) {
+						state.annotate.clear();
+						state.annotate = null;
+					}
+				});
+			}
+			
+			SearchUtil.prototype.findNext = function(rev, callback) {
+				var cm = this.cm;
+				var state = getSearchState(cm);
+				if (!state.query) {
+					return;
+				}
+				cm.operation(function() {
+					var cursor = getSearchCursor(cm, state.query, rev ? state.posFrom : state.posTo);
+					if (!cursor.find(rev)) {
+						cursor = getSearchCursor(cm, state.query, rev ? CodeMirror.Pos(cm.lastLine()) : CodeMirror.Pos(cm.firstLine(), 0));
+						if (!cursor.find(rev)) {
+							if (callback)
+								callback(null);
+							return;
+						}
+					}
+					cm.setSelection(cursor.from(), cursor.to());
+
+					var ranges = cm.getAllMarks();
+					for (var i = 0; i < ranges.length; i++) ranges[i].clear();
+
+					cm.markText(cursor.from(), cursor.to(), {
+						className: "styled-background"
+					});
+
+					var coords = cm.cursorCoords(cursor.from(), 'local');
+					cm.scrollTo(0, coords.top);
+					state.posFrom = cursor.from();
+					state.posTo = cursor.to();
+					if (callback) callback({
+						from: cursor.from(),
+						to: cursor.to()
+					})
+				});
+			}
+			
+			SearchUtil.prototype.replace = function(text){
+				var cm = this.cm;
+				var state = getSearchState(cm);
+				if (!state.query) {
+					return;
+				}
+				var cursor = getSearchCursor(cm, state.query, cm.getCursor("from"));
+				var advance = function() {
+					var start = cursor.from(),
+						match;
+					if (!(match = cursor.findNext())) {
+						cursor = getSearchCursor(cm, state.query);
+						if (!(match = cursor.findNext()) || (start && cursor.from().line == start.line && cursor.from().ch == start.ch)) return;
+					}
+					cm.setSelection(cursor.from(), cursor.to());
+
+					var coords = cm.cursorCoords(cursor.from(), 'local');
+					cm.scrollTo(0, coords.top);
+					cursor.replace(typeof query == "string" ? text : text.replace(/\$(\d)/g,
+						function(_, i) {}));
+				};
+				advance();
+			}
+			
+			SearchUtil.prototype.replaceAll = function(text){
+				var cm = this.cm;
+				var state = getSearchState(cm);
+				if (!state.query) {
+					return;
+				}
+				var query = state.query;
+				cm.operation(function() {
+					for (var cursor = getSearchCursor(cm, query); cursor.findNext();) {
+						if (typeof query != "string") {
+							var match = cm.getRange(cursor.from(), cursor.to()).match(query);
+							cursor.replace(text.replace(/\$(\d)/g,
+								function(_, i) {
+									return match[i];
+								}));
+						} else cursor.replace(text);
+					}
+				});
+			}
+
+			function getSearchState(cm) {
+				return cm.state.search || (cm.state.search = new SearchState());
+			}
+
+			function queryCaseInsensitive(query) {
+				return typeof query == "string" && query == query.toLowerCase();
+			}
+
+			function getSearchCursor(cm, query, pos) {
+				return cm.getSearchCursor(query, pos, {
+					caseFold: queryCaseInsensitive(query),
+					multiline: true
+				});
+			}
+
+			function parseString(string) {
+				return string.replace(/\\([nrt\\])/g, function(match, ch) {
+					if (ch == "n") return "\n"
+					if (ch == "r") return "\r"
+					if (ch == "t") return "\t"
+					if (ch == "\\") return "\\"
+					return match
+				})
+			}
+
+			function parseQuery(query) {
+				if (query == '') return query;
+				var isRE = query.match(/^\/(.*)\/([a-z]*)$/);
+				if (isRE) {
+					try {
+						query = new RegExp(isRE[1], isRE[2].indexOf("i") == -1 ? "" : "i");
+					} catch (e) {} // Not a regular expression after all, do a string search
+				} else {
+					query = parseString(query)
+				}
+				if (typeof query == "string" ? query == "" : query.test("")) query = /x^/;
+				return query;
+			}
+
+			function SearchState() {
+				this.posFrom = this.posTo = this.lastQuery = this.query = null;
+				this.overlay = null;
+			}
+			
+			return {create : function(editor){return new SearchUtil(editor)}}
+			
+		})();
+		
+		function SearchHelper(editor){
+			var html = '';
+			html += '<div id="editor_searchHelper" style="position:absolute;bottom:10px;width:100%;z-index:99;display:none;padding:20px;padding-bottom:5px">';
+			html += '<div style="width:100%;text-align:right;margin-bottom:5px"><i class="fas fa-times icon"  style="cursor:pointer;margin-right:0px"></i></div>';
+			html += ' <form>';
+			html += '<div class="input-group mb-3">';
+			html += '<input type="text" style="border:none" class="form-control" placeholder="查找内容" >';
+			html += '<div class="input-group-append" data-search>';
+			html += ' <span class="input-group-text" ><i class="fas fa-search " style="cursor:pointer"></i></span>';
+			html += ' </div>';
+			html += '</div>';
+			html += '<div class="input-group mb-3" style="display:none">';
+			html += '<input type="text" style="border:none" class="form-control" placeholder="替换内容" >';
+			html += '<div class="input-group-append" data-replace style="cursor:pointer">';
+			html += ' <span class="input-group-text" ><i class="fas fa-exchange-alt" ></i></span>';
+			html += ' </div>';
+			html += '<div class="input-group-append" data-replace-all style="cursor:pointer">';
+			html += ' <span class="input-group-text" ><i class="fas fa-sync-alt" ></i></span>';
+			html += ' </div>';
+			html += '<div class="input-group-append" data-up style="cursor:pointer">';
+			html += ' <span class="input-group-text" ><i class="fas fa-arrow-up" ></i></span>';
+			html += ' </div>';
+			html += '<div class="input-group-append" data-down style="cursor:pointer">';
+			html += ' <span class="input-group-text" ><i class="fas fa-arrow-down" ></i></span>';
+			html += ' </div>';
+			html += '</div>';
+			html += '</form>';
+			html += '</div>';
+			
+			var ele = $(html);
+			$("#editor_in").append(ele);
+			
+			var searchUtil = SearchUtil.create(editor);
+			
+			var nextHandler =  function() {
+				searchUtil.findNext(false);
+			}
+			
+			var previousHandler = function(){
+				searchUtil.findNext(true)
+			}
+			
+			this.keyMap = {
+				'Up' : previousHandler,
+				'Down' : nextHandler
+			}
+			
+			var startSearchHandler = function() {
+				var query = ele.find('input').eq(0).val();
+				if ($.trim(query) == '') {
+					swal('搜索内容不能为空');
+					return;
+				}
+				searchUtil.startSearch(query,function(cursor) {
+					if (cursor == null) {
+						swal('没有找到符合条件的搜索内容');
+					} else {
+						ele.find(".input-group").eq(0).hide();
+						ele.find(".input-group").eq(1).show();
+						editor.focus();
+					}
+				});
+			};
+			
+			
+			var replaceHandler = function() {
+				var text = ele.find('input').eq(1).val();
+				searchUtil.replace(text);
+			}
+			
+			var replaceAllHandler = function() {
+				Swal.fire({
+					title: '确定要替换全部吗?',
+					type: 'warning',
+					showCancelButton: true,
+					confirmButtonColor: '#3085d6',
+					cancelButtonColor: '#d33'
+				}).then((result) => {
+					if (result.value) {
+						var text = ele.find('input').eq(1).val();
+						searchUtil.replaceAll(text);
+					}
+				})
+			}
+			
+			ele.find('.form-control').eq(0).on('keydown',function(event){
+				if (keyNames[event.keyCode] == 'Enter') {
+					startSearchHandler();
+					event.preventDefault();
+				}
+			});
+			
+			ele.find('.form-control').eq(1).on('keydown',function(event){
+				if (keyNames[event.keyCode] == 'Enter') {
+					replaceHandler();
+					event.preventDefault();
+				}
+			});
+			
+			ele.on('click', '[data-search]',startSearchHandler );
+			ele.on('click', '[data-down]',nextHandler);
+			ele.on('click', '[data-up]', previousHandler);
+			ele.on('click', '[data-replace]', replaceHandler);
+			ele.on('click', '[data-replace-all]', replaceAllHandler);
+			var me = this;
+			ele.on('click', '.fa-times', function(){
+				me.close();
+			});
+			
+			this.ele = ele;
+			this.visible = false;
+			this.editor = editor;
+			this.searchUtil = searchUtil;
+		}
+		
+		SearchHelper.prototype.open = function(){
+			this.editor.setOption('readOnly', true);
+			this.ele.show();
+			this.ele.find('.form-control').focus();
+			this.visible = true;
+			this.editor.addKeyMap(this.keyMap);
+		}
+		
+		SearchHelper.prototype.close = function(){
+			this.searchUtil.clearSearch();
+			this.ele.hide();
+			this.ele.find('input').val('');
+			this.ele.find(".input-group").eq(0).show();
+			this.ele.find(".input-group").eq(1).hide();
+			this.editor.setOption('readOnly', false)
+			this.visible = false;
+			this.editor.removeKeyMap(this.keyMap);
+		}
+		
+		SearchHelper.prototype.isVisible = function(){
+			return this.visible;
+		}
+
+		return {create:function(editor){return new SearchHelper(editor)}}
+
+	})();
 
 
     var EditorWrapper = (function() {
 
         var mobile = CodeMirror.browser.mobile;
         var ios = CodeMirror.browser.ios;
-		
-        var ThemeHandler = (function() {
-			
-			function ThemeHandler(config){
-				this.key = config.theme_key || "heather-theme";
-				this.store = {
-					saveJson : function(key,json){
-						localStorage.setItem(key, json);
-					},
-					getJson : function(key){
-						return localStorage.getItem(key);
-					}
-				};
-				this.config = config;
-				this.timer = undefined;
-			}
-			
-			ThemeHandler.prototype.saveTheme = function(theme){
-				if (this.timer) {
-                    clearTimeout(this.timer);
-                }
-                var handler = this;
-                this.timer = setTimeout(function() {
-					var json = JSON.stringify(theme);
-					handler.store.saveJson(handler.key,json);
-                }, 500)
-			}
-			
-			ThemeHandler.prototype.reset = function() {
-                var theme = new Theme(this.config);
-                this.store.saveJson(this.key,JSON.stringify(theme));
-                theme.render();
-                return theme;
-            }
-			
-			ThemeHandler.prototype.getTheme = function(){
-				var json = this.store.getJson(this.key);
-				if(json == null){
-					return new Theme(this.config);
-				} else {
-					var current = $.parseJSON(json);
-					var theme = new Theme(this.config);
-					theme.toolbar = current.toolbar;
-					theme.bar = current.bar;
-					theme.stat = current.stat;
-					theme.editor = current.editor;
-					theme.inCss = current.inCss;
-					theme.cursorHelper = current.cursorHelper;
-					theme.mermaid = current.mermaid;
-					theme.customCss = current.customCss;
-					return theme;
-				}
-			}
-			
-            function Theme(config) {
-                this.toolbar = {};
-                this.bar = {};
-                this.stat = {};
-                this.editor = {};
-                this.inCss = {};
-                this.searchHelper = {};
-                this.mermaid = {};
-                this.hljs = {
-                    theme: 'github'
-                };
-                this.customCss = undefined;
-                this.timer = undefined;
-                this.config = config;
-            }
-
-            Theme.prototype.clone = function() {
-                var copy = JSON.parse(JSON.stringify(this));
-                var theme = new Theme(this.config);
-                theme.toolbar = copy.toolbar;
-                theme.bar = copy.bar;
-                theme.stat = copy.stat;
-                theme.editor = copy.editor;
-                theme.inCss = copy.inCss;
-                theme.searchHelper = copy.searchHelper;
-                theme.mermaid = copy.mermaid;
-                theme.customCss = copy.customCss;
-                return theme;
-            }
-
-            Theme.prototype.render = function(config) {
-				config = config || {};
-                loadEditorTheme(this,config.editorThemeLoad);
-                loadHljsTheme(this);
-                var css = "";
-                css += "#editor_toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
-                css += "#editor_innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
-                css += "#editor_stat{color:" + (this.stat.color || 'inherit') + "}\n";
-                css += "#editor_in{background:" + (this.inCss.background || 'inherit') + "}\n";
-                var searchHelperColor = (this.searchHelper.color || 'inherit');
-                css += "#editor_searchHelper{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control{color:" + searchHelperColor + "}\n#editor_searchHelper .input-group-text{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control::placeholder {color: " + searchHelperColor + ";opacity: 1;}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}";
-
-                $("#custom_theme").remove();
-                if ($.trim(css) != '') {
-                    $("head").append("<style type='text/css' id='custom_theme'>" + css + "</style>");
-                }
-                $("#custom_css").remove();
-                $("head").append("<style type='text/css' id='custom_css'>" + (this.customCss || '') + "</style>");
-            }
-			
-			
-            function loadHljsTheme(theme) {
-                if (theme.hljs.theme) {
-                    var hljsTheme = theme.hljs.theme;
-                    var hljsThemeFunction = theme.config.res_hljsTheme || function(hljsTheme) {
-                        return 'highlight/styles/' + hljsTheme + '.css';
-                    }
-                    if ($('hljs-theme-' + hljsTheme + '').length == 0) {
-                        $('<link id="hljs-theme-' + hljsTheme + '" >').appendTo('head').attr({
-                            type: 'text/css',
-                            rel: 'stylesheet',
-                            href: hljsThemeFunction(hljsTheme)
-                        })
-                    }
-                }
-            }
-			
-			function loadEditorTheme(theme, callback) {
-				if (theme.editor.theme) {
-					var editorTheme = theme.editor.theme;
-					var editorThemeFunction = theme.config.res_editorTheme || function(editorTheme) {
-						return 'codemirror/theme/' + editorTheme + '.css';
-					}
-					if ($('#codemirror-theme-' + editorTheme + '').length == 0) {
-						$('<link id="codemirror-theme-' + editorTheme + '" >').appendTo('head').attr({
-							type: 'text/css',
-							rel: 'stylesheet',
-							onload: function() {
-								if (callback) {
-									callback(editorTheme)
-								}
-							},
-							href: editorThemeFunction(editorTheme)
-						})
-					} else {
-						if (callback) {
-							callback(editorTheme)
-						}
-					}
-				}
-			}
-
-            return {
-                create: function(config) {
-                    return new ThemeHandler(config);
-                }
-            };
-        })();
 
         function EditorWrapper(config) {
             var html = '<div id="editor_wrapper">';
@@ -580,7 +1053,7 @@ var EditorWrapper = (function() {
             $("#editor_wrapper").animate({
                 scrollLeft: $("#editor_toc").outerWidth()
             }, 0);
-
+			this.commands = {};
             this.eventHandlers = [];
 			this.themeHandler = ThemeHandler.create(config);
             var theme = this.themeHandler.getTheme();
@@ -639,6 +1112,7 @@ var EditorWrapper = (function() {
             this.theme = theme;
             this.sync = Sync.create(editor, $("#editor_out")[0], config);
             this.render = Render.create(config, theme);
+			this.searchHelper = SearchHelper.create(editor);
             this.toolbar = Bar.create($("#editor_toolbar")[0]);
             var innerBar = Bar.create($("#editor_innerBar")[0]);
             innerBar.hide();
@@ -767,6 +1241,10 @@ var EditorWrapper = (function() {
             })
             this.editor = editor;
             this.config = config;
+			if(this.config.backupEnable !== false){
+				this.backup = Backup.create(this);
+			}
+			initCommandsAndKeyMap(this);
             initInnerBar(this);
             initToolbar(this);
             this.fullscreen = false;
@@ -783,260 +1261,9 @@ var EditorWrapper = (function() {
 
             triggerEvent(this, 'load');
         }
-
-        function triggerEvent(wrapper, name, args) {
-            for (var i = 0; i < wrapper.eventHandlers.length; i++) {
-                var evtHandler = wrapper.eventHandlers[i];
-                if (evtHandler.name == name) {
-                    try {
-                        evtHandler.handler.call(wrapper, args);
-                    } catch (e) {}
-                }
-            }
-        }
-
-        function changeWhenFullScreenChange(wrapper, isFullscreen) {
-            if (!CodeMirror.browser.mobile) {
-                var cm = wrapper.editor;
-                var wrap = cm.getWrapperElement();
-
-
-                var outToEditorHandler = function(e) {
-                    var keyCode = e.which || e.keyCode;
-                    if (e.ctrlKey && keyCode == 37) {
-                        $("#editor_out").removeAttr("tabindex");
-                        wrapper.toEditor(function() {
-							cm.focus();
-							var info = cm.state.fullScreenRestore;
-							window.scrollTo(info.scrollLeft, info.scrollTop);
-                        });
-                    }
-                }
-
-                var tocToEditorHandler = function(e) {
-                    var keyCode = e.which || e.keyCode;
-                    if (e.ctrlKey && keyCode == 39) {
-                        $("#editor_toc").removeAttr("tabindex");
-                        wrapper.toEditor(function() {
-							cm.focus();
-							var info = cm.state.fullScreenRestore;
-							window.scrollTo(info.scrollLeft, info.scrollTop);
-                        });
-                    }
-                }
-				
-				var keyMap = {
-					'Ctrl-Right': function(){
-                        wrapper.toPreview(function() {
-                            $("#editor_out").prop('tabindex', 0);
-                            $("#editor_out").focus();
-                        });
-					},
-					'Ctrl-Left' : function(){
-                        wrapper.toToc(function() {
-                            $("#editor_toc").prop('tabindex', 0);
-                            $("#editor_toc").focus();
-                        });
-					}
-				}
-
-                if (isFullscreen) {
-					wrapper.editor.addKeyMap(keyMap);
-
-                    $("#editor_out").on('keydown', outToEditorHandler);
-                    $("#editor_toc").on('keydown', tocToEditorHandler);
-
-                    $(wrapper.getFullScreenElement()).addClass('editor_fullscreen');
-
-                    //from CodeMirror display fullscreen.js
-                    cm.state.fullScreenRestore = {
-                        scrollTop: window.pageYOffset,
-                        scrollLeft: window.pageXOffset,
-                        width: wrap.style.width,
-                        height: wrap.style.height
-                    };
-                    wrap.style.width = "";
-                    wrap.style.height = "auto";
-                    wrap.className += " CodeMirror-fullscreen";
-                    document.documentElement.style.overflow = "hidden";
-                    cm.refresh();
-
-                } else {
-
-					wrapper.editor.removeKeyMap(keyMap);
-                    $("#editor_out").off('keydown', outToEditorHandler);
-                    $("#editor_toc").off('keydown', tocToEditorHandler);
-
-                    $(wrapper.getFullScreenElement()).removeClass('editor_fullscreen');
-                    wrap.className = wrap.className.replace(/\s*CodeMirror-fullscreen\b/, "");
-                    document.documentElement.style.overflow = "";
-                    var info = cm.state.fullScreenRestore;
-                    wrap.style.width = info.width;
-                    wrap.style.height = info.height;
-                    window.scrollTo(info.scrollLeft, info.scrollTop);
-                    cm.refresh();
-
-                }
-                wrapper.toEditor(function() {
-					wrapper.doRender(false);
-				}, 0);
-            }
-        }
-
-        EditorWrapper.prototype.doRender = function(patch) {
-            this.render.renderAt(this.editor.getValue(), $("#editor_out")[0], patch);
-            renderToc();
-        }
-
-        EditorWrapper.prototype.remove = function(patch) {
-            var me = this;
-            var removeHandler = function() {
-                Swal.close();
-                triggerEvent(me, 'remove');
-                $(me.getFullScreenElement()).removeClass('editor_fullscreen');
-                $('body').removeClass('editor_noscroll');
-                $('html').removeClass('editor_noscroll');
-                $('html,body').scrollTop(me.scrollTop);
-                me.wrapperElement.parentNode.removeChild(me.wrapperElement);
-                wrapperInstance.wrapper = undefined;
-                delete wrapperInstance.wrapper;
-            }
-            if (this.fullscreen) {
-                this.exitFullScreen().then(function() {
-                    removeHandler();
-                });
-            } else {
-                removeHandler();
-            }
-        }
-
-        EditorWrapper.prototype.doSync = function() {
-            this.sync.doSync();
-        }
-
-        EditorWrapper.prototype.requestFullScreen = function() {
-            if (!mobile) {
-                if (screenfull.enabled) {
-                    screenfull.request(this.getFullScreenElement());
-                } else {
-                    swal("当前浏览器不支持全屏模式")
-                }
-            }
-        }
-
-        EditorWrapper.prototype.getFullScreenElement = function() {
-            return document.body;
-        }
-
-        EditorWrapper.prototype.exitFullScreen = function() {
-            if (!mobile && screenfull.enabled) {
-                return screenfull.exit();
-            }
-        }
-
-        EditorWrapper.prototype.enableSync = function() {
-            if (!this.syncEnable) {
-                editor.on('scroll', this.scrollHandler)
-                this.syncEnable = true;
-            }
-        }
-
-        EditorWrapper.prototype.getHtml = function() {
-            return this.render.getHtml(this.editor.getValue());
-        }
-
-        EditorWrapper.prototype.getValue = function() {
-            return this.editor.getValue();
-        }
-
-        EditorWrapper.prototype.setValue = function(text) {
-            return this.editor.setValue(text);
-        }
-
-        EditorWrapper.prototype.disableSync = function() {
-            if (this.syncEnable) {
-                editor.off('scroll', this.scrollHandler);
-                this.syncEnable = false;
-            }
-        }
-
-        EditorWrapper.prototype.on = function(name, handler) {
-            this.eventHandlers.push({
-                name: name,
-                handler: handler
-            })
-        }
-
-        EditorWrapper.prototype.off = function(name, handler) {
-            for (var i = 0; i < this.eventHandlers.length; i++) {
-                var handler = this.eventHandlers[i];
-                if (handler.name == name && handler.handler == handler) {
-                    this.eventHandlers.splice(i, 1);
-                    break;
-                }
-            }
-        }
-
-        EditorWrapper.prototype.onRemove = function(fun) {
-            this.on('remove', fun)
-        }
-
-        EditorWrapper.prototype.offRemove = function(fun) {
-            this.off('remove', fun);
-        }
-
-        EditorWrapper.prototype.toEditor = function(callback, _ms) {
-            var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
-             $("#editor_wrapper").animate({
-				scrollLeft: $("#editor_in").width()
-			}, ms, function() {
-				if (callback) callback();
-			});
-        }
-
-
-        EditorWrapper.prototype.toToc = function(callback, _ms) {
-            this.editor.getInputField().blur();
-            if (mobile) {
-                this.doRender(true);
-            }
-            var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
-            $("#editor_wrapper").animate({
-                scrollLeft: 0
-            }, ms, function() {
-                if (callback) callback();
-            });
-        }
-
-        EditorWrapper.prototype.toPreview = function(callback, _ms) {
-            var me = this;
-            if (mobile || me.fullscreen) {
-                this.editor.getInputField().blur();
-                if (mobile) {
-                    this.doRender(true);
-                    this.doSync();
-                }
-                var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
-                $("#editor_wrapper").animate({
-                    scrollLeft: $("#editor_out")[0].offsetLeft
-                }, ms, function() {
-                    if (callback) callback();
-                });
-            }
-        }
 		
-		EditorWrapper.prototype.saveTheme = function() {
-           this.themeHandler.saveTheme(this.theme);
-        }
-
-        function initInnerBar(wrapper) {
-            var innerBar = wrapper.innerBar;
-            var editor = wrapper.editor;
-            var config = wrapper.config;
-
-            var innerBarElement = $("#editor_innerBar");
-            var ios = CodeMirror.browser.ios;
-
+		function initCommandsAndKeyMap(wrapper){
+			var editor = wrapper.editor;
 			var emojiHandler = function() {
 				var emojiArray = config.emojiArray || $.trim("😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 ☺️ 🙂 🤗 🤔 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🤑 😲 ☹️ 🙁 😖 😞 😟 😤 😢 😭 😦 😧 😨 😩 😬 😰 😱 😳 😵 😡 😠 😷 🤒 🤕 🤢 🤧 😇 🤠 🤡 🤥 🤓 😈 👿 👹 👺 💀 👻 👽 🤖 💩 😺 😸 😹 😻 😼 😽 🙀 😿 😾").split(' ');
 				var html = '';
@@ -1312,98 +1539,30 @@ var EditorWrapper = (function() {
 					innerBar.show();
 				}).catch(swal.noop)
 			};
-
 			
-            var icons = config.innerBar_icons || ['emoji', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table', 'undo', 'redo', 'close'];
-            for (var i = 0; i < icons.length; i++) {
-                var icon = icons[i];
-                if(icon == 'emoji'){
-					innerBar.addIcon('far fa-grin-alt',undefined,function(ele){
-						ele.addEventListener('click',emojiHandler);
-					})
+			var searchHandler = function() {
+				if(wrapper.searchHelper.isVisible()){
+					wrapper.searchHelper.close();
+				} else {
+					wrapper.searchHelper.open();
 				}
-				if(icon == 'heading'){
-					innerBar.addIcon('fas fa-heading',undefined,function(ele){
-						ele.addEventListener('click',headingHandler);
-					})
-				}
-				if(icon == 'bold'){
-					innerBar.addIcon('fas fa-bold',undefined,function(ele){
-						ele.addEventListener('click',boldHandler);
-					})
-				}
-				if(icon == 'italic'){
-					innerBar.addIcon('fas fa-italic',undefined,function(ele){
-						ele.addEventListener('click',italicHandler);
-					})
-				}
-				if(icon == 'quote'){
-					innerBar.addIcon('fas fa-quote-left',undefined,function(ele){
-						ele.addEventListener('click',quoteHandler);
-					})
-				}
-				
-				if(icon == 'strikethrough'){
-					innerBar.addIcon('fas fa-strikethrough',undefined,function(ele){
-						ele.addEventListener('click',strikethroughHandler);
-					})
-				}
-				
-				if(icon == 'link'){
-					innerBar.addIcon('fas fa-link',undefined,function(ele){
-						ele.addEventListener('click',linkHandler);
-					})
-				}
-				
-				if(icon == 'code'){
-					innerBar.addIcon('fas fa-code',undefined,function(ele){
-						ele.addEventListener('click',codeHandler);
-					})
-				}
-				
-				if(icon == 'code-block'){
-					innerBar.addIcon('fas fa-file-code',undefined,function(ele){
-						ele.addEventListener('click',codeBlockHandler);
-					})
-				}
-				
-				if(icon == 'uncheck'){
-					innerBar.addIcon('far fa-square',undefined,function(ele){
-						ele.addEventListener('click',uncheckHandler);
-					})
-				}
-				
-				if(icon == 'check'){
-					innerBar.addIcon('far fa-check-square',undefined,function(ele){
-						ele.addEventListener('click',checkHandler);
-					})
-				}
-				
-				if(icon == 'table'){
-					innerBar.addIcon('fas fa-table',undefined,function(ele){
-						ele.addEventListener('click',tableHandler);
-					})
-				}
-				
-				if(icon == 'undo'){
-					innerBar.addIcon('fas fa-undo',undefined,function(ele){
-						ele.addEventListener('click',undoHandler);
-					})
-				}
-				
-				if(icon == 'redo'){
-					innerBar.addIcon('fas fa-redo',undefined,function(ele){
-						ele.addEventListener('click',redoHandler);
-					})
-				}
-				if(icon == 'close'){
-					innerBar.addIcon('fas fa-times',function(){
-						innerBar.hide();
-					})
-				}
-            }
+			};
 			
-			var keyMap = {
+			var keyMap = mac ? {
+				"Ctrl-B" : boldHandler,
+				"Ctrl-I" : italicHandler,
+				"Shift-Cmd-T" : tableHandler,
+				"Ctrl-H" : headingHandler,
+				"Ctrl-L" : linkHandler,
+				"Ctrl-Q" : quoteHandler,
+				"Shift-Cmd-B" : codeBlockHandler,
+				"Shift-Cmd-U" : uncheckHandler,
+				"Shift-Cmd-I" : checkHandler,
+				'Ctrl-S':searchHandler,
+				"Cmd-Enter":function(){
+					wrapper.requestFullScreen();
+				}
+			} : {
 				"Ctrl-B" : boldHandler,
 				"Ctrl-I" : italicHandler,
 				"Alt-T" : tableHandler,
@@ -1412,11 +1571,390 @@ var EditorWrapper = (function() {
 				"Ctrl-Q" : quoteHandler,
 				"Alt-B" : codeBlockHandler,
 				"Alt-U" : uncheckHandler,
-				"Alt-I" : checkHandler
+				"Alt-I" : checkHandler,
+				'Alt-S' : searchHandler,
+				"Ctrl-Enter":function(){
+					wrapper.requestFullScreen();
+				}
 			}
 			
+			
+			wrapper.addCommand('emoji',emojiHandler);
+			wrapper.addCommand('heading',headingHandler);
+			wrapper.addCommand('bold',boldHandler);
+			wrapper.addCommand('italic',italicHandler);
+			wrapper.addCommand('quote',quoteHandler);
+			wrapper.addCommand('strikethrough',strikethroughHandler);
+			wrapper.addCommand('link',linkHandler);
+			wrapper.addCommand('codeBlock',codeBlockHandler);
+			wrapper.addCommand('code',codeHandler);
+			wrapper.addCommand('uncheck',uncheckHandler);
+			wrapper.addCommand('undo',undoHandler);
+			wrapper.addCommand('redo',redoHandler);
+			wrapper.addCommand('table',tableHandler);
+			wrapper.addCommand('search',searchHandler);
 			wrapper.editor.addKeyMap(keyMap);
+		}
+		
 
+        function triggerEvent(wrapper, name, args) {
+            for (var i = 0; i < wrapper.eventHandlers.length; i++) {
+                var evtHandler = wrapper.eventHandlers[i];
+                if (evtHandler.name == name) {
+                    try {
+                        evtHandler.handler.call(wrapper, args);
+                    } catch (e) {}
+                }
+            }
+        }
+
+        function changeWhenFullScreenChange(wrapper, isFullscreen) {
+            if (!CodeMirror.browser.mobile) {
+                var cm = wrapper.editor;
+                var wrap = cm.getWrapperElement();
+                var outToEditorHandler = function(e) {
+                    var keyCode = e.which || e.keyCode;
+                    if ((e.ctrlKey || e.metaKey) && keyCode == 37) {
+                        $("#editor_out").removeAttr("tabindex");
+                        wrapper.toEditor(function() {
+							cm.focus();
+							var info = cm.state.fullScreenRestore;
+							window.scrollTo(info.scrollLeft, info.scrollTop);
+                        });
+                    }
+                }
+
+                var tocToEditorHandler = function(e) {
+                    var keyCode = e.which || e.keyCode;
+                    if ((e.ctrlKey|| e.metaKey) && keyCode == 39) {
+                        $("#editor_toc").removeAttr("tabindex");
+                        wrapper.toEditor(function() {
+							cm.focus();
+							var info = cm.state.fullScreenRestore;
+							window.scrollTo(info.scrollLeft, info.scrollTop);
+                        });
+                    }
+                }
+				
+				var toPreviewHandler = function(){
+					wrapper.toPreview(function() {
+						$("#editor_out").prop('tabindex', 0);
+						$("#editor_out").focus();
+					});
+				};
+				
+				var toTocHandler = function(){
+					wrapper.toToc(function() {
+						$("#editor_toc").prop('tabindex', 0);
+						$("#editor_toc").focus();
+					});
+				};
+				
+				var keyMap = mac ? {
+					'Cmd-Right': toPreviewHandler,
+					'Cmd-Left' : toTocHandler
+				} : {
+					'Ctrl-Right': toPreviewHandler,
+					'Ctrl-Left' : toTocHandler
+				} 
+
+                if (isFullscreen) {
+					wrapper.editor.addKeyMap(keyMap);
+
+                    $("#editor_out").on('keydown', outToEditorHandler);
+                    $("#editor_toc").on('keydown', tocToEditorHandler);
+
+                    $(wrapper.getFullScreenElement()).addClass('editor_fullscreen');
+
+                    //from CodeMirror display fullscreen.js
+                    cm.state.fullScreenRestore = {
+                        scrollTop: window.pageYOffset,
+                        scrollLeft: window.pageXOffset,
+                        width: wrap.style.width,
+                        height: wrap.style.height
+                    };
+                    wrap.style.width = "";
+                    wrap.style.height = "auto";
+                    wrap.className += " CodeMirror-fullscreen";
+                    document.documentElement.style.overflow = "hidden";
+                    cm.refresh();
+
+                } else {
+
+					wrapper.editor.removeKeyMap(keyMap);
+                    $("#editor_out").off('keydown', outToEditorHandler);
+                    $("#editor_toc").off('keydown', tocToEditorHandler);
+
+                    $(wrapper.getFullScreenElement()).removeClass('editor_fullscreen');
+                    wrap.className = wrap.className.replace(/\s*CodeMirror-fullscreen\b/, "");
+                    document.documentElement.style.overflow = "";
+                    var info = cm.state.fullScreenRestore;
+                    wrap.style.width = info.width;
+                    wrap.style.height = info.height;
+                    window.scrollTo(info.scrollLeft, info.scrollTop);
+                    cm.refresh();
+
+                }
+                wrapper.toEditor(function() {
+					wrapper.doRender(false);
+				}, 0);
+            }
+        }
+		
+		EditorWrapper.prototype.addCommand = function(name,handler) {
+		   this.commands[name] = handler;
+        }
+		
+		EditorWrapper.prototype.execCommand = function(name) {
+           var handler = this.commands[name];
+		   if(!isUndefined(handler)){
+			   handler(this);
+		   }
+        }
+
+        EditorWrapper.prototype.doRender = function(patch) {
+            this.render.renderAt(this.editor.getValue(), $("#editor_out")[0], patch);
+            renderToc();
+        }
+
+        EditorWrapper.prototype.remove = function() {
+            var me = this;
+            var removeHandler = function() {
+                Swal.close();
+                triggerEvent(me, 'remove');
+                $(me.getFullScreenElement()).removeClass('editor_fullscreen');
+                $('body').removeClass('editor_noscroll');
+                $('html').removeClass('editor_noscroll');
+                $('html,body').scrollTop(me.scrollTop);
+                me.wrapperElement.parentNode.removeChild(me.wrapperElement);
+                wrapperInstance.wrapper = undefined;
+                delete wrapperInstance.wrapper;
+            }
+            if (this.fullscreen) {
+                this.exitFullScreen().then(function() {
+                    removeHandler();
+                });
+            } else {
+                removeHandler();
+            }
+        }
+
+        EditorWrapper.prototype.doSync = function() {
+            this.sync.doSync();
+        }
+
+        EditorWrapper.prototype.requestFullScreen = function() {
+            if (!mobile) {
+                if (screenfull.enabled) {
+                    screenfull.request(this.getFullScreenElement());
+                } else {
+                    swal("当前浏览器不支持全屏模式")
+                }
+            }
+        }
+
+        EditorWrapper.prototype.getFullScreenElement = function() {
+            return document.body;
+        }
+
+        EditorWrapper.prototype.exitFullScreen = function() {
+            if (!mobile && screenfull.enabled) {
+                return screenfull.exit();
+            }
+        }
+
+        EditorWrapper.prototype.enableSync = function() {
+            if (!this.syncEnable) {
+                editor.on('scroll', this.scrollHandler)
+                this.syncEnable = true;
+            }
+        }
+
+        EditorWrapper.prototype.getHtml = function() {
+            return this.render.getHtml(this.editor.getValue());
+        }
+
+        EditorWrapper.prototype.getValue = function() {
+            return this.editor.getValue();
+        }
+
+        EditorWrapper.prototype.setValue = function(text) {
+            return this.editor.setValue(text);
+        }
+
+        EditorWrapper.prototype.disableSync = function() {
+            if (this.syncEnable) {
+                editor.off('scroll', this.scrollHandler);
+                this.syncEnable = false;
+            }
+        }
+
+        EditorWrapper.prototype.on = function(name, handler) {
+            this.eventHandlers.push({
+                name: name,
+                handler: handler
+            })
+        }
+
+        EditorWrapper.prototype.off = function(name, handler) {
+            for (var i = 0; i < this.eventHandlers.length; i++) {
+                var handler = this.eventHandlers[i];
+                if (handler.name == name && handler.handler == handler) {
+                    this.eventHandlers.splice(i, 1);
+                    break;
+                }
+            }
+        }
+
+        EditorWrapper.prototype.onRemove = function(fun) {
+            this.on('remove', fun)
+        }
+
+        EditorWrapper.prototype.offRemove = function(fun) {
+            this.off('remove', fun);
+        }
+
+        EditorWrapper.prototype.toEditor = function(callback, _ms) {
+            var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
+             $("#editor_wrapper").animate({
+				scrollLeft: $("#editor_in").width()
+			}, ms, function() {
+				if (callback) callback();
+			});
+        }
+
+
+        EditorWrapper.prototype.toToc = function(callback, _ms) {
+            this.editor.unfocus();
+            if (mobile) {
+                this.doRender(true);
+            }
+            var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
+            $("#editor_wrapper").animate({
+                scrollLeft: 0
+            }, ms, function() {
+                if (callback) callback();
+            });
+        }
+
+        EditorWrapper.prototype.toPreview = function(callback, _ms) {
+            var me = this;
+            if (mobile || me.fullscreen) {
+                this.editor.unfocus();
+                if (mobile) {
+                    this.doRender(true);
+                    this.doSync();
+                }
+                var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
+                $("#editor_wrapper").animate({
+                    scrollLeft: $("#editor_out")[0].offsetLeft
+                }, ms, function() {
+                    if (callback) callback();
+                });
+            }
+        }
+		
+		EditorWrapper.prototype.saveTheme = function() {
+           this.themeHandler.saveTheme(this.theme);
+        }
+
+        function initInnerBar(wrapper) {
+            var innerBar = wrapper.innerBar;
+            var editor = wrapper.editor;
+            var config = wrapper.config;
+
+            var innerBarElement = $("#editor_innerBar");
+            var ios = CodeMirror.browser.ios;
+			
+            var icons = config.innerBar_icons || ['emoji', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table', 'undo', 'redo', 'close'];
+            for (var i = 0; i < icons.length; i++) {
+                var icon = icons[i];
+                if(icon == 'emoji'){
+					innerBar.addIcon('far fa-grin-alt icon',function(){
+						wrapper.execCommand('emoji');
+					})
+				}
+				if(icon == 'heading'){
+					innerBar.addIcon('fas fa-heading icon',function(){
+						wrapper.execCommand('heading');
+					})
+				}
+				if(icon == 'bold'){
+					innerBar.addIcon('fas fa-bold icon',function(){
+						wrapper.execCommand('bold');
+					})
+				}
+				if(icon == 'italic'){
+					innerBar.addIcon('fas fa-italic icon',function(){
+						wrapper.execCommand('italic');
+					})
+				}
+				if(icon == 'quote'){
+					innerBar.addIcon('fas fa-quote-left icon',function(){
+						wrapper.execCommand('quote');
+					})
+				}
+				
+				if(icon == 'strikethrough'){
+					innerBar.addIcon('fas fa-strikethrough icon',function(){
+						wrapper.execCommand('strikethrough');
+					})
+				}
+				
+				if(icon == 'link'){
+					innerBar.addIcon('fas fa-link icon',function(){
+						wrapper.execCommand('link');
+					})
+				}
+				
+				if(icon == 'code'){
+					innerBar.addIcon('fas fa-code icon',function(){
+						wrapper.execCommand('code');
+					})
+				}
+				
+				if(icon == 'code-block'){
+					innerBar.addIcon('fas fa-file-code icon',function(){
+						wrapper.execCommand('codeBlock');
+					})
+				}
+				
+				if(icon == 'uncheck'){
+					innerBar.addIcon('fas fa-square icon',function(){
+						wrapper.execCommand('uncheck');
+					})
+				}
+				
+				if(icon == 'check'){
+					innerBar.addIcon('fas fa-check-square icon',function(){
+						wrapper.execCommand('check');
+					})
+				}
+				
+				if(icon == 'table'){
+					innerBar.addIcon('fas fa-table icon',function(){
+						wrapper.execCommand('table');
+					})
+				}
+				
+				if(icon == 'undo'){
+					innerBar.addIcon('fas fa-undo icon',function(){
+						wrapper.execCommand('undo');
+					})
+				}
+				
+				if(icon == 'redo'){
+					innerBar.addIcon('fas fa-redo icon',function(){
+						wrapper.execCommand('redo');
+					})
+				}
+				if(icon == 'close'){
+					innerBar.addIcon('fas fa-times icon',function(){
+						innerBar.hide();
+					})
+				}
+            }
+			
             var cursorActivityHandler = function(bar) {
                 var lh = editor.defaultTextHeight();
                 innerBarElement.css({
@@ -1472,7 +2010,6 @@ var EditorWrapper = (function() {
 
                         showBar();
                     }
-
                 }
             }
 
@@ -1503,169 +2040,6 @@ var EditorWrapper = (function() {
             var theme = wrapper.theme;
             var cm = editor;
             var config = wrapper.config;
-            ////////////////////backup 
-            var Backup = (function() {
-
-                function Backup(key) {
-                    this.key = key;
-                    var me = this;
-                    wrapper.editor.on('change', function() {
-                        if (me.autoSaveTimer) {
-                            clearTimeout(me.autoSaveTimer);
-                        }
-                        me.autoSaveTimer = setTimeout(function() {
-							var value = wrapper.getValue();
-							if(value == ''){
-								return ;
-							}
-                            if (me.docName) {
-                                me.addDocument(me.docName, value);
-                            } else {
-                                me.addDocument('default', value);
-                            }
-                        }, getDefault(config.toolbar_autoSaveMs, 500));
-                    });
-                    wrapper.onRemove(function() {
-                        if (me.autoSaveTimer) {
-                            clearTimeout(me.autoSaveTimer);
-                        }
-                    });
-                    wrapper.eventHandlers.push({
-                        name: 'load',
-                        handler: function() {
-                            setTimeout(function() {
-                                me.loadLastDocument();
-                            }, 100)
-                        }
-                    });
-                }
-
-                Backup.prototype.addDocument = function(title, content) {
-                    var documents = this.getDocuments();
-                    deleteDocumentByTitle(documents, title);
-                    documents.push({
-                        title: title,
-                        content: content,
-                        time: $.now()
-                    });
-                    storeDocuments(this.key, documents);
-                }
-
-                Backup.prototype.deleteDocument = function(title) {
-                    var doc = this.getDocument(title);
-                    if (doc != null && this.docName == doc.title) {
-                        this.newDocument();
-                    }
-                    var documents = this.getDocuments();
-                    deleteDocumentByTitle(documents, title);
-                    storeDocuments(this.key, documents);
-                }
-
-                Backup.prototype.getDocument = function(title) {
-                    var documents = this.getDocuments();
-                    for (var i = documents.length - 1; i >= 0; i--) {
-                        if (documents[i].title == title) {
-                            return documents[i];
-                        }
-                    }
-                    return null;
-                }
-
-                Backup.prototype.getDocuments = function() {
-                    var content = localStorage.getItem(this.key);
-                    if (content == null) {
-                        return [];
-                    }
-                    return $.parseJSON(content);
-                }
-
-                Backup.prototype.getLastDocument = function() {
-                    var documents = this.getDocuments();
-                    documents.sort(function(a, b) {
-                        var ta = a.time;
-                        var tb = b.time;
-                        return ta > tb ? -1 : ta == tb ? 0 : 1;
-                    });
-                    return documents.length > 0 ? documents[0] : null;
-                }
-
-                Backup.prototype.loadLastDocument = function() {
-                    var doc = this.getLastDocument();
-                    loadDocument(this, doc);
-                }
-
-                Backup.prototype.loadDocument = function(title) {
-                    var doc = this.getDocument(title);
-                    loadDocument(this, doc);
-                }
-
-                function loadDocument(backup, doc) {
-                    if (doc != null) {
-                        if (doc.title != 'default')
-                            backup.docName = doc.title;
-                        else
-                            backup.docName = undefined;
-                        wrapper.setValue(doc.content);
-                        //代码高亮的同步预览中，由于codemirror只渲染当前视窗，因此会出现不同步的现象
-                        //可以调用CodeMirror.renderAllDoc，但是这个方法在大文本中速度很慢，可以选择关闭
-                        if (wrapper.syncEnable !== false && config.renderAllDocEnable !== false) {
-                            wrapper.editor.renderAllDoc(0);
-                        }
-                    }
-                }
-
-                Backup.prototype.newDocument = function() {
-                    this.docName = undefined;
-                    wrapper.setValue("");
-                }
-
-                Backup.prototype.backup = function() {
-                    if (this.docName) {
-                        this.addDocument(this.docName, wrapper.getValue());
-                        this.deleteDocument('default');
-                        swal('保存成功');
-                    } else {
-                        var me = this;
-                        async function requestName() {
-                            const {
-                                value: name
-                            } = await Swal.fire({
-                                title: '标题',
-                                input: 'text',
-                                showCancelButton: true
-                            })
-                            if (name) {
-                                me.addDocument(name, wrapper.getValue());
-                                me.docName = name;
-                                me.deleteDocument('default');
-                                swal('保存成功');
-                            }
-                        }
-                        requestName();
-                    }
-                }
-
-                function deleteDocumentByTitle(documents, title) {
-                    for (var i = documents.length - 1; i >= 0; i--) {
-                        if (documents[i].title == title) {
-                            documents.splice(i, 1);
-                            break;
-                        }
-                    }
-                }
-
-                function storeDocuments(key, documents) {
-                    var json = JSON.stringify(documents);
-                    localStorage.setItem(key, json);
-                }
-
-                return {
-                    create: function(key) {
-                        return new Backup(key);
-                    }
-                }
-            })();
-
             var themeMode = (function() {
                 var toolbarHandler = function(e) {
                     if ($(e.target).hasClass('fa-cog')) {
@@ -1836,7 +2210,7 @@ var EditorWrapper = (function() {
                     editor.setOption('readOnly', true);
                     $("#editor_searchHelper input").attr('value', '点击设置字体颜色');
                     $("#editor_searchHelper").children().addClass('noclick');
-                    searchHelper.show();
+                    wrapper.searchHelper.open();
                     $("#editor_searchHelper").on('click', searchHelprHandler);
                     $("#editor_toolbar").children().addClass('noclick');
                     $(configIcon).removeClass('noclick');
@@ -1861,7 +2235,7 @@ var EditorWrapper = (function() {
                     cloneBar.remove();
                     $("#editor_searchHelper").off('click', searchHelprHandler);
                     $("#editor_searchHelper input").removeAttr('value');
-                    searchHelper.hide();
+                    wrapper.searchHelper.close();
                     editor.off('cursorActivity', changeThemeHandler);
                     $("#editor_toolbar").off('click', toolbarHandler);
                     $("#editor_stat").off('click', statHandler);
@@ -1920,317 +2294,10 @@ var EditorWrapper = (function() {
                 }
             })();
 
-            var searchHelper = (function() {
-                var html = '';
-                html += '<div id="editor_searchHelper" style="position:absolute;bottom:10px;width:100%;z-index:99;display:none;padding:20px;padding-bottom:5px">';
-                html += '<div style="width:100%;text-align:right;margin-bottom:5px"><i class="fas fa-times icon"  style="cursor:pointer;margin-right:0px"></i></div>';
-                html += ' <form>';
-                html += '<div class="input-group mb-3">';
-                html += '<input type="text" style="border:none" class="form-control" placeholder="查找内容" >';
-                html += '<div class="input-group-append" data-search>';
-                html += ' <span class="input-group-text" ><i class="fas fa-search " style="cursor:pointer"></i></span>';
-                html += ' </div>';
-                html += '</div>';
-                html += '<div class="input-group mb-3" style="display:none">';
-                html += '<input type="text" style="border:none" class="form-control" placeholder="替换内容" >';
-                html += '<div class="input-group-append" data-replace style="cursor:pointer">';
-                html += ' <span class="input-group-text" ><i class="fas fa-exchange-alt" ></i></span>';
-                html += ' </div>';
-                html += '<div class="input-group-append" data-replace-all style="cursor:pointer">';
-                html += ' <span class="input-group-text" ><i class="fas fa-sync-alt" ></i></span>';
-                html += ' </div>';
-                html += '<div class="input-group-append" data-up style="cursor:pointer">';
-                html += ' <span class="input-group-text" ><i class="fas fa-arrow-up" ></i></span>';
-                html += ' </div>';
-                html += '<div class="input-group-append" data-down style="cursor:pointer">';
-                html += ' <span class="input-group-text" ><i class="fas fa-arrow-down" ></i></span>';
-                html += ' </div>';
-                html += '</div>';
-                html += '</form>';
-                html += '  </div>';
-
-                var ele = $(html);
-                $("#editor_in").append(ele);
-				
-
-				var isVisible = false;
-
-				var startSearchHandler = function() {
-                    startSearch(function(cursor) {
-                        if (cursor == null) {
-                            swal('没有找到符合条件的搜索内容');
-                        } else {
-                            ele.find(".input-group").eq(0).hide();
-                            ele.find(".input-group").eq(1).show();
-							editor.focus();
-                        }
-                    });
-                };
-				
-				
-				
-				var nextHandler =  function() {
-                    findNext(false);
-                }
-				
-				var previousHandler = function(){
-					findNext(true)
-				}
-				
-				var keyMap = {
-					'Up' : previousHandler,
-					'Down' : nextHandler
-				}
-				
-				var openHandler = function(){
-					editor.setOption('readOnly', true);
-					ele.show();
-					ele.find('.form-control').focus();
-					isVisible = true;
-					editor.addKeyMap(keyMap);
-				}
-				
-				var closeHelper = function(){
-					clearSearch();
-                    ele.hide();
-                    ele.find('input').val('');
-                    ele.find(".input-group").eq(0).show();
-                    ele.find(".input-group").eq(1).hide();
-                    editor.setOption('readOnly', false)
-					isVisible = false;
-					editor.removeKeyMap(keyMap);
-				}
-				
-				var replaceHandler = function() {
-                    var text = ele.find('input').eq(1).val();
-                    var state = getSearchState();
-                    if (!state.query) {
-                        return;
-                    }
-                    var cursor = getSearchCursor(cm, state.query, cm.getCursor("from"));
-                    var advance = function() {
-                        var start = cursor.from(),
-                            match;
-                        if (!(match = cursor.findNext())) {
-                            cursor = getSearchCursor(cm, state.query);
-                            if (!(match = cursor.findNext()) || (start && cursor.from().line == start.line && cursor.from().ch == start.ch)) return;
-                        }
-                        cm.setSelection(cursor.from(), cursor.to());
-
-                        var coords = cm.cursorCoords(cursor.from(), 'local');
-                        cm.scrollTo(0, coords.top);
-                        cursor.replace(typeof query == "string" ? text : text.replace(/\$(\d)/g,
-                            function(_, i) {}));
-                    };
-                    advance();
-                }
-				
-				
-				ele.find('.form-control').eq(0).on('keydown',function(event){
-					if (keyNames[event.keyCode] == 'Enter') {
-						startSearchHandler();
-						event.preventDefault();
-					}
-				});
-				
-				ele.find('.form-control').eq(1).on('keydown',function(event){
-					if (keyNames[event.keyCode] == 'Enter') {
-						replaceHandler();
-						event.preventDefault();
-					}
-				});
-				
-
-                ele.on('click', '[data-search]',startSearchHandler );
-                ele.on('click', '.fa-times', closeHelper);
-                ele.on('click', '[data-down]',nextHandler);
-                ele.on('click', '[data-up]', previousHandler);
-                ele.on('click', '[data-replace]', replaceHandler);
-
-                ele.on('click', '[data-replace-all]', function() {
-                    Swal.fire({
-                        title: '确定要替换全部吗?',
-                        type: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#3085d6',
-                        cancelButtonColor: '#d33'
-                    }).then((result) => {
-                        if (result.value) {
-                            var text = ele.find('input').eq(1).val();
-                            var state = getSearchState();
-                            if (!state.query) {
-                                return;
-                            }
-                            query = state.query;
-                            cm.operation(function() {
-                                for (var cursor = getSearchCursor(cm, query); cursor.findNext();) {
-                                    if (typeof query != "string") {
-                                        var match = cm.getRange(cursor.from(), cursor.to()).match(query);
-                                        cursor.replace(text.replace(/\$(\d)/g,
-                                            function(_, i) {
-                                                return match[i];
-                                            }));
-                                    } else cursor.replace(text);
-                                }
-                            });
-                        }
-                    })
-
-                });
-
-
-                function startSearch(callback) {
-                    clearSearch();
-                    var state = getSearchState();
-                    var query = ele.find('input').eq(0).val();
-                    if ($.trim(query) == '') {
-                        swal('搜索内容不能为空');
-                        return;
-                    }
-                    state.queryText = query;
-                    state.query = parseQuery(query);
-                    cm.removeOverlay(state.overlay, queryCaseInsensitive(state.query));
-                    //state.overlay = searchOverlay(state.query, queryCaseInsensitive(state.query));
-                    //cm.addOverlay(state.overlay);
-                    findNext(false, callback);
-                }
-
-                function findNext(rev, callback) {
-                    var state = getSearchState();
-                    if (!state.query) {
-                        return;
-                    }
-
-                    cm.operation(function() {
-                        var cursor = getSearchCursor(cm, state.query, rev ? state.posFrom : state.posTo);
-                        if (!cursor.find(rev)) {
-                            cursor = getSearchCursor(cm, state.query, rev ? CodeMirror.Pos(cm.lastLine()) : CodeMirror.Pos(cm.firstLine(), 0));
-                            if (!cursor.find(rev)) {
-                                if (callback)
-                                    callback(null);
-                                return;
-                            }
-                        }
-                        cm.setSelection(cursor.from(), cursor.to());
-
-                        var ranges = editor.getAllMarks();
-                        for (var i = 0; i < ranges.length; i++) ranges[i].clear();
-
-                        editor.markText(cursor.from(), cursor.to(), {
-                            className: "styled-background"
-                        });
-
-                        var coords = cm.cursorCoords(cursor.from(), 'local');
-                        cm.scrollTo(0, coords.top);
-                        state.posFrom = cursor.from();
-                        state.posTo = cursor.to();
-                        if (callback) callback({
-                            from: cursor.from(),
-                            to: cursor.to()
-                        })
-                    });
-                }
-
-                function clearSearch() {
-                    var ranges = editor.getAllMarks();
-                    for (var i = 0; i < ranges.length; i++) ranges[i].clear();
-                    wrapper.editor.operation(function() {
-                        var state = getSearchState();
-                        state.lastQuery = state.query;
-                        if (!state.query) return;
-                        state.query = state.queryText = null;
-                        wrapper.editor.removeOverlay(state.overlay);
-                        if (state.annotate) {
-                            state.annotate.clear();
-                            state.annotate = null;
-                        }
-                    });
-                }
-
-                function getSearchState() {
-                    return wrapper.editor.state.search || (wrapper.editor.state.search = new SearchState());
-                }
-
-                function queryCaseInsensitive(query) {
-                    return typeof query == "string" && query == query.toLowerCase();
-                }
-
-                function getSearchCursor(cm, query, pos) {
-                    return cm.getSearchCursor(query, pos, {
-                        caseFold: queryCaseInsensitive(query),
-                        multiline: true
-                    });
-                }
-
-                function parseString(string) {
-                    return string.replace(/\\([nrt\\])/g, function(match, ch) {
-                        if (ch == "n") return "\n"
-                        if (ch == "r") return "\r"
-                        if (ch == "t") return "\t"
-                        if (ch == "\\") return "\\"
-                        return match
-                    })
-                }
-
-                function parseQuery(query) {
-                    if (query == '') return query;
-                    var isRE = query.match(/^\/(.*)\/([a-z]*)$/);
-                    if (isRE) {
-                        try {
-                            query = new RegExp(isRE[1], isRE[2].indexOf("i") == -1 ? "" : "i");
-                        } catch (e) {} // Not a regular expression after all, do a string search
-                    } else {
-                        query = parseString(query)
-                    }
-                    if (typeof query == "string" ? query == "" : query.test("")) query = /x^/;
-                    return query;
-                }
-
-                function SearchState() {
-                    this.posFrom = this.posTo = this.lastQuery = this.query = null;
-                    this.overlay = null;
-                }
-
-                function searchOverlay(query, caseInsensitive) {
-                    if (typeof query == "string") query = new RegExp(query.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&"), caseInsensitive ? "gi" : "g");
-                    else if (!query.global) query = new RegExp(query.source, query.ignoreCase ? "gi" : "g");
-
-                    return {
-                        token: function(stream) {
-                            query.lastIndex = stream.pos;
-                            var match = query.exec(stream.string);
-                            if (match && match.index == stream.pos) {
-                                stream.pos += match[0].length || 1;
-                                return "searching";
-                            } else if (match) {
-                                stream.pos = match.index;
-                            } else {
-                                stream.skipToEnd();
-                            }
-                        }
-                    };
-                }
-
-                return {
-                    'show': openHandler,
-                    'hide': closeHelper,
-                    'isVisible': function(){
-						return isVisible;
-					}
-                };
-
-            })();
-
             var configIcon;
             var icons = config.toolbar_icons || ['toc', 'innerBar', 'backup', 'search', 'config', 'expand'];
             
-			var searchHandler = function() {
-				if(searchHelper.isVisible()){
-					searchHelper.hide();
-				} else {
-					searchHelper.show();
-				}
-			};
+			
 
 			for (var i = 0; i < icons.length; i++) {
                 var icon = icons[i];
@@ -2249,27 +2316,26 @@ var EditorWrapper = (function() {
                 }
 				
                 if (icon == 'search') {
-                    wrapper.toolbar.addIcon('fas fa-search icon', searchHandler);
+                    wrapper.toolbar.addIcon('fas fa-search icon', function(){
+						wrapper.execCommand('search');
+					});
                 }
 
-                if (icon == 'backup') {
-                    var backup = Backup.create('heather-documents');
+                if (icon == 'backup' && wrapper.config.backupEnable !== false) {
                     wrapper.toolbar.addIcon('fas icon fa-upload ', function(ele) {
-                        backup.backup();
+                        wrapper.backup.backup();
                     });
                     wrapper.toolbar.addIcon('fas icon fa-download ', function(ele) {
-                        selectDocuments(backup);
+                        selectDocuments(wrapper.backup);
                     });
 					var newDocumentHandler = function(ele) {
-                        newDocument(backup);
+                        newDocument(wrapper.backup);
                     };
                     wrapper.toolbar.addIcon('far fa-file icon',newDocumentHandler);
-                    wrapper.backup = backup;
                 }
 
                 if (icon == 'config') {
                     wrapper.toolbar.addIcon('fas icon fa-cog nofullscreen', function() {
-
                         swal({
                             html: '<input type="checkbox"  />主题编辑模式 <p style="margin-top:0.5rem"><button style="margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;">自定义css</button></p>'
                         });
@@ -2285,7 +2351,6 @@ var EditorWrapper = (function() {
                         configIcon = ele;
                     })
                 }
-
 
                 if (icon == 'expand') {
                     wrapper.toolbar.addIcon('fas fa-expand icon mobile-hide', function(ele) {
@@ -2312,12 +2377,6 @@ var EditorWrapper = (function() {
                     });
                 }
             }
-			
-			var keyMap = {
-				'Alt-S' : searchHandler
-			}
-			
-			editor.addKeyMap(keyMap);
 
             var isToc = false;
 
@@ -2356,7 +2415,7 @@ var EditorWrapper = (function() {
                 if (documents.length == 0) {
                     swal('没有保存的文档');
                 } else {
-                    var html = '<table class="table">';
+                    var html = '<table style="width:100%">';
                     for (var i = 0; i < documents.length; i++) {
                         var doc = documents[i];
                         html += '<tr><td>' + doc.title + '</td><td><i class="fas fa-times" data-title="' + doc.title + '" style="margin-right:20px;cursor:pointer"></i><i data-title="' + doc.title + '" class="fas fa-arrow-down" style=";cursor:pointer"></i></td><tr>';
@@ -2497,8 +2556,6 @@ var EditorWrapper = (function() {
             }
         }
     })();
-
-
 
     return EditorWrapper;
 
