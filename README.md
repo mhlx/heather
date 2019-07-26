@@ -302,7 +302,7 @@ wrapper.saveTheme();
 
 系统内置指令
 
-| 名称   | 说明   |   快捷键_pc| 快捷键_mac| 
+| 名称   | 说明   |   快捷键_mac| 快捷键_pc| 
 |  -  |  -  | - | - |
 |  search  |  开启\|关闭一个搜索框  | <kbd>Ctrl</kbd> <kbd>S</kbd> |<kbd>Alt</kbd> <kbd>S</kbd>|
 |  emoji  |  打开emoji选择框  |     
