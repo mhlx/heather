@@ -324,16 +324,7 @@ wrapper.saveTheme();
 ### 新增指令
 `EditorWrapper.commands[commandName] = commandHandler`
 
-
-commandHandler接受一个参数，在通过`wrapper.execCommand()`执行这条指令时，参数为`wrapper`，如果对该指令绑定了快捷键，并且通过快捷键触发，那么参数为`editor`
-
-
-指令通常用于编辑器的快捷键绑定，例如：
-```javascript
-var keyMap = {'Shift-Ctrl-S':EditorWrapper.commands[commandName]}
-wrapper.editor.addKeyMap(keyMap);
-              
-```
+commandHandler接受一个参数`wrapper`，例如：
 
 新增一个插入图片的指令，并且为该指令绑定`Ctrl+G`的快捷键：
 ```javascript
