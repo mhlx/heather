@@ -141,7 +141,7 @@ function loadJS(callback) {
 		if(!CodeMirror.browser.mobile){
 			$('.github-corner').show();
 		}
-
+		
 		if ('serviceWorker' in navigator) {
 		   navigator.serviceWorker.register('sw.js', { scope: '/' }).then(function(reg) {
 			if(reg.installing) {
@@ -156,6 +156,7 @@ function loadJS(callback) {
 			console.log('Registration failed with ' + error);
 		   });
 		 }
+
 		var config = {};
 		var wrapper = EditorWrapper.create(config);
 		//https://www.qyh.me/space/web/article/598
@@ -182,33 +183,8 @@ function loadJS(callback) {
 			wrapper.toEditor(undefined,0);
 		});
 		
-		function isCyclic (obj) {
-		  var seenObjects = [];
-
-		  function detect (obj) {
-			if (obj && typeof obj === 'object') {
-			  if (seenObjects.indexOf(obj) !== -1) {
-				return true;
-			  }
-			  seenObjects.push(obj);
-			  for (var key in obj) {
-				if (obj.hasOwnProperty(key) && detect(obj[key])) {
-				  console.log(obj, 'cycle at ' + key);
-				  return true;
-				}
-			  }
-			}
-			return false;
-		  }
-
-		  return detect(obj);
-		}
-		
-		
-		var editor = wrapper.editor;
-		
 		wrapper.toolbar.addIcon('far fa-question-circle icon',function(){
-			$.get('readme.md',{},function(data){
+			$.get('help.md',{},function(data){
 				var html = window.md.render(data);
 				html  = '<div class="markdown-body" style="text-align:left">' + html + '</html>';
 				Swal({width:800,html:html,animation:false})

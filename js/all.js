@@ -88,6 +88,8 @@ var EditorWrapper = (function() {
 			this.md2 = md2;
             this.config = config;
             this.theme = theme;
+			this.hasMermaid = hasMermaid;
+			this.hasKatex = $.inArray('katex', plugins) != -1;
         }
 
         var mermaidLoading = false;
@@ -156,11 +158,11 @@ var EditorWrapper = (function() {
 
         MarkdownRender.prototype.renderAt = function(markdownText, element, patch) {
             var doc = $.parseHTML2(this.md.render(markdownText));
-            var hasMermaid = doc.querySelector('.mermaid') != null;
+            var hasMermaid = doc.querySelector('.mermaid') != null && this.hasMermaid !== false;
             if (hasMermaid) {
                 loadMermaid(this.theme, this.config);
             }
-            var hasKatex = doc.querySelector(".katex") != null;
+            var hasKatex = doc.querySelector(".katex") != null && this.hasKatex !== false;
             if (hasKatex) {
                 loadKatex(this.config)
             }
@@ -420,7 +422,7 @@ var EditorWrapper = (function() {
 					} else {
 						me.addDocument('default', value);
 					}
-				}, getDefault(wrapper.config.toolbar_autoSaveMs, 500));
+				}, getDefault(wrapper.config.backup_autoSaveMs, 500));
 			});
 			wrapper.onRemove(function() {
 				me.wrapper = null;
@@ -1021,10 +1023,320 @@ var EditorWrapper = (function() {
 	})();
 
 
-    var EditorWrapper = (function() {
+    var _EditorWrapper = (function() {
 
         var mobile = CodeMirror.browser.mobile;
         var ios = CodeMirror.browser.ios;
+		
+		function _EditorWrapper(){
+			this.wrapperInstance = {};
+			this.commands = {
+				emoji : function(wrapper) {
+					var editor = wrapper.editor;
+					var emojiArray = $.trim("😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 ☺️ 🙂 🤗 🤔 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🤑 😲 ☹️ 🙁 😖 😞 😟 😤 😢 😭 😦 😧 😨 😩 😬 😰 😱 😳 😵 😡 😠 😷 🤒 🤕 🤢 🤧 😇 🤠 🤡 🤥 🤓 😈 👿 👹 👺 💀 👻 👽 🤖 💩 😺 😸 😹 😻 😼 😽 🙀 😿 😾").split(' ');
+					var html = '';
+					for (var i = 0; i < emojiArray.length; i++) {
+						html += '<span data-emoji style="cursor:pointer">' + emojiArray[i] +
+							'</span>';
+					}
+					swal({
+						html: html
+					})
+					$(Swal.getContent()).find('[data-emoji]').click(function() {
+						var emoji = $(this).text();
+						var text = editor.getSelection();
+						if (text == '') {
+							editor.replaceRange(emoji, editor.getCursor());
+						} else {
+							editor.replaceSelection(emoji);
+						}
+						Swal.close();
+					})
+				},
+				heading : function(wrapper) {
+					var editor = wrapper.editor;
+					async function getHeading() {
+						const {
+							value: heading
+						} = await Swal.fire({
+							input: 'select',
+							inputValue: '1',
+							inputOptions: {
+								'1': 'H1',
+								'2': 'H2',
+								'3': 'H3',
+								'4': 'H4',
+								'5': 'H5',
+								'6': 'H6'
+							},
+							inputPlaceholder: '',
+							showCancelButton: true
+						});
+						if (heading) {
+							var v = parseInt(heading);
+							var text = editor.getSelection();
+							var _text = '\n';
+							for (var i = 0; i < v; i++) {
+								_text += '#';
+							}
+							_text += ' ';
+							if (text == '') {
+								editor.replaceRange(_text, editor.getCursor());
+								editor.focus();
+								var start_cursor = editor.getCursor();
+								var cursorLine = start_cursor.line;
+								var cursorCh = start_cursor.ch;
+								editor.setCursor({
+									line: cursorLine,
+									ch: cursorCh + v
+								});
+							} else {
+								editor.replaceSelection(_text + text);
+							}
+						}
+					}
+					getHeading();
+				},
+				bold :  function(wrapper) {
+					var editor = wrapper.editor;
+					var text = editor.getSelection();
+					if (text == '') {
+						editor.replaceRange("****", editor.getCursor());
+						editor.focus();
+						var str = "**";
+						var mynum = str.length;
+						var start_cursor = editor.getCursor();
+						var cursorLine = start_cursor.line;
+						var cursorCh = start_cursor.ch;
+						editor.setCursor({
+							line: cursorLine,
+							ch: cursorCh - mynum
+						});
+					} else {
+						editor.replaceSelection("**" + text + "**");
+					}
+				},
+
+				italic : function(wrapper) {
+					var editor = wrapper.editor;
+					var text = editor.getSelection();
+					if (text == '') {
+						editor.replaceRange("**", editor.getCursor());
+						editor.focus();
+						var str = "*";
+						var mynum = str.length;
+						var start_cursor = editor.getCursor();
+						var cursorLine = start_cursor.line;
+						var cursorCh = start_cursor.ch;
+						editor.setCursor({
+							line: cursorLine,
+							ch: cursorCh - mynum
+						});
+					} else {
+						editor.replaceSelection("*" + text + "*");
+					}
+				},
+
+				quote : function(wrapper) {
+					var editor = wrapper.editor;
+					var text = editor.getSelection();
+					if (text == '') {
+						editor.replaceRange("\n> ", editor.getCursor());
+						editor.focus();
+						var start_cursor = editor.getCursor();
+						var cursorLine = start_cursor.line;
+						var cursorCh = start_cursor.ch;
+						editor.setCursor({
+							line: cursorLine,
+							ch: cursorCh
+						});
+					} else {
+						editor.replaceSelection("> " + text);
+					}
+				},
+
+				strikethrough : function(wrapper) {
+					var editor = wrapper.editor;
+					var text = editor.getSelection();
+					if (text == '') {
+						editor.replaceRange("~~~~", editor.getCursor());
+						editor.focus();
+						var str = "~~";
+						var mynum = str.length;
+						var start_cursor = editor.getCursor();
+						var cursorLine = start_cursor.line;
+						var cursorCh = start_cursor.ch;
+						editor.setCursor({
+							line: cursorLine,
+							ch: cursorCh - mynum
+						});
+					} else {
+						editor.replaceSelection("~~" + text + "~~");
+					}
+				},
+
+
+				link : function(wrapper) {
+					var editor = wrapper.editor;
+					var text = editor.getSelection();
+					if (text == '') {
+						editor.replaceRange("[](https://)", editor.getCursor());
+						editor.focus();
+						var start_cursor = editor.getCursor();
+						var cursorLine = start_cursor.line;
+						var cursorCh = start_cursor.ch;
+						editor.setCursor({
+							line: cursorLine,
+							ch: cursorCh - 11
+						});
+					} else {
+						editor.replaceSelection("[" + text + "](https://)");
+					}
+				},
+
+				codeBlock : function(wrapper) {
+					var editor = wrapper.editor;
+					var text = "\n```";
+					text += '\n';
+					text += editor.getSelection() + "";
+					text += '\n'
+					text += "```";
+					editor.focus();
+					editor.replaceSelection(text);
+					editor.setCursor({
+						line: editor.getCursor('start').line - 1,
+						ch: 0
+					});
+				},
+
+				code : function(wrapper) {
+					var editor = wrapper.editor;
+					var text = editor.getSelection();
+					if (text == '') {
+						editor.replaceRange("``", editor.getCursor());
+						editor.focus();
+						var start_cursor = editor.getCursor();
+						var cursorLine = start_cursor.line;
+						var cursorCh = start_cursor.ch;
+						editor.setCursor({
+							line: cursorLine,
+							ch: cursorCh - 1
+						});
+					} else {
+						editor.replaceSelection("`" + text + "`");
+					}
+				},
+
+				uncheck :  function(wrapper) {
+					var editor = wrapper.editor;
+					var text = editor.getSelection();
+					if (text == '') {
+						editor.replaceRange("\n- [ ] ", editor.getCursor());
+						editor.focus();
+						var start_cursor = editor.getCursor();
+						var cursorLine = start_cursor.line;
+						var cursorCh = start_cursor.ch;
+						editor.setCursor({
+							line: cursorLine,
+							ch: cursorCh
+						});
+					} else {
+						editor.replaceSelection("- [ ] " + text);
+					}
+				},
+
+				check : function(wrapper) {
+					var editor = wrapper.editor;
+					var text = editor.getSelection();
+					if (text == '') {
+						editor.replaceRange("\n- [x] ", editor.getCursor());
+						editor.focus();
+						var start_cursor = editor.getCursor();
+						var cursorLine = start_cursor.line;
+						var cursorCh = start_cursor.ch;
+						editor.setCursor({
+							line: cursorLine,
+							ch: cursorCh
+						});
+					} else {
+						editor.replaceSelection("- [x] " + text);
+					}
+				},
+
+				table : function(wrapper) {
+					var editor = wrapper.editor;
+					swal({
+						html: '<input class="swal2-input" placeholder="行">' +
+							'<input class="swal2-input" placeholder="列">',
+						preConfirm: function() {
+							return new Promise(function(resolve) {
+								var inputs = $(Swal.getContent()).find('input');
+								resolve([
+									inputs.eq(0).val(),
+									inputs.eq(1).val()
+								])
+							})
+						}
+					}).then(function(result) {
+						var value = result.value;
+						var cols = parseInt(value[0]) || 3;
+						var rows = parseInt(value[1]) || 3;
+						if (rows < 1)
+							rows = 3;
+						if (cols < 1)
+							cols = 3;
+						var text = '';
+						for (var i = 0; i <= cols; i++) {
+							text += '|    ';
+						}
+						text += "\n";
+						for (var i = 0; i < cols; i++) {
+							text += '|  -  ';
+						}
+						text += '|'
+						if (rows > 1) {
+							text += '\n';
+							for (var i = 0; i < rows - 1; i++) {
+								for (var j = 0; j <= cols; j++) {
+									text += '|    ';
+								}
+								text += "\n";
+							}
+						}
+						editor.replaceSelection("\n" + text);
+						innerBar.show();
+					}).catch(swal.noop)
+				},
+				
+				search : function(wrapper) {
+					if(wrapper.searchHelper.isVisible()){
+						wrapper.searchHelper.close();
+					} else {
+						wrapper.searchHelper.open();
+					}
+				}
+			}
+		}
+		
+		_EditorWrapper.prototype.create = function(config){
+			if (this.wrapperInstance.wrapper) {
+				this.wrapperInstance.wrapper.remove();
+			}
+			var wrapper = new EditorWrapper(config);
+			this.wrapperInstance.wrapper = wrapper;
+			return wrapper;
+		}
+		
+		_EditorWrapper.prototype.getEditor = function(o){
+			return o.doc ? o : o.editor;
+		}
+		
+		_EditorWrapper.prototype.getWrapper = function(o){
+			return o.doc ? o.state.wrapper : o;
+		}
+		
+		
+		var _EditorWrapper = new _EditorWrapper(); 
 
         function EditorWrapper(config) {
             var html = '<div id="editor_wrapper">';
@@ -1053,7 +1365,6 @@ var EditorWrapper = (function() {
             $("#editor_wrapper").animate({
                 scrollLeft: $("#editor_toc").outerWidth()
             }, 0);
-			this.commands = {};
             this.eventHandlers = [];
 			this.themeHandler = ThemeHandler.create(config);
             var theme = this.themeHandler.getTheme();
@@ -1244,7 +1555,7 @@ var EditorWrapper = (function() {
 			if(this.config.backupEnable !== false){
 				this.backup = Backup.create(this);
 			}
-			initCommandsAndKeyMap(this);
+			initKeyMap(this);
             initInnerBar(this);
             initToolbar(this);
             this.fullscreen = false;
@@ -1262,338 +1573,37 @@ var EditorWrapper = (function() {
             triggerEvent(this, 'load');
         }
 		
-		function initCommandsAndKeyMap(wrapper){
-			var editor = wrapper.editor;
-			var emojiHandler = function() {
-				var emojiArray = config.emojiArray || $.trim("😀 😁 😂 🤣 😃 😄 😅 😆 😉 😊 😋 😎 😍 😘 😗 😙 😚 ☺️ 🙂 🤗 🤔 😐 😑 😶 🙄 😏 😣 😥 😮 🤐 😯 😪 😫 😴 😌 😛 😜 😝 🤤 😒 😓 😔 😕 🙃 🤑 😲 ☹️ 🙁 😖 😞 😟 😤 😢 😭 😦 😧 😨 😩 😬 😰 😱 😳 😵 😡 😠 😷 🤒 🤕 🤢 🤧 😇 🤠 🤡 🤥 🤓 😈 👿 👹 👺 💀 👻 👽 🤖 💩 😺 😸 😹 😻 😼 😽 🙀 😿 😾").split(' ');
-				var html = '';
-				for (var i = 0; i < emojiArray.length; i++) {
-					html += '<span data-emoji style="cursor:pointer">' + emojiArray[i] +
-						'</span>';
-				}
-				swal({
-					html: html
-				})
-				$(Swal.getContent()).find('[data-emoji]').click(function() {
-					var emoji = $(this).text();
-					var text = editor.getSelection();
-					if (text == '') {
-						editor.replaceRange(emoji, editor.getCursor());
-					} else {
-						editor.replaceSelection(emoji);
-					}
-					Swal.close();
-				})
-			};
-
-            var headingHandler =  function() {
-				async function getHeading() {
-					const {
-						value: heading
-					} = await Swal.fire({
-						input: 'select',
-						inputValue: '1',
-						inputOptions: {
-							'1': 'H1',
-							'2': 'H2',
-							'3': 'H3',
-							'4': 'H4',
-							'5': 'H5',
-							'6': 'H6'
-						},
-						inputPlaceholder: '',
-						showCancelButton: true
-					});
-					if (heading) {
-						var v = parseInt(heading);
-						var text = editor.getSelection();
-						var _text = '\n';
-						for (var i = 0; i < v; i++) {
-							_text += '#';
-						}
-						_text += ' ';
-						if (text == '') {
-							editor.replaceRange(_text, editor.getCursor());
-							editor.focus();
-							var start_cursor = editor.getCursor();
-							var cursorLine = start_cursor.line;
-							var cursorCh = start_cursor.ch;
-							editor.setCursor({
-								line: cursorLine,
-								ch: cursorCh + v
-							});
-						} else {
-							editor.replaceSelection(_text + text);
-						}
-					}
-				}
-				getHeading();
-			};
-
-			var boldHandler = function() {
-				var text = editor.getSelection();
-				if (text == '') {
-					editor.replaceRange("****", editor.getCursor());
-					editor.focus();
-					var str = "**";
-					var mynum = str.length;
-					var start_cursor = editor.getCursor();
-					var cursorLine = start_cursor.line;
-					var cursorCh = start_cursor.ch;
-					editor.setCursor({
-						line: cursorLine,
-						ch: cursorCh - mynum
-					});
-				} else {
-					editor.replaceSelection("**" + text + "**");
-				}
-			}
-
-            var italicHandler = function() {
-				var text = editor.getSelection();
-				if (text == '') {
-					editor.replaceRange("**", editor.getCursor());
-					editor.focus();
-					var str = "*";
-					var mynum = str.length;
-					var start_cursor = editor.getCursor();
-					var cursorLine = start_cursor.line;
-					var cursorCh = start_cursor.ch;
-					editor.setCursor({
-						line: cursorLine,
-						ch: cursorCh - mynum
-					});
-				} else {
-					editor.replaceSelection("*" + text + "*");
-				}
-			};
-
-			var quoteHandler = function() {
-				var text = editor.getSelection();
-				if (text == '') {
-					editor.replaceRange("\n> ", editor.getCursor());
-					editor.focus();
-					var start_cursor = editor.getCursor();
-					var cursorLine = start_cursor.line;
-					var cursorCh = start_cursor.ch;
-					editor.setCursor({
-						line: cursorLine,
-						ch: cursorCh
-					});
-				} else {
-					editor.replaceSelection("> " + text);
-				}
-			}
-
-			var strikethroughHandler = function() {
-				var text = editor.getSelection();
-				if (text == '') {
-					editor.replaceRange("~~~~", editor.getCursor());
-					editor.focus();
-					var str = "~~";
-					var mynum = str.length;
-					var start_cursor = editor.getCursor();
-					var cursorLine = start_cursor.line;
-					var cursorCh = start_cursor.ch;
-					editor.setCursor({
-						line: cursorLine,
-						ch: cursorCh - mynum
-					});
-				} else {
-					editor.replaceSelection("~~" + text + "~~");
-				}
-			};
-
-
-            var linkHandler = function() {
-				var text = editor.getSelection();
-				if (text == '') {
-					editor.replaceRange("[](https://)", editor.getCursor());
-					editor.focus();
-					var start_cursor = editor.getCursor();
-					var cursorLine = start_cursor.line;
-					var cursorCh = start_cursor.ch;
-					editor.setCursor({
-						line: cursorLine,
-						ch: cursorCh - 11
-					});
-				} else {
-					editor.replaceSelection("[" + text + "](https://)");
-				}
-			};
-
-            var codeBlockHandler = function() {
-				var text = "\n```";
-				text += '\n';
-				text += editor.getSelection() + "";
-				text += '\n'
-				text += "```";
-				editor.focus();
-				editor.replaceSelection(text);
-				editor.setCursor({
-					line: editor.getCursor('start').line - 1,
-					ch: 0
-				});
-			};
-
-            var codeHandler = function() {
-				var text = editor.getSelection();
-				if (text == '') {
-					editor.replaceRange("``", editor.getCursor());
-					editor.focus();
-					var start_cursor = editor.getCursor();
-					var cursorLine = start_cursor.line;
-					var cursorCh = start_cursor.ch;
-					editor.setCursor({
-						line: cursorLine,
-						ch: cursorCh - 1
-					});
-				} else {
-					editor.replaceSelection("`" + text + "`");
-				}
-			};
-
-            var uncheckHandler =  function() {
-				var text = editor.getSelection();
-				if (text == '') {
-					editor.replaceRange("\n- [ ] ", editor.getCursor());
-					editor.focus();
-					var start_cursor = editor.getCursor();
-					var cursorLine = start_cursor.line;
-					var cursorCh = start_cursor.ch;
-					editor.setCursor({
-						line: cursorLine,
-						ch: cursorCh
-					});
-				} else {
-					editor.replaceSelection("- [ ] " + text);
-				}
-			};
-
-            var checkHandler = function() {
-				var text = editor.getSelection();
-				if (text == '') {
-					editor.replaceRange("\n- [x] ", editor.getCursor());
-					editor.focus();
-					var start_cursor = editor.getCursor();
-					var cursorLine = start_cursor.line;
-					var cursorCh = start_cursor.ch;
-					editor.setCursor({
-						line: cursorLine,
-						ch: cursorCh
-					});
-				} else {
-					editor.replaceSelection("- [x] " + text);
-				}
-			};
-			
-			var undoHandler = function() {
-				editor.execCommand("undo");
-			}
-			
-			var redoHandler = function() {
-				editor.execCommand("redo");
-			}
-
-            var tableHandler = function() {
-				innerBar.hide();
-				swal({
-					html: '<input class="swal2-input" placeholder="行">' +
-						'<input class="swal2-input" placeholder="列">',
-					preConfirm: function() {
-						return new Promise(function(resolve) {
-							var inputs = $(Swal.getContent()).find('input');
-							resolve([
-								inputs.eq(0).val(),
-								inputs.eq(1).val()
-							])
-						})
-					}
-				}).then(function(result) {
-					var value = result.value;
-					var cols = parseInt(value[0]) || 3;
-					var rows = parseInt(value[1]) || 3;
-					if (rows < 1)
-						rows = 3;
-					if (cols < 1)
-						cols = 3;
-					var text = '';
-					for (var i = 0; i <= cols; i++) {
-						text += '|    ';
-					}
-					text += "\n";
-					for (var i = 0; i < cols; i++) {
-						text += '|  -  ';
-					}
-					text += '|'
-					if (rows > 1) {
-						text += '\n';
-						for (var i = 0; i < rows - 1; i++) {
-							for (var j = 0; j <= cols; j++) {
-								text += '|    ';
-							}
-							text += "\n";
-						}
-					}
-					editor.replaceSelection("\n" + text);
-					innerBar.show();
-				}).catch(swal.noop)
-			};
-			
-			var searchHandler = function() {
-				if(wrapper.searchHelper.isVisible()){
-					wrapper.searchHelper.close();
-				} else {
-					wrapper.searchHelper.open();
-				}
-			};
-			
+		function initKeyMap(wrapper){
 			var keyMap = mac ? {
-				"Ctrl-B" : boldHandler,
-				"Ctrl-I" : italicHandler,
-				"Shift-Cmd-T" : tableHandler,
-				"Ctrl-H" : headingHandler,
-				"Ctrl-L" : linkHandler,
-				"Ctrl-Q" : quoteHandler,
-				"Shift-Cmd-B" : codeBlockHandler,
-				"Shift-Cmd-U" : uncheckHandler,
-				"Shift-Cmd-I" : checkHandler,
-				'Ctrl-S':searchHandler,
+				"Ctrl-B" : 'bold',
+				"Ctrl-I" : 'italic',
+				"Shift-Cmd-T" : 'table',
+				"Ctrl-H" : 'heading',
+				"Ctrl-L" : 'link',
+				"Ctrl-Q" : 'quote',
+				"Shift-Cmd-B" :  'codeBlock',
+				"Shift-Cmd-U" : 'uncheck',
+				"Shift-Cmd-I" : 'check',
+				'Ctrl-S' : 'search',
 				"Cmd-Enter":function(){
 					wrapper.requestFullScreen();
 				}
 			} : {
-				"Ctrl-B" : boldHandler,
-				"Ctrl-I" : italicHandler,
-				"Alt-T" : tableHandler,
-				"Ctrl-H" : headingHandler,
-				"Ctrl-L" : linkHandler,
-				"Ctrl-Q" : quoteHandler,
-				"Alt-B" : codeBlockHandler,
-				"Alt-U" : uncheckHandler,
-				"Alt-I" : checkHandler,
-				'Alt-S' : searchHandler,
+				"Ctrl-B" : 'bold',
+				"Ctrl-I" : 'italic',
+				"Alt-T" : 'table',
+				"Ctrl-H" : 'heading',
+				"Ctrl-L" : 'link',
+				"Ctrl-Q" : 'quote',
+				"Alt-B" :  'codeBlock',
+				"Alt-U" : 'uncheck',
+				"Alt-I" : 'check',
+				'Alt-S' : 'search',
 				"Ctrl-Enter":function(){
 					wrapper.requestFullScreen();
 				}
 			}
-			
-			
-			wrapper.addCommand('emoji',emojiHandler);
-			wrapper.addCommand('heading',headingHandler);
-			wrapper.addCommand('bold',boldHandler);
-			wrapper.addCommand('italic',italicHandler);
-			wrapper.addCommand('quote',quoteHandler);
-			wrapper.addCommand('strikethrough',strikethroughHandler);
-			wrapper.addCommand('link',linkHandler);
-			wrapper.addCommand('codeBlock',codeBlockHandler);
-			wrapper.addCommand('code',codeHandler);
-			wrapper.addCommand('uncheck',uncheckHandler);
-			wrapper.addCommand('undo',undoHandler);
-			wrapper.addCommand('redo',redoHandler);
-			wrapper.addCommand('table',tableHandler);
-			wrapper.addCommand('search',searchHandler);
-			wrapper.editor.addKeyMap(keyMap);
+			wrapper.bindKey(keyMap);
 		}
 		
 
@@ -1701,14 +1711,11 @@ var EditorWrapper = (function() {
             }
         }
 		
-		EditorWrapper.prototype.addCommand = function(name,handler) {
-		   this.commands[name] = handler;
-        }
 		
 		EditorWrapper.prototype.execCommand = function(name) {
-           var handler = this.commands[name];
+           var handler = _EditorWrapper.commands[name];
 		   if(!isUndefined(handler)){
-			   handler(this);
+			   handler.call(null,this);
 		   }
         }
 
@@ -1857,6 +1864,36 @@ var EditorWrapper = (function() {
 		EditorWrapper.prototype.saveTheme = function() {
            this.themeHandler.saveTheme(this.theme);
         }
+		
+		EditorWrapper.prototype.bindKey = function(map) {
+			var keyMap = {};
+			var me = this;
+			Object.keys(map).forEach(function(key,index) {
+				var o = map[key];
+				if(typeof o === 'string'){
+					var handler = _EditorWrapper.commands[o];
+					if(!isUndefined(handler)){
+						var newHandler = function(){
+							handler.call(null,me);
+						}
+						keyMap[key] = newHandler;
+					}
+				} else {
+					keyMap[key] = o;
+				}
+				
+			});
+			this.editor.addKeyMap(keyMap);
+        }
+		
+		EditorWrapper.prototype.unbindKey = function(keys) {
+			var keyMaps = this.editor.state.keyMaps;
+			for(var i=0;i<keys.length;i++){
+				for(var j=0;j<keyMaps.length;j++){
+					delete keyMaps[j][keys[i]];
+				}
+			}
+        }
 
         function initInnerBar(wrapper) {
             var innerBar = wrapper.innerBar;
@@ -1920,13 +1957,13 @@ var EditorWrapper = (function() {
 				}
 				
 				if(icon == 'uncheck'){
-					innerBar.addIcon('fas fa-square icon',function(){
+					innerBar.addIcon('far fa-square icon',function(){
 						wrapper.execCommand('uncheck');
 					})
 				}
 				
 				if(icon == 'check'){
-					innerBar.addIcon('fas fa-check-square icon',function(){
+					innerBar.addIcon('far fa-check-square icon',function(){
 						wrapper.execCommand('check');
 					})
 				}
@@ -1939,13 +1976,13 @@ var EditorWrapper = (function() {
 				
 				if(icon == 'undo'){
 					innerBar.addIcon('fas fa-undo icon',function(){
-						wrapper.execCommand('undo');
+						wrapper.editor.execCommand('undo');
 					})
 				}
 				
 				if(icon == 'redo'){
 					innerBar.addIcon('fas fa-redo icon',function(){
-						wrapper.execCommand('redo');
+						wrapper.editor.execCommand('redo');
 					})
 				}
 				if(icon == 'close'){
@@ -2545,18 +2582,9 @@ var EditorWrapper = (function() {
             };
         }
 
-        var wrapperInstance = {};
-        return {
-            create: function(config) {
-                if (wrapperInstance.wrapper) {
-                    wrapperInstance.wrapper.remove();
-                }
-                wrapperInstance.wrapper = new EditorWrapper(config)
-                return wrapperInstance.wrapper;
-            }
-        }
+        return _EditorWrapper;
     })();
 
-    return EditorWrapper;
+    return _EditorWrapper;
 
 })();
