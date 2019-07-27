@@ -1,5 +1,6 @@
 # heather
 
+![test](./1.jpg)
 ## 说明
 markdown编辑器，特性如下：
 1. 支持mermaid图表、katex
@@ -252,9 +253,9 @@ wrapper.toolbar.hide();
 #### 配置编辑器主题
 ```javascript
 var theme = wrapper.theme;
-theme.editor.theme = 'abcdef'
-theme.render();
-wrapper.saveTheme();
+theme.setEditorTheme(wrapper.editor,'abcdef',function(){
+	theme.render();
+})
 ```
 
 #### 配置代码高亮主题
@@ -262,7 +263,6 @@ wrapper.saveTheme();
 var theme = wrapper.theme;
 theme.hljs.theme = 'a11y-light'
 theme.render();
-wrapper.saveTheme();
 ```
 
 #### 配置顶部工具条颜色
@@ -270,7 +270,6 @@ wrapper.saveTheme();
 var theme = wrapper.theme;
 theme.toolbar.color = '#fff'
 theme.render();
-wrapper.saveTheme();
 ```
 
 #### 配置辅助工具条颜色
@@ -278,7 +277,6 @@ wrapper.saveTheme();
 var theme = wrapper.theme;
 theme.bar.color = '#fff'
 theme.render();
-wrapper.saveTheme();
 ```
 
 #### 配置状态条字体颜色
@@ -286,7 +284,6 @@ wrapper.saveTheme();
 var theme = wrapper.theme;
 theme.stat.color = '#fff'
 theme.render();
-wrapper.saveTheme();
 ```
 
 #### 自定义css
@@ -294,7 +291,18 @@ wrapper.saveTheme();
 var css = '';
 wrapper.theme.customCss = css;
 wrapper.theme.render();
+```
+
+#### 保存主题
+``` javascript
 wrapper.saveTheme();
+```
+
+#### 重置主题
+
+``` javascript
+wrapper.resetTheme();
+
 ```
 
 ### 执行指令

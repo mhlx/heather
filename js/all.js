@@ -31,6 +31,8 @@ var EditorWrapper = (function() {
 	
 	var keyNames = CodeMirror.keyNames;
 	var mac = CodeMirror.browser.mac;
+	var mobile = CodeMirror.browser.mobile;
+    var ios = CodeMirror.browser.ios;
 
 
     function cloneAttributes(element, sourceNode) {
@@ -402,6 +404,172 @@ var EditorWrapper = (function() {
     })();
 	
 	
+	var Tooltip = (function(){
+		
+		var HljsTip = (function(){
+				
+			function HljsTip(editor){
+				$('<div id="editor_hljs_tip" style="visibility:hidden;position:absolute;z-index:99;overflow:auto;background-color:#fff"></div>').appendTo($("#editor_in"));				
+				var state = {running:false,cursor:undefined,hideOnNextChange:false};
+				var tip = $("#editor_hljs_tip");
+				
+				tip.on('click','tr',function(){
+					setLanguage($(this));
+				})
+				
+				var setLanguage = function(selected){
+					var lang = selected.text();
+					var cursor = editor.getCursor();
+					var text = editor.getLine(cursor.line);
+					editor.setSelection({line:cursor.line,ch:4},{line:cursor.line,ch:text.length});
+					editor.replaceSelection(lang);
+					hideTip();
+					state.hideOnNextChange = true;
+				}
+				
+				var hideTip = function(){
+					tip.css({'visibility':'hidden'});
+					if(!mobile){
+						editor.removeKeyMap(languageSelectKeyMap);
+					}
+					state.running = false;
+					state.cursor = undefined;
+				}
+				
+				var languageSelectKeyMap = {
+					'Up':function(){
+						var current = tip.find('.selected');
+						var prev = current.prev('tr');
+						if(prev.length > 0){
+							current.removeClass('selected');
+							prev.addClass('selected');
+							prev[0].scrollIntoView();
+						}
+					},
+					'Down':function(){
+						var current = tip.find('.selected');
+						var next = current.next('tr');
+						if(next.length > 0){
+							current.removeClass('selected');
+							next.addClass('selected');
+							next[0].scrollIntoView();
+						}
+					},
+					'Enter':function(editor){
+						setLanguage(tip.find('.selected'));
+					},
+					'Esc':function(editor){
+						hideTip();
+					}
+				}
+				var hljsTimer ;
+				var hljsLanguages = hljs.listLanguages();
+				this.hideTipOnCursorChange = function(editor){
+					if(editor.getSelection() != ''){
+						hideTip();
+						return ;
+					}
+					var cursor = editor.getCursor();
+					if(cursor.ch < 5){
+						hideTip();
+						return ;
+					}
+					if((state.cursor || {line:-1}).line != cursor.line){
+						hideTip();
+					}
+				}
+				this.hideTipOnScroll = function(){
+					hideTip();
+				}
+				this.tipHandler = function(editor){
+					if(editor.getSelection() == ''){
+						var cursor = editor.getCursor();
+						///``` j
+						if(cursor.ch >= 5){
+							if(hljsTimer){
+								clearTimeout(hljsTimer);
+							}
+							hljsTimer = setTimeout(function(){
+								var text = editor.getLine(cursor.line);
+								if(text.startsWith("``` ")){
+									var lang = text.substring(4,cursor.ch).trimStart();
+									var tips = [];
+									for(var i=0;i<hljsLanguages.length;i++){
+										var hljsLang = hljsLanguages[i];
+										if(hljsLang.indexOf(lang) != -1){
+											tips.push(hljsLang);
+										}
+									}
+									
+									if(tips.length > 0){
+										if(state.hideOnNextChange){
+											state.hideOnNextChange = false;
+											return ;
+										}
+										state.running = true;
+										state.cursor = cursor;
+										var html = '<table style="width:100%">';
+										for(var i=0;i<tips.length;i++){
+											var clazz = i == 0 ? 'selected' : '';
+											html += '<tr class="'+clazz+'"><td >'+tips[i]+'</td></tr>';
+										}
+										html += '</table>';
+										var pos = editor.cursorCoords(true);
+										tip.html(html);
+										var height = tip.height();
+										if($("#editor_in").height() - pos.top < height+editor.defaultTextHeight()){
+											tip.css({'top':pos.top - height,'left':pos.left,'visibility':'visible'});
+										} else {
+											tip.css({'top':pos.top+editor.defaultTextHeight(),'left':pos.left,'visibility':'visible'})
+										}
+										if(!mobile){
+											editor.addKeyMap(languageSelectKeyMap);
+										}
+									} else{
+										hideTip();
+									}
+								} else {
+										hideTip();
+								}
+							},100)
+						}
+					} else {
+						hideTip();
+					}
+				}
+				this.editor = editor;
+			}
+			
+			HljsTip.prototype.enable = function(){
+				this.editor.on('change',this.tipHandler);
+				this.editor.on('cursorActivity',this.hideTipOnCursorChange);
+				this.editor.on('scroll',this.hideTipOnScroll);
+				this.editor.on('touchmove',this.hideTipOnScroll);
+			}
+			
+			HljsTip.prototype.disable = function(){
+				this.editor.off('change',this.tipHandler);
+				this.editor.off('cursorActivity',this.hideTipOnCursorChange);
+				this.editor.off('scroll',this.hideTipOnScroll);
+				this.editor.off('touchmove',this.hideTipOnScroll);
+			}
+			
+			return {create:function(editor){return new HljsTip(editor)}}
+		})();
+		
+		function Tooltip(editor){
+			this.hljsTip = HljsTip.create(editor);
+		}
+		
+		Tooltip.prototype.enable = function(){
+			this.hljsTip.enable();
+		}
+		
+		return {create : function(editor){return new Tooltip(editor)}}
+		
+	})();
+	
+	
 	//TODO
 	var Backup = (function() {
 		function Backup(wrapper) {
@@ -607,13 +775,14 @@ var EditorWrapper = (function() {
 			} else {
 				var current = $.parseJSON(json);
 				var theme = new Theme(this.config);
-				theme.toolbar = current.toolbar;
-				theme.bar = current.bar;
-				theme.stat = current.stat;
-				theme.editor = current.editor;
+				theme.toolbar = current.toolbar || {};
+				theme.bar = current.bar || {};
+				theme.stat = current.stat || {};
+				theme.editor = current.editor || {};
 				theme.inCss = current.inCss;
-				theme.cursorHelper = current.cursorHelper;
-				theme.mermaid = current.mermaid;
+				theme.searchHelper = current.searchHelper || {};
+				theme.cursorHelper = current.cursorHelper || {};
+				theme.mermaid = current.mermaid || {};
 				theme.customCss = current.customCss;
 				return theme;
 			}
@@ -626,6 +795,7 @@ var EditorWrapper = (function() {
 			this.editor = {};
 			this.inCss = {};
 			this.searchHelper = {};
+			this.cursorHelper = {};
 			this.mermaid = {};
 			this.hljs = {
 				theme: 'github'
@@ -638,26 +808,43 @@ var EditorWrapper = (function() {
 		Theme.prototype.clone = function() {
 			var copy = JSON.parse(JSON.stringify(this));
 			var theme = new Theme(this.config);
-			theme.toolbar = copy.toolbar;
-			theme.bar = copy.bar;
-			theme.stat = copy.stat;
-			theme.editor = copy.editor;
+			theme.toolbar = copy.toolbar || {};
+			theme.bar = copy.bar || {};
+			theme.stat = copy.stat || {};
+			theme.editor = copy.editor  || {};
 			theme.inCss = copy.inCss;
-			theme.searchHelper = copy.searchHelper;
-			theme.mermaid = copy.mermaid;
+			theme.editor = copy.editor || {};
+			theme.searchHelper = copy.searchHelper || {};
+			theme.cursorHelper = copy.cursorHelper || {};
+			theme.mermaid = copy.mermaid || {};
 			theme.customCss = copy.customCss;
 			return theme;
 		}
+		
+		Theme.prototype.setEditorTheme = function(editor,name,callback){
+			this.editor.theme = name;
+			var me = this;
+			loadEditorTheme(this,function(){
+				var div =  document.createElement('div');
+				div.classList.add('cm-s-'+name);
+				document.body.appendChild(div);
+				var bgColor = window.getComputedStyle(div, null).getPropertyValue('background-color');
+				document.body.removeChild(div);
+				editor.setOption("theme", name);
+				me.inCss.background = bgColor;
+				if(callback) callback();
+			})
+		}
 
-		Theme.prototype.render = function(config) {
-			config = config || {};
-			loadEditorTheme(this,config.editorThemeLoad);
+		Theme.prototype.render = function() {
+			loadEditorTheme(this);
 			loadHljsTheme(this);
 			var css = "";
 			css += "#editor_toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
 			css += "#editor_innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
 			css += "#editor_stat{color:" + (this.stat.color || 'inherit') + "}\n";
 			css += "#editor_in{background:" + (this.inCss.background || 'inherit') + "}\n";
+			css += "#editor_cursorHelper{color:" + (this.cursorHelper.color || 'inherit') + "}\n";
 			var searchHelperColor = (this.searchHelper.color || 'inherit');
 			css += "#editor_searchHelper{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control{color:" + searchHelperColor + "}\n#editor_searchHelper .input-group-text{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control::placeholder {color: " + searchHelperColor + ";opacity: 1;}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}";
 
@@ -676,7 +863,7 @@ var EditorWrapper = (function() {
 				var hljsThemeFunction = theme.config.res_hljsTheme || function(hljsTheme) {
 					return 'highlight/styles/' + hljsTheme + '.css';
 				}
-				if ($('hljs-theme-' + hljsTheme + '').length == 0) {
+				if ($('#hljs-theme-' + hljsTheme + '').length == 0) {
 					$('<link id="hljs-theme-' + hljsTheme + '" >').appendTo('head').attr({
 						type: 'text/css',
 						rel: 'stylesheet',
@@ -1021,12 +1208,127 @@ var EditorWrapper = (function() {
 		return {create:function(editor){return new SearchHelper(editor)}}
 
 	})();
+	
+	
+	///手机端辅助选中
+	var CursorHelper = (function(){
+		'use strict';
+		
+		var CursorUtil = (function(){
+			function CursorUtil(editor){
+				this.from = editor.getCursor('from');
+				this.to = editor.getCursor('to');
+				this.movedByMouseOrTouch = false;
+				var me = this;
+				this.cursorActivityHandler = function () {
+					if (me.movedByMouseOrTouch) {
+						if(me.mark){
+							me.mark.clear();
+						}
+						me.movedByMouseOrTouch = false;
+						me.from = editor.getCursor('from');
+						me.to = editor.getCursor('to');
+					}
+				};
+				this.movedHandler = function(){
+					me.movedByMouseOrTouch = true;
+				};
+				this.editor = editor;
+			}
+			
+			CursorUtil.prototype.init = function(){
+				if(this.mark){
+					this.mark.clear();
+				}
+				this.editor.on("cursorActivity",this.cursorActivityHandler);
+				this.editor.on("mousedown",this.movedHandler );
+				this.editor.on("touchstart",this.movedHandler);
+			}
+			
+			CursorUtil.prototype.move = function(action){
+				var editor = this.editor;
+				editor.setCursor(this.to);
+				editor.execCommand(action);
+				this.to = editor.getCursor('from');
+				if(this.mark){
+					this.mark.clear();
+				}
+				if(this.from.line > this.to.line || (this.from.line == this.to.line && this.from.ch > this.to.ch)){
+					this.mark = editor.markText(this.to,this.from, {className: "styled-background"});
+				}else{
+					this.mark = editor.markText(this.from,this.to, {className: "styled-background"});
+				}
+			}
+			
+			CursorUtil.prototype.end = function(){
+				if(this.mark){
+					this.mark.clear();
+				}
+				var editor = this.editor;
+				editor.on("cursorActivity",this.cursorActivityHandler);
+				editor.on("mousedown",this.movedHandler );
+				editor.on("touchstart",this.movedHandler);
+				if(this.from.line > this.to.line || (this.from.line == this.to.line && this.from.ch > this.to.ch)){
+					editor.setSelection(this.to,this.from);
+				}else{
+					editor.setSelection(this.from,this.to);
+				}
+				editor.focus(); 			
+			}
+			
+			return {create:function(editor){return new CursorUtil(editor)}}
+		})();
+		
+		function CursorHelper(editor){
+			var html = '<div id="editor_cursorHelper" style="position:absolute;bottom:5px;width:150px;left:calc(50% - 75px);display:none;z-index:9999" class="alpha30" >'		
+			html += '<div style="height:26.66%;padding:5px;cursor:pointer">';
+			html += '<i class="fas fa-times"  style="font-size:35px" title="关闭"></i>';		
+			html += '<div style="clear:both"></div>';
+			html += '</div>';
+			html += '<div style="height:26.66%;text-align:center">';
+			html += '<i class="fas fa-arrow-up" data-arrow="goLineUp" style="font-size:50px;cursor:pointer"></i>'	
+			html += '</div>';
+			html += '<div style="height:26.66%">'
+			html += '<i class="fas fa-arrow-left" data-arrow="goCharLeft" style="font-size:50px;float:left;cursor:pointer;margin-right:20px"></i>';
+			html += '<i class="fas fa-arrow-right" data-arrow="goCharRight" style="font-size:50px;float:right;cursor:pointer"></i>';
+			html += '<div style="clear:both"></div>';
+			html += '</div>';
+			html += '<div style="height:26.66%;text-align:center">';
+			html += '<i class="fas fa-arrow-down" data-arrow="goLineDown" style="font-size:50px;cursor:pointer"></i>';
+			html += '</div>';
+			html += '</div>';
+			var ele = $(html);
+			$("#editor_in").append(ele);
+			var cursorUtil = CursorUtil.create(editor);
+			ele.on('click','[data-arrow]',function(){
+				var action = $(this).data('arrow');
+				cursorUtil.move(action);
+			});
+			var me = this;
+			ele.on('click','.fa-times',function(){
+				me.close();
+			});
+			this.editor = editor;
+			this.ele = ele;
+			this.cursorUtil = cursorUtil;
+		}
+		
+		CursorHelper.prototype.open = function(){
+			this.editor.setOption('readOnly',true);
+			this.cursorUtil.init();
+			this.ele.show();
+		} 
+		
+		CursorHelper.prototype.close = function(){
+			this.ele.hide();
+			this.editor.setOption('readOnly',false);
+			this.cursorUtil.end();
+		} 
+		return {create:function(editor){return new CursorHelper(editor)}};
+	})();
 
 
     var _EditorWrapper = (function() {
-
-        var mobile = CodeMirror.browser.mobile;
-        var ios = CodeMirror.browser.ios;
 		
 		function _EditorWrapper(){
 			this.wrapperInstance = {};
@@ -1350,6 +1652,8 @@ var EditorWrapper = (function() {
             html += '</div>';
             html += '<div class="markdown-body" id="editor_out"></div>';
             html += '</div>';
+			
+			
             var $wrapperElement = $(html);
             $('body').append($wrapperElement);
             this.scrollTop = $(window).scrollTop();
@@ -1400,30 +1704,21 @@ var EditorWrapper = (function() {
                 turndownService.use(window.turndownPluginGfm.gfm);
             }
 
-            var dropHtmlMarkdownEnable = config.drop_htmlMarkdownEnable !== false;
-
-            if (dropHtmlMarkdownEnable) {
-                //drop md|html|htm file
-
-                var contentHandler = config.drop_htmlMarkdownHandler || function(ext, content, turndownService) {
-                    if (ext == "md") {
-                        return content;
-                    } else if (ext == "html" || ext == 'htm') {
-                        return turndownService.turndown(content);
-                    }
-                }
-                editor.setOption('dropContentHandler', function(fileName, content) {
-                    var ext = fileName.split(".").pop().toLowerCase();
-                    if (ext == 'md' || ext == 'html' || ext == 'htm') {
-                        return contentHandler(ext, content, turndownService);
-                    }
-                    return "";
-                });
-            }
+			editor.setOption('dropContentHandler', function(fileName, content) {
+				var ext = fileName.split(".").pop().toLowerCase();
+				if (ext == "md") {
+					return content;
+				} else if (ext == "html" || ext == 'htm') {
+					return turndownService.turndown(content);
+				} else return "";
+			});
             this.theme = theme;
             this.sync = Sync.create(editor, $("#editor_out")[0], config);
             this.render = Render.create(config, theme);
 			this.searchHelper = SearchHelper.create(editor);
+			this.cursorHelper = CursorHelper.create(editor);
+			this.tooltip = Tooltip.create(editor);
+			this.tooltip.enable();
             this.toolbar = Bar.create($("#editor_toolbar")[0]);
             var innerBar = Bar.create($("#editor_innerBar")[0]);
             innerBar.hide();
@@ -1513,7 +1808,6 @@ var EditorWrapper = (function() {
                     return canWipe(element.parentElement);
                 }
 
-
                 $("#editor_out").touchwipe({
                     wipeRight: function(e) {
                         if (canWipe(e.target)) {
@@ -1552,6 +1846,7 @@ var EditorWrapper = (function() {
             })
             this.editor = editor;
             this.config = config;
+			this.doRender(false);
 			if(this.config.backupEnable !== false){
 				this.backup = Backup.create(this);
 			}
@@ -1865,6 +2160,12 @@ var EditorWrapper = (function() {
            this.themeHandler.saveTheme(this.theme);
         }
 		
+		EditorWrapper.prototype.resetTheme = function() {
+		   this.editor.setOption('theme','default');
+           this.theme = this.themeHandler.reset();
+		   this.theme.render();
+        }
+		
 		EditorWrapper.prototype.bindKey = function(map) {
 			var keyMap = {};
 			var me = this;
@@ -1901,9 +2202,8 @@ var EditorWrapper = (function() {
             var config = wrapper.config;
 
             var innerBarElement = $("#editor_innerBar");
-            var ios = CodeMirror.browser.ios;
 			
-            var icons = config.innerBar_icons || ['emoji', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table', 'undo', 'redo', 'close'];
+            var icons = config.innerBar_icons || ['emoji', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table','move', 'undo', 'redo', 'close'];
             for (var i = 0; i < icons.length; i++) {
                 var icon = icons[i];
                 if(icon == 'emoji'){
@@ -1985,6 +2285,13 @@ var EditorWrapper = (function() {
 						wrapper.editor.execCommand('redo');
 					})
 				}
+				
+				if(icon == 'move'){
+					innerBar.addIcon('fas fa-arrows-alt icon pc-hide',function(){
+						wrapper.cursorHelper.open();
+					})
+				}
+				
 				if(icon == 'close'){
 					innerBar.addIcon('fas fa-times icon',function(){
 						innerBar.hide();
@@ -2102,6 +2409,14 @@ var EditorWrapper = (function() {
                         wrapper.saveTheme();
                     });
                 }
+				
+				var cursorHelprHandler = function() {
+                    colorPicker(theme.cursorHelper.color, function(color) {
+                        theme.cursorHelper.color = color;
+                        theme.render();
+                        wrapper.saveTheme();
+                    });
+                }
                 var barHandler = function() {
                     colorPicker(theme.bar.color, function(color) {
                         theme.bar.color = color;
@@ -2180,17 +2495,9 @@ var EditorWrapper = (function() {
                             showCancelButton: true
                         });
                         if (_theme) {
-                            theme.editor.theme = _theme;
-                            theme.render({
-								editorThemeLoad:function(editorTheme){
-									 setTimeout(function() {
-										editor.setOption("theme", editorTheme);
-										var bgColor = window.getComputedStyle(editor.getWrapperElement(), null).getPropertyValue('background-color');
-										theme.inCss.background = bgColor;
-										theme.render();
-										wrapper.saveTheme();
-									}, 100)
-								}
+							theme.setEditorTheme(editor,_theme,function(){
+								theme.render();
+								wrapper.saveTheme();
 							});
                         }
                         setTimeout(function() {
@@ -2247,8 +2554,11 @@ var EditorWrapper = (function() {
                     editor.setOption('readOnly', true);
                     $("#editor_searchHelper input").attr('value', '点击设置字体颜色');
                     $("#editor_searchHelper").children().addClass('noclick');
+					$("#editor_cursorHelper").children().addClass('noclick');
                     wrapper.searchHelper.open();
+                    wrapper.cursorHelper.open();
                     $("#editor_searchHelper").on('click', searchHelprHandler);
+                    $("#editor_cursorHelper").on('click', cursorHelprHandler);
                     $("#editor_toolbar").children().addClass('noclick');
                     $(configIcon).removeClass('noclick');
                     $("#editor_toolbar").on('click', toolbarHandler);
@@ -2271,8 +2581,8 @@ var EditorWrapper = (function() {
                     cloneBar.off('click', barHandler);
                     cloneBar.remove();
                     $("#editor_searchHelper").off('click', searchHelprHandler);
+                    $("#editor_cursorHelper").off('click', cursorHelprHandler);
                     $("#editor_searchHelper input").removeAttr('value');
-                    wrapper.searchHelper.close();
                     editor.off('cursorActivity', changeThemeHandler);
                     $("#editor_toolbar").off('click', toolbarHandler);
                     $("#editor_stat").off('click', statHandler);
@@ -2280,6 +2590,8 @@ var EditorWrapper = (function() {
                     $("#editor_stat").text("").hide();
                     $('.noclick').removeClass('noclick');
                     editor.setOption('readOnly', false);
+                    wrapper.searchHelper.close();
+                    wrapper.cursorHelper.close();
                 }
 
 
@@ -2374,15 +2686,29 @@ var EditorWrapper = (function() {
                 if (icon == 'config') {
                     wrapper.toolbar.addIcon('fas icon fa-cog nofullscreen', function() {
                         swal({
-                            html: '<input type="checkbox"  />主题编辑模式 <p style="margin-top:0.5rem"><button style="margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;">自定义css</button></p>'
+                            html: '<input type="checkbox"  />主题编辑模式 <p style="margin-top:0.5rem"><button style="margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;">自定义css</button><button style="margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #dc3545;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;">重置主题</button></p>'
                         });
                         var cb = $(Swal.getContent().querySelector('input'));
                         cb.prop('checked', themeMode.isThemeMode);
                         cb.change(function() {
                             var isThemeMode = themeMode.toggle();
                         });
-                        $(Swal.getContent().querySelector('button')).click(function() {
+						var buttons = Swal.getContent().querySelectorAll('button');
+                        $(buttons[0]).click(function() {
                             writeCustomCss();
+                        });
+						$(buttons[1]).click(function() {
+                             Swal.fire({
+								title: '确定要重置主题吗?',
+								type: 'warning',
+								showCancelButton: true,
+								confirmButtonColor: '#3085d6',
+								cancelButtonColor: '#d33'
+							}).then((result) => {
+								if (result.value) {
+									wrapper.resetTheme();
+								}
+							})
                         });
                     }, function(ele) {
                         configIcon = ele;
@@ -2532,6 +2858,7 @@ var EditorWrapper = (function() {
         function renderToc() {
             var headings = $("#editor_out").children('h1,h2,h3,h4,h5,h6');
             var toc = [];
+			
             for (var i = 0; i < headings.length; i++) {
                 var head = headings[i];
                 var index = head.tagName.substring(1);

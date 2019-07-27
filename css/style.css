@@ -340,9 +340,26 @@ h6 {
 	#editor_wrapper .pc-hide {
 		display: none;
 	}
+	#editor_hljs_tip .selected{
+		background-color:#70B7FD;
+	}
+	#editor_hljs_tip{
+		max-height:200px;
+		max-width:200px;
+	}
 }
 
 @media (max-width: 768px) {
+	#editor_hljs_tip{
+		max-height:120px;
+		max-width:200px;
+	}
+	#editor_hljs_tip .selected{
+		background-color:inherit;
+	}
+	#editor_hljs_tip tr{
+		height:30px;
+	}
 	#editor_wrapper .mobile-hide {
 		display: none;
 	}
@@ -489,8 +506,15 @@ h6 {
 	display:none !important;
 }
 
+
 .editor_noscroll{
 	margin: 0 !important; 
 	height: 100% !important; 
 	overflow:hidden !important;
+}
+
+
+#editor_toc:focus,
+#editor_out:focus {
+    outline: 0px solid transparent;
 }
