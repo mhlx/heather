@@ -315,6 +315,29 @@ var Heather = (function(){
 		});
 	}
 	
+	_Heather.prototype.markdownToBlocks = function(markdown){
+		var lines = markdown.split('\n');
+		var blocks = [];
+		var block = '';
+		for(var i=0;i<lines.length;i++){
+			if(lines[i].trim() == ''){
+				if(block.startsWith("``` ") && !block.endsWith("```")){
+					continue;
+				}
+				blocks.push(block);
+				block = '';
+			} else {
+				block += lines[i];
+				if(i < lines.length - 1){
+					block += '\n';
+				}
+			}
+		}
+		if(block.trim() != ''){
+			blocks.push(block);
+		}
+		return blocks;
+	}
 
     _Heather.prototype.loadKatex = function(callback){
 		if (this.katexLoading) return;
@@ -616,7 +639,7 @@ var Heather = (function(){
 		config = config || {};
 		var _editor = createEditor(editor,display,config);
 		cm = _editor.editor;
-		var md = config.md || window.md;
+		this.md = config.md || window.md;
 		var cvtKey = (mac ? "Cmd-Enter" : "Ctrl-Enter")||config.cvtKey;
 		var nbKey = (mac ? "Shift-Cmd-Enter" : "Shift-Ctrl-Enter")||config.nbKey;
 		var keyMap = {};
@@ -624,8 +647,13 @@ var Heather = (function(){
 		
 		var handler = function(editor){
 			var source = editor.getValue();
-			var html = window.md.render(source);
-			$(display).append('<div class="markdown-body editor_display_inline">'+html+'<textarea class="editor_display_source">'+source+'</textarea></div>');
+			var html = render(me,source);
+			
+			var div = createDisplayElement(html);
+			var textarea = createSourceElement(source);
+			div.appendChild(textarea);
+			
+			$(display).append(div);
 			renderHtml($('.editor_display_inline').last());
 			editor.setValue('');
 			editor.setCursor({line:0,ch:0})
@@ -657,23 +685,7 @@ var Heather = (function(){
 			}
 			var reader = new FileReader();
 			reader.onload = function (e) {
-                var lines = e.target.result.split('\n');
-				var blocks = [];
-				var block = '';
-				for(var i=0;i<lines.length;i++){
-					if(lines[i].trim() == ''){
-						blocks.push(block);
-						block = '';
-					} else {
-						block += lines[i];
-						if(i < lines.length - 1){
-							block += '\n';
-						}
-					}
-				}
-				if(block.trim() != ''){
-					blocks.push(block);
-				}
+				var blocks = _heather.markdownToBlocks(e.target.result);
 				me.render(blocks);
             };
             reader.readAsText(file);
@@ -681,22 +693,6 @@ var Heather = (function(){
 		});
 		
 		
-		/////test
-		var blocksJson = localStorage.getItem('heather-demo');
-		if(blocksJson == null){
-			
-			 $.ajax({
-				url: "test.txt",
-				async: false,
-				success: function (data){
-					blocksJson = data;
-				}
-			});
-			
-		}
-		
-		var blocks = $.parseJSON(blocksJson);
-		this.render(blocks);
 	}
 	
 	
@@ -735,6 +731,7 @@ var Heather = (function(){
 		return this.md.render(this.getMarkdown());
 	}
 	
+	
 	Heather.prototype.clear = function(){
 		this.display.innerHTML = '';
 		this.cm.setValue('');
@@ -749,11 +746,25 @@ var Heather = (function(){
 		for(var i=0;i<blocks.length;i++){
 			var block = blocks[i];
 			var html = md.render(block);
-			$(display).append('<div class="markdown-body editor_display_inline">'+html+'<textarea class="editor_display_source">'+block+'</textarea></div>');
+			
+			var div = createDisplayElement(html);
+			var textarea = createSourceElement(block);
+			div.appendChild(textarea);
+			
+			$(display).append(div);
 		}
 		renderHtml($(display));
 	}
 	
+	Heather.prototype.loadMarkdown = function(markdown){
+		this.clear();
+		var blocks = _heather.markdownToBlocks(markdown);
+		this.render(blocks);
+	}
+	
+	function render(heather,markdown){
+		return $.parseHTML2(heather.md.render(markdown)).body.innerHTML;
+	}
 	
 	function bindInnerBar(editor){
 		var div = document.createElement('div');
@@ -962,25 +973,31 @@ var Heather = (function(){
 					newSource += editor.getLine(line).substring(0,ch);
 					lastSource = editor.getLine(line).substring(ch);
 					for(var i=line+1;i<=lineCount-1;i++){
+						if(i == line+1){
+							lastSource += '\n';
+						}
 						lastSource += editor.getLine(i);
 						if(i < lineCount - 1){
 							lastSource += '\n';
 						}
 					}
-					
-					if(lastSource.startsWith('\n')) lastSource = lastSource.substring(2);
+					if(lastSource.startsWith('\n')) lastSource = lastSource.substring(1);
 					if(lastSource.trim() != ''){
-						var html = heather.md.render(lastSource);
-						var newDisplay = $('<div class="editor_display_inline markdown-body">'+html+'<textarea class="editor_display_source">'+lastSource+'</textarea></div>');
-						$(me).after(newDisplay);
-						renderHtml(newDisplay);
+						var html = render(heather,lastSource);
+						var div = createDisplayElement(html);
+						var textarea = createSourceElement(lastSource);
+						div.appendChild(textarea);
+						$(me).after(div);
+						renderHtml($(div));
 					}
 					
 					if(newSource.trim() == ''){
 						$(me).remove();
 					} else {
-						var html = heather.md.render(newSource);
-						me.innerHTML = html+'<textarea class="editor_display_source">'+newSource+'</textarea>';
+						var html = render(heather,newSource);
+						me.innerHTML = html;
+						var textarea = createSourceElement(newSource);
+						me.appendChild(textarea);
 						$(me).addClass('markdown-body');
 						renderHtml($(me));
 					}
@@ -1006,8 +1023,10 @@ var Heather = (function(){
 				return ;
 			}
 			
-			var html = heather.md.render(source);
-			me.innerHTML = html+'<textarea class="editor_display_source">'+source+'</textarea>';
+			var html = render(heather,source);
+			me.innerHTML = html;
+			var textarea = createSourceElement(source);
+			me.appendChild(textarea);
 			$(me).addClass('markdown-body');
 			renderHtml($(me));
 			
@@ -1092,6 +1111,21 @@ var Heather = (function(){
 			editor.setCursor({line:editor.lineCount()-1,ch:editor.getLine(editor.lineCount()-1).length});
 			
 		})
+	}
+	
+	function createDisplayElement(html){
+		var div = document.createElement('div');
+		div.classList.add('markdown-body');
+		div.classList.add('editor_display_inline');
+		div.innerHTML = html;
+		return div;
+	}
+	
+	function createSourceElement(source){
+		var textarea = document.createElement('textarea');
+		textarea.classList.add('editor_display_source');
+		textarea.innerHTML = source;
+		return textarea;
 	}
 	
 	function Editor(editor,tooltip,innerBar){

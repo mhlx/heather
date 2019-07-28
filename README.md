@@ -1,7 +1,16 @@
 # heather
 
-![test](./1.jpg)
+## 2.0 (可能)
+
+2.0不再提供左右栏的结构，而是尝试将输入的markdown文本直接转化为html，用户点击渲染的html元素时，显示原始的markdown文本以供编辑
+
+如果你对此感兴趣，可以到 https://md.qyh.me/new.html 尝试，原型版本提供以下操作：
+
+1. 编辑完成之后通过 <kbd>Ctrl|Cmd</kbd> <kbd>Enter</kbd>保存编辑器的内容到一个块中
+2. 编辑工程中，通过点击 <kbd>Shift</kbd> <kbd>Ctrl|Cmd</kbd> <kbd>Enter</kbd>来分块，**一次只能分两块，以编辑器所在光标为分块点**
+
 ## 说明
+
 markdown编辑器，特性如下：
 1. 支持mermaid图表、katex
 2. 自定义工具条|辅助工具条
@@ -15,15 +24,19 @@ markdown编辑器，特性如下：
 10. 全屏编辑
 
 ### 在线demo
+
 https://md.qyh.me
 
 ### 源码
+
 https://github.com/mhlx/heather
 
 ## 使用
+
 从 https://github.com/mhlx/heather 下载最新的文件
 
 ### 引入css
+
 ```html
 <link rel="stylesheet"  href="codemirror/lib/codemirror.css" media="screen">
 <link rel="stylesheet" 
@@ -35,6 +48,7 @@ https://github.com/mhlx/heather
 ```
 
 ### 引入js
+
 ```html
 <script src="jquery/jquery.min.js"></script>
 <script src="js/htmlparser.js"></script>
@@ -68,6 +82,7 @@ var wrapper = EditorWrapper.create(config);
 ```
 
 ### 完整代码
+
 ```html
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -124,11 +139,13 @@ var wrapper = EditorWrapper.create(config);
 ```
 
 ### 其他
+
 1. `codemirror.js` codemirror核心文件 **本地处理过，请勿使用cdn**
 2. `md.js` markdown-it **本地处理过，请勿使用cdn**
 3. 一个页面只能存在一个`EditorWrapper`实例，创建另一个`EditorWrapper`实例时会自动销毁已经存在的实例
 4. 编辑器不会替代任何你页面的html元素，它只会额外创建一些html元素，它始终是全屏的，并且**无法改变**
 5. `EditorWrapper`依赖以下html元素(初始化实例时自动创建)，请保证ID的唯一性
+
 ```html
 <div id="editor_wrapper">
   <div id="editor_toc"></div>
@@ -168,148 +185,160 @@ var wrapper = EditorWrapper.create(config);
 |  `res_colorpickerJs`  | 指定colorpicker js文件路径  | colorpicker/dist/js/bootstrap-colorpicker.min.js |
 |  `renderAllDocEnable`  | 代码高亮的同步预览中，由于codemirror只渲染当前视窗，因此会出现不同步的现象，开启这个选项在载入文档时可以消除这个现象，但是在文本量比较大的时候，加载非常缓慢，可以选择关闭  | true |
 
-
-
 ## 方法
 
 ### 编辑器
 
 #### 获取codemirror对象
+
 `wrapper.editor`
 
 #### 获取编辑器内容
+
 `wrapper.getValue()`
 
 #### 设置编辑器内容
+
 `wrapper.setValue(newValue)`
 
 ### 获取html内容
+
 `wrapper.getHtml()`
 
 ### 渲染内容
+
 `wrapper.doRender(patch)` patch:是否patch更新
 
 ### 同步滚动条
+
 `wrapper.doSync()`
 
 ### 启用编辑和预览的同步
+
 `wrapper.enableSync()`
 
 ### 停用编辑和预览的同步
+
 `wrapper.disableSync()`
 
 ### 切换到编辑器页面
+
 `wrapper.toEditor()`
 
 ### 切换到TOC页面
+
 `wrapper.toToc()`
 
 ### 切换到预览页面
+
 `wrapper.toPreview()`**只在手机端或者全屏模式下有效**
 
 ### 顶部工具栏
+
 `wrapper.toolbar`
 
 #### 添加一个图标
+
 `wrapper.toolbar.addIcon(clazz,hander,callback)`
 
 clazz为fontawesome图标的样式，例如`fa fa-file icon`，handler为图标被点击时触发的方法，callback则为图标元素的回调，例如为添加的图标加上id属性：
+
 ```javascript
 wrapper.toolbar.addIcon(clazz,hander,function(icon){
   icon.setAttribute(id,'icon-id');
 })
 ```
+
 ##### 额外的图标样式
+
 1. `mobile-hide`在手机端隐藏
 2. `pc-hide`在pc端隐藏
 3. `nofullscreen`在全屏模式下隐藏
 4. `onfullscreen` 只在全屏模式下出现
 
 #### 删除图标
+
 `wrapper.toolbar.removeIcon(function(icon){return bool})`
 
 #### 隐藏
+
 `wrapper.toolbar.hide()`
 
 #### 显示
+
 `wrapper.toolbar.show()`
 
 #### 保持隐藏状态
-```javascript
-wrapper.toolbar.keepHidden = true;
+
+```javascriptwrapper.toolbar.keepHidden = true;
 wrapper.toolbar.hide();
 ```
 
-
 ### 辅助工具栏
+
 `wrapper.innerBar`
 
 方法同顶部工具条
 
-
 ### 主题
+
 `wrapper.theme`
 
 #### 配置编辑器主题
-```javascript
-var theme = wrapper.theme;
+
+```javascriptvar theme = wrapper.theme;
 theme.setEditorTheme(wrapper.editor,'abcdef',function(){
 	theme.render();
 })
 ```
 
 #### 配置代码高亮主题
-```javascript
-var theme = wrapper.theme;
+
+```javascriptvar theme = wrapper.theme;
 theme.hljs.theme = 'a11y-light'
 theme.render();
 ```
 
 #### 配置顶部工具条颜色
-```javascript
-var theme = wrapper.theme;
+
+```javascriptvar theme = wrapper.theme;
 theme.toolbar.color = '#fff'
 theme.render();
 ```
 
 #### 配置辅助工具条颜色
-```javascript
-var theme = wrapper.theme;
+
+```javascriptvar theme = wrapper.theme;
 theme.bar.color = '#fff'
 theme.render();
 ```
 
 #### 配置状态条字体颜色
-```javascript
-var theme = wrapper.theme;
+
+```javascriptvar theme = wrapper.theme;
 theme.stat.color = '#fff'
 theme.render();
 ```
 
 #### 自定义css
-```javascript
-var css = '';
+
+```javascriptvar css = '';
 wrapper.theme.customCss = css;
 wrapper.theme.render();
 ```
 
 #### 保存主题
+
 ``` javascript
 wrapper.saveTheme();
 ```
-
 #### 重置主题
-
 ``` javascript
 wrapper.resetTheme();
-
 ```
-
 ### 执行指令
 `wrapper.execCommand(commandName)`
-
 系统内置指令
-
 | 名称   | 说明   |   快捷键_mac| 快捷键_pc| 
 |  -  |  -  | - | - |
 |  search  |  开启\|关闭一个搜索框  | <kbd>Ctrl</kbd> <kbd>S</kbd> |<kbd>Alt</kbd> <kbd>S</kbd>|
@@ -327,13 +356,9 @@ wrapper.resetTheme();
 |  undo  |  撤回  |<kbd>Cmd</kbd> <kbd>Z</kbd> | <kbd>Ctrl</kbd> <kbd>Z</kbd>|
 |  redo  |  取消撤回  |<kbd>Cmd</kbd> <kbd>Y</kbd>|<kbd>Ctrl</kbd> <kbd>Y</kbd>|
 |  table  |  插入表格  | <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>T</kbd> |<kbd>Alt</kbd> <kbd>T</kbd>|
-
-
 ### 新增指令
 `EditorWrapper.commands[commandName] = commandHandler`
-
 commandHandler接受一个参数`wrapper`，例如：
-
 新增一个插入图片的指令，并且为该指令绑定`Ctrl+G`的快捷键：
 ```javascript
 EditorWrapper.commands['image'] = function(wrapper){
@@ -353,38 +378,25 @@ EditorWrapper.commands['image'] = function(wrapper){
       editor.replaceSelection("![" + text + "]()");
   }
 }
-
 wrapper.bindKey({'Ctrl-G':'image'});
 ```
-
-
 ### 快捷键绑定
 `wrapper.bindKey(keyMap)`
-
 keyMap对象属性为快捷键名称，例如`Ctrl-A`,属性值可以为string或者一个方法，如果为string类型，那么则会绑定对应名称的命令，如果为方法，则会直接绑定该方法
-
 ### 解除快捷键绑定
 `wrapper.unbindKey(keyArray)` keyArray为快捷键数组，例如`['Ctrl-A']`
-
 ### 全屏编辑
 `wrapper.requestFullScreen()` **只在PC端有效**
-
 ### 退出全屏
 `wrapper.exitFullScreen()`  **只在PC端有效**
-
 ### 销毁实例
 `wrapper.remove()`
-
 ### 监听实例销毁
 `wrapper.onRemove(fun)`
-
 ### 取消监听实例销毁
 `wrapper.offRemove(fun)`
-
 ## 导出PDF
-
 没有直接导出PDF的方法，但是可以通过以下步骤，让chrome浏览器的打印功能来实现
-
 ### 设置打印样式
 ```html
 <link rel="stylesheet"  href="codemirror/lib/codemirror.css" media="screen">
@@ -396,7 +408,6 @@ keyMap对象属性为快捷键名称，例如`Ctrl-A`,属性值可以为string�
 <link rel="stylesheet" href="css/print.css" media="print">
 ```
 上述html中，`media="print"`的只会在打印时使用，`media="screen"`的则只会在页面渲染时使用，而`media="all"` 则在所有情况下都会使用，请参考 https://www.w3schools.com/tags/att_link_media.asp
-
 ### 打印前渲染
 mermaid渲染出来的元素大小会根据视窗大小自动调整，由于左右预览的原因，打印出来的大小会跟预期的大小不一致，此时可以通过监听打印事件使得在打印前再次渲染。
 ```javascript
@@ -414,16 +425,13 @@ wrapper.onRemove(function(){
     mediaQueryList.removeListener(beforePrintHandler);
 });
 ```
-
 ### 强制分页
 通过添加以下代码可以让pdf文件强制分页
 ```html
 <div style="page-break-after: always;"></div>
 ```
-
 ## 支持的浏览器
 **只在chrome上做了测试，但应该支持一些其他的现代化浏览器**
-
 ## 感谢
 1. 采用[codemirror](https://codemirror.net/)作为编辑器
 2. 采用[markdown-it](https://github.com/markdown-it/markdown-it)渲染markdown

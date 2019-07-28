@@ -139,6 +139,12 @@
 		$("#clear").click(function(){
 			heather.clear();
 		});
+		$.ajax({
+			url:'README.md',
+			success:function(data){
+				heather.loadMarkdown(data);
+			}
+		})
 	  </script>
 	  
    </body>
