@@ -1606,7 +1606,6 @@ var EditorWrapper = (function() {
 							}
 						}
 						editor.replaceSelection("\n" + text);
-						innerBar.show();
 					}).catch(swal.noop)
 				},
 				
@@ -1676,9 +1675,7 @@ var EditorWrapper = (function() {
 			this.theme = theme;
             var scrollBarStyle = mobile ? 'native' : 'overlay';
             var editor = CodeMirror.fromTextArea(document.getElementById('editor_wrapper').querySelector('textarea'), {
-                mode: {
-                    name: "gfm"
-                },
+                mode: {name: "gfm"}
                 lineNumbers: false,
                 matchBrackets: true,
                 lineWrapping: true,
