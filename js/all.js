@@ -25,6 +25,18 @@ var EditorWrapper = (function() {
 	CodeMirror.prototype.unfocus = function(){
 		this.getInputField().blur();
 	}
+	
+	CodeMirror.prototype.getLines = function(line,endLine){
+		var str = '';
+		for(var i=line;i<endLine;i++){
+			str += this.getLine(i);
+			
+			if(i < endLine - 1){
+				str += '\n';
+			}
+		}
+		return str;
+	}
 
     CodeMirror.keyMap.default["Shift-Tab"] = "indentLess";
     CodeMirror.keyMap.default["Tab"] = "indentMore";
@@ -33,8 +45,22 @@ var EditorWrapper = (function() {
 	var mac = CodeMirror.browser.mac;
 	var mobile = CodeMirror.browser.mobile;
     var ios = CodeMirror.browser.ios;
+	
+	var turndownService = new window.TurndownService({
+		'headingStyle': 'atx',
+		'codeBlockStyle': 'fenced',
+		'emDelimiter': '*',
+		defaultReplacement: function(innerHTML, node) {
+			return node.isBlock ? '\n\n' + node.outerHTML + '\n\n' : node.outerHTML
+		}
+	});
+	turndownService.use(window.turndownPluginGfm.gfm);
 
-
+    var plainPasteHandler = function(e){
+		var text = (e.originalEvent || e).clipboardData.getData('text/plain');
+		document.execCommand('insertText',false,text);
+		return false;
+	}
     function cloneAttributes(element, sourceNode) {
         let attr;
         let attributes = Array.prototype.slice.call(sourceNode.attributes);
@@ -54,6 +80,102 @@ var EditorWrapper = (function() {
     function getDefault(o, dft) {
         return isUndefined(o) ? dft : o;
     }
+	
+	function parseHTML(html){
+		return new DOMParser().parseFromString(html, "text/html");
+	}
+	
+	var FileUpload = (function(){
+		
+		function FileUpload(file,wrapper){
+			var config = wrapper.config;
+			this.uploadUrl = config.upload_url;
+			this.fileName = config.upload_fileName || 'file';
+			this.beforeUpload = config.upload_before;
+			this.file = file;
+			this.fileUploadFinish = config.upload_finish;
+			this.wrapper = wrapper;
+		}
+		
+		FileUpload.prototype.start = function(){
+			var me = this;
+			var editor = this.wrapper.editor;
+			var formData = new FormData();
+			formData.append(this.fileName, this.file);
+			if(this.beforeUpload){
+				this.beforeUpload(formData,this.file);
+			}
+			var xhr = new XMLHttpRequest();
+			var fileUploadProgress = this.fileUploadProgress;
+			var bar = document.createElement("div");
+			bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="fas fa-times middle-icon" style="position: absolute;top: 0;right: 0;"><i></div>'
+			bar.querySelector('i').addEventListener('click',function(){
+				xhr.abort();
+			});
+			var widget = editor.addLineWidget(editor.getCursor().line, bar, {coverGutter: false, noHScroll: true})
+			xhr.upload.addEventListener("progress", function(e){
+				var prefix = "!["+me.signature+"_";
+				if (e.lengthComputable) {
+					var percentComplete = parseInt(e.loaded*100 / e.total)+"";
+					var pb = bar.querySelector('.heather_progressbar').firstChild;
+					$(pb).css({"width":percentComplete+"%"})
+					bar.querySelector('.heather_progressbar').querySelector('span').textContent = percentComplete+"%";
+				} 
+			}, false);
+			xhr.addEventListener('readystatechange', function(e) {
+			  if(this.readyState === 4 ) {
+				  editor.removeLineWidget(widget);
+				  if (xhr.status !== 0) {
+					  var info = me.fileUploadFinish(xhr.response);
+					  if(info){
+						  var type = (info.type || 'image').toLowerCase();
+						  switch(type){
+							case 'image':
+								editor.replaceRange('![]('+info.url+')', me.cursor);
+								editor.focus();
+								editor.setCursor({line:me.cursor.line,ch:me.cursor.ch+2})
+								break;
+							case 'file':
+								editor.replaceRange('[]('+info.url+')', me.cursor);
+								editor.focus();
+								editor.setCursor({line:me.cursor.line,ch:me.cursor.ch+1})
+								break;
+							case 'video':
+								var video = document.createElement('video');
+								video.setAttribute('controls','');
+								if(info.poster){
+									video.setAttribute('poster',info.poster);
+								}
+								var sources = info.sources || [];
+								if(sources.length > 0){
+									for(var i=0;i<sources.length;i++){
+										var source = sources[i];
+										var ele = document.createElement('source');
+										ele.setAttribute('src',source.src);
+										ele.setAttribute('type',source.type);
+										video.appendChild(ele);
+									}
+								} else {
+									video.setAttribute('src',info.url);
+								}
+								editor.replaceRange(video.outerHTML, me.cursor);
+								break;
+						  }
+						  
+					  }
+				  }
+			  }
+			});
+			xhr.open("POST", this.uploadUrl);
+			xhr.send(formData);
+			var cursor = editor.getCursor(true);
+			this.cursor = cursor;
+		}
+			
+		return {create:function(file,wrapper){
+			return new FileUpload(file,wrapper);
+		}}
+	})();
 
     var Render = (function() {
 
@@ -108,11 +230,17 @@ var EditorWrapper = (function() {
                         theme: theme.mermaid.theme || 'default'
                     });
                     clearInterval(t);
-                    try {
-                        mermaid.init({}, '#editor_out .mermaid');
-                    } catch (e) {
-                        console.log(e);
-                    }
+					
+					$("#heather_out").find('.mermaid').each(function(){
+						if(this.getAttribute("data-processed") == null){
+							try{
+								mermaid.parse(this.textContent);
+								mermaid.init({}, $(this));
+							}catch(e){
+								this.innerHTML = '<pre>'+e.str+'</pre>'
+							}
+						}
+					});
                 } catch (__) {}
             }, 20)
         }
@@ -136,13 +264,14 @@ var EditorWrapper = (function() {
                         throwOnError: false
                     })
                     clearInterval(t);
-                    var katexs = document.getElementById("editor_out").querySelectorAll(".katex");
+                    var katexs = document.getElementById("heather_out").querySelectorAll(".katex");
                     for (var i = 0; i < katexs.length; i++) {
                         var block = katexs[i];
+						var displayMode = block.tagName != 'SPAN';
                         try {
                             block.innerHTML = katex.renderToString(block.textContent, {
                                 throwOnError: false,
-                                displayMode: true
+                                displayMode: displayMode
                             });
                         } catch (e) {
                             console.log(e);
@@ -159,7 +288,7 @@ var EditorWrapper = (function() {
         }
 
         MarkdownRender.prototype.renderAt = function(markdownText, element, patch) {
-            var doc = $.parseHTML2(this.md.render(markdownText));
+            var doc = parseHTML(this.md.render(markdownText));
             var hasMermaid = doc.querySelector('.mermaid') != null && this.hasMermaid !== false;
             if (hasMermaid) {
                 loadMermaid(this.theme, this.config);
@@ -202,16 +331,18 @@ var EditorWrapper = (function() {
             } else {
                 element.innerHTML = innerHTML;
             }
-			var logError = false;
-            try {
-                mermaid.initialize({
-                    theme: this.theme.mermaid.theme || 'default'
-                });
-				logError = true;
-                mermaid.init({}, '#editor_out .mermaid');
-            } catch (e) {
-                if (logError) console.log(e)
-            }
+		
+			$("#heather_out").find('.mermaid').each(function(){
+				if(this.getAttribute("data-processed") == null){
+					try{
+						mermaid.parse(this.textContent);
+						mermaid.init({}, $(this));
+					}catch(e){
+						if(window.mermaid)
+							this.innerHTML = '<pre>'+e.str+'</pre>'
+					}
+				}
+			});
         }
 
         return {
@@ -230,6 +361,9 @@ var EditorWrapper = (function() {
             this.keepHidden = false;
         }
 
+		Bar.prototype.remove = function() {
+            this.element.remove();
+        }
 
         Bar.prototype.hide = function() {
             this.element.css({
@@ -240,6 +374,10 @@ var EditorWrapper = (function() {
 
         Bar.prototype.height = function() {
             return this.element.height();
+        }
+		
+		Bar.prototype.width = function() {
+            return this.element.width();
         }
 
         Bar.prototype.show = function() {
@@ -290,9 +428,26 @@ var EditorWrapper = (function() {
                 }
             }
         }
+		
+		 Bar.prototype.insertElement = function(element, index) {
+            var toolbar = this.element[0];
+            if (index >= this.getSize()) {
+                toolbar.appendChild(element);
+            } else {
+                if (index <= 0) {
+                    toolbar.insertBefore(element, toolbar.childNodes[0])
+                } else {
+                    toolbar.insertBefore(element, toolbar.childNodes[index])
+                }
+            }
+        }
 
         Bar.prototype.addIcon = function(clazz, handler, callback) {
             this.insertIcon(clazz, handler, this.getSize(), callback);
+        }
+		
+		Bar.prototype.addElement = function(element) {
+            this.insertElement(element, this.getSize());
         }
 
         Bar.prototype.removeIcon = function(deleteChecker) {
@@ -409,9 +564,9 @@ var EditorWrapper = (function() {
 		var HljsTip = (function(){
 				
 			function HljsTip(editor){
-				$('<div id="editor_hljs_tip" style="visibility:hidden;position:absolute;z-index:99;overflow:auto;background-color:#fff"></div>').appendTo($("#editor_in"));				
+				$('<div id="heather_hljs_tip" style="visibility:hidden;position:absolute;z-index:99;overflow:auto;background-color:#fff"></div>').appendTo($("#heather_in"));				
 				var state = {running:false,cursor:undefined,hideOnNextChange:false};
-				var tip = $("#editor_hljs_tip");
+				var tip = $("#heather_hljs_tip");
 				
 				tip.on('click','tr',function(){
 					setLanguage($(this));
@@ -517,7 +672,7 @@ var EditorWrapper = (function() {
 										var pos = editor.cursorCoords(true);
 										tip.html(html);
 										var height = tip.height();
-										if($("#editor_in").height() - pos.top < height+editor.defaultTextHeight()){
+										if($("#heather_in").height() - pos.top < height+editor.defaultTextHeight()){
 											tip.css({'top':pos.top - height,'left':pos.left,'visibility':'visible'});
 										} else {
 											tip.css({'top':pos.top+editor.defaultTextHeight(),'left':pos.left,'visibility':'visible'})
@@ -840,13 +995,13 @@ var EditorWrapper = (function() {
 			loadEditorTheme(this);
 			loadHljsTheme(this);
 			var css = "";
-			css += "#editor_toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
-			css += "#editor_innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
-			css += "#editor_stat{color:" + (this.stat.color || 'inherit') + "}\n";
-			css += "#editor_in{background:" + (this.inCss.background || 'inherit') + "}\n";
-			css += "#editor_cursorHelper{color:" + (this.cursorHelper.color || 'inherit') + "}\n";
+			css += "#heather_toolbar{color:" + (this.toolbar.color || 'inherit') + "}\n";
+			css += "#heather_innerBar{color:" + (this.bar.color || 'inherit') + "}\n"
+			css += "#heather_stat{color:" + (this.stat.color || 'inherit') + "}\n";
+			css += "#heather_in{background:" + (this.inCss.background || 'inherit') + "}\n";
+			css += "#heather_cursorHelper{color:" + (this.cursorHelper.color || 'inherit') + "}\n";
 			var searchHelperColor = (this.searchHelper.color || 'inherit');
-			css += "#editor_searchHelper{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control{color:" + searchHelperColor + "}\n#editor_searchHelper .input-group-text{color:" + searchHelperColor + "}\n#editor_searchHelper .form-control::placeholder {color: " + searchHelperColor + ";opacity: 1;}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}\n#editor_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}";
+			css += "#heather_searchHelper{color:" + searchHelperColor + "}\n#heather_searchHelper .form-control{color:" + searchHelperColor + "}\n#heather_searchHelper .input-group-text{color:" + searchHelperColor + "}\n#heather_searchHelper .form-control::placeholder {color: " + searchHelperColor + ";opacity: 1;}\n#heather_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}\n#heather_searchHelper .form-control::-ms-input-placeholder {color: " + searchHelperColor + ";}";
 
 			$("#custom_theme").remove();
 			if ($.trim(css) != '') {
@@ -903,6 +1058,509 @@ var EditorWrapper = (function() {
 				return new ThemeHandler(config);
 			}
 		};
+	})();
+	
+	
+	var TaskListHelper = (function(){
+		
+		function TaskListHelper(wrapper){
+			$("#heather_out").on('click','.contains-task-list',function(e){
+				var root = e.target;
+				while(!root.classList.contains('contains-task-list')){
+					root = root.parentElement;
+				}
+				
+				wrapper.editor.setOption('readOnly',true);
+				var line = parseInt(root.getAttribute('data-line'));
+				var endLine = parseInt(root.getAttribute('data-end-line'));
+				var str = wrapper.editor.getLines(line,endLine);
+				
+				var body = parseHTML(str).body;
+				if(body.querySelector('.contains-task-list') != null){
+					wrapper.editor.setOption('readOnly',false);
+					return ;
+				}
+				
+				var node = parseHTML(wrapper.render.getHtml(str)).body.firstChild;
+				cloneAttributes(node,root);
+				if(node.isEqualNode(root)){
+					var checkbox = root.querySelector('input[type="checkbox"]');
+					if(checkbox.checked){
+						checkbox.removeAttribute('checked');
+					}else{
+						checkbox.setAttribute('checked','checked');
+					}
+					//html to markdown
+					var element = parseHTML(root.outerHTML).body.firstChild;
+					var markdown = turndownService.turndown(element.outerHTML);
+					wrapper.editor.replaceRange(markdown, {line: line, ch: 0}, {line: endLine-1});
+					wrapper.doRender(true);
+				}
+				
+				wrapper.editor.setOption('readOnly',false);
+			})
+		}
+		
+		return {create : function(wrapper){
+			return new TaskListHelper(wrapper);
+		}}
+	})();
+	
+	var ContenteditableBar = (function(){
+		function ContenteditableBar(wrapper,element){
+			var me = this;
+			this.composing = false;
+			var bar = document.createElement('div');
+			bar.setAttribute('class','heather_contenteditable_bar');
+			document.body.appendChild(bar);
+			bar = Bar.create(bar);
+			var clazz = "heather_status_on";
+			bar.addIcon('fas fa-bold middle-icon',undefined,function(ele){
+				var event = mobile ? 'touchstart' : 'mousedown';
+				ele.addEventListener(event,function(){
+					document.execCommand('bold');
+					document.queryCommandState('bold') ? ele.classList.add(clazz) : ele.classList.remove(clazz);
+				})
+				me.boldBtn = ele;
+			});
+			bar.addIcon('fas fa-italic middle-icon',undefined,function(ele){
+				var event = mobile ? 'touchstart' : 'mousedown';
+				ele.addEventListener(event,function(){
+					document.execCommand('italic');
+					document.queryCommandState('italic') ? ele.classList.add(clazz) : ele.classList.remove(clazz);
+				})
+				me.italicBtn = ele;
+			});
+			bar.addIcon('fas fa-strikethrough middle-icon',undefined,function(ele){
+				var event = mobile ? 'touchstart' : 'mousedown';
+				ele.addEventListener(event,function(){
+					document.execCommand('strikeThrough');
+					document.queryCommandState('strikeThrough') ? ele.classList.add(clazz) : ele.classList.remove(clazz);
+				})
+				me.strikeThroughBtn = ele;
+			});
+			bar.addIcon('fas fa-code middle-icon',undefined,function(ele){
+				var event = mobile ? 'touchstart' : 'mousedown';
+				ele.addEventListener(event,function(){
+					var selection = window.getSelection().toString();
+					if(selection.length > 0){
+						document.execCommand("insertHTML",false,'<code>'+selection+'</code>');
+					}
+				})
+			});
+			bar.addIcon('fas fa-eraser middle-icon',undefined,function(ele){
+				var event = mobile ? 'touchstart' : 'mousedown';
+				ele.addEventListener(event,function(){
+					var selection = window.getSelection().toString();
+					if(selection.length > 0){
+						document.execCommand('removeFormat');
+					}
+				})
+			});
+			var startHandler = function(e){
+				me.composing = true;
+			};
+			var endHandler = function(e){
+				me.composing = false;
+			};
+			
+			var selectionChangeListener = function(){
+				if(me.composing == false && window.getSelection().toString().length > 0){
+					posContenteditableBar(bar,element);
+				} else {
+					bar.hide();
+				}
+				document.queryCommandState('bold') ? me.boldBtn.classList.add(clazz) : me.boldBtn.classList.remove(clazz);
+				document.queryCommandState('italic') ? me.italicBtn.classList.add(clazz) : me.italicBtn.classList.remove(clazz);				
+				document.queryCommandState('strikeThrough') ? me.strikeThroughBtn.classList.add(clazz) : me.strikeThroughBtn.classList.remove(clazz);			
+			}
+			wrapper.selectionChangeListeners.push(selectionChangeListener);
+			element.addEventListener('compositionstart',startHandler);
+			element.addEventListener('compositionend',endHandler);
+			this.startHandler = startHandler;
+			this.endHandler = endHandler;
+			this.bar = bar;
+			this.selectionChangeListener = selectionChangeListener;
+			this.element = element;
+			this.wrapper = wrapper;
+		}
+		
+		ContenteditableBar.prototype.remove = function(){
+			var listeners = this.wrapper.selectionChangeListeners;
+			for(var i=0;i<listeners.length;i++){
+				if(listeners[i] == this.selectionChangeListener){
+					listeners.splice(i,1);
+					break;
+				}
+			}
+			this.bar.remove();
+			this.element.removeEventListener('compositionstart',this.startHandler);
+			this.element.removeEventListener('compositionend',this.endHandler);
+		}
+		
+		function posContenteditableBar(bar,element){
+			var sel = window.getSelection();
+			var elem = sel.getRangeAt(0);
+			var node = elem.commonAncestorContainer;
+			while(node != null ){
+				if(node == element){
+					var coords = getCoords();
+					var top = coords.top - 80 - bar.height() - $(window).scrollTop();
+					bar.element.css({'top':top < 0 ? coords.top + coords.height+30 : top+$(window).scrollTop()+"px"});
+					if(!mobile){
+						if(bar.width() + coords.left > $(window).width()){
+							bar.element.css({'right':30+"px"})
+						} else {
+							bar.element.css({'left':coords.left+"px"})
+						}
+					}
+					bar.show();
+					return;
+				}
+				node = node.parentElement;
+			}
+			bar.hide();
+		}
+		
+		function getCoords() {
+			var sel = window.getSelection();
+			var elem = sel.getRangeAt(0);
+			var box = elem.getBoundingClientRect();
+			var body = document.body;
+			var docEl = document.documentElement;
+			var scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
+			var scrollLeft = window.pageXOffset || docEl.scrollLeft || body.scrollLeft;
+			var clientTop = docEl.clientTop || body.clientTop || 0;
+			var clientLeft = docEl.clientLeft || body.clientLeft || 0;
+			var top  = box.top +  scrollTop - clientTop;
+			var left = box.left + scrollLeft - clientLeft;
+			return { top: Math.round(top), left: Math.round(left),height:Math.round(box.height) };
+		}
+		
+		return {create:function(wrapper,element){
+			return new ContenteditableBar(wrapper,element);
+		}}
+	})();
+	
+	var TableHelper = (function(){
+		
+		function TableHelper(wrapper){
+			var me = this;
+			this.oneTimeHandlers = [];
+			$("#heather_out").on('click','table',function(e){
+				var root = e.target;
+				while(root != null && root.tagName != 'TABLE'){
+					root = root.parentElement;
+				}
+				if(root == null){
+					return ;
+				}
+				var line = parseInt(root.getAttribute('data-line'));
+				var endLine = parseInt(root.getAttribute('data-end-line'));
+				var str = wrapper.editor.getLines(line,endLine);
+				
+				var body = parseHTML(str).body;
+				if(body.querySelector('table') != null){
+					wrapper.editor.setOption('readOnly',false);
+					return ;
+				}
+				
+				if(isUndefined(this.tableSession) || this.tableSession.closed === true){
+					var node = parseHTML(wrapper.render.getHtml(str)).body.firstChild;
+					cloneAttributes(node,root);
+					if(node.isEqualNode(root)){
+						this.tableSession = new TableSession(wrapper,root,line,endLine);
+						this.tableSession.start();
+					}
+				}
+				
+			})
+		}
+		
+		function TableSession(wrapper,table,line,endLine){
+			this.wrapper = wrapper;
+			this.table = table;
+			this.line = line;
+			this.endLine = endLine;
+		}
+		
+		TableSession.prototype.start = function(){
+			var me = this;
+			this.wrapper.editor.setOption('readOnly',true);
+			this.wrapper.disableRender = true;
+			this.clickHandler = function(e){
+				var td = getTd(e.target);
+				if(!td.isContentEditable){
+					if(me.contenteditableBar){
+						me.contenteditableBar.remove();
+					}
+					$(me.table).find('[contenteditable]').each(function(){
+						this.removeEventListener('paste',plainPasteHandler);
+						this.removeAttribute('contenteditable');
+					});
+					td.addEventListener('paste',plainPasteHandler);
+					td.setAttribute('contenteditable',true);
+					me.contenteditableBar = ContenteditableBar.create(me.wrapper,td);
+					setTimeout(function(){
+						td.scrollIntoView();
+					},100)
+				}
+				me.td = td;
+			}
+			$(this.table).on('click','th,td',this.clickHandler);
+			var toolbar = document.createElement('div');
+			toolbar.setAttribute("style","margin-bottom:10px;margin-top:5px");
+			this.table.before(toolbar);
+			toolbar = Bar.create(toolbar);
+			toolbar.addIcon('fas fa-trash middle-icon',function(){
+				Swal.fire({
+					title: '确定要删除表格?',
+					type: 'warning',
+					showCancelButton: true,
+					confirmButtonColor: '#3085d6',
+					cancelButtonColor: '#d33'
+				}).then((result) => {
+					if (result.value) {
+						$(me.table).remove();
+						me.close();
+					}
+				})
+			});
+			toolbar.addIcon('fas fa-plus middle-icon',function(){
+				if(!me.td){
+					return ;
+				}
+				var td = $(me.td);
+				var table = $(me.table);
+				var style = 'width:200px;margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;';
+				var html = '';
+				html += '<div><button style="'+style+'" >向右添加列</button></div>';
+				html += '<div><button style="'+style+'" >向左添加列</button></div>';
+				html += '<div><button style="'+style+'" >向上添加行</button></div>';
+				html += '<div><button style="'+style+'" >向下添加行</button></div>';
+				Swal({
+					animation:false,
+					html : html
+				});
+				var buttons = $(Swal.getContent()).find('button');
+				buttons.eq(0).click(function(){
+					addCol(table,td,true);
+					Swal.close();
+				});
+				buttons.eq(1).click(function(){
+					addCol(table,td,false);
+					Swal.close();
+				});
+				buttons.eq(2).click(function(){
+					addRow(table,td,false);
+					Swal.close();
+				});
+				buttons.eq(3).click(function(){
+					addRow(table,td,true);
+					Swal.close();
+				});
+			});
+			toolbar.addIcon('fas fa-minus middle-icon',function(){
+				if(!me.td){
+					return ;
+				}
+				var td = $(me.td);
+				var table = $(me.table);
+				var style = 'width:200px;margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;';
+				var html = '';
+				html += '<div><button style="'+style+'" >删除当前行</button></div>';
+				html += '<div><button style="'+style+'" >删除当前列</button></div>';
+				Swal({
+					animation:false,
+					html : html
+				});
+				var buttons = $(Swal.getContent()).find('button');
+				buttons.eq(0).click(function(){
+					deleteRow(table,td);
+					Swal.close();
+				});
+				buttons.eq(1).click(function(){
+					deleteCol(table,td);
+					Swal.close();
+				});
+			});
+			toolbar.addIcon('fas fa-align-left middle-icon',function(){
+				if(!me.td){
+					return ;
+				}
+				doAlign($(me.table),$(me.td),'left')
+			});
+			toolbar.addIcon('fas fa-align-center middle-icon',function(){
+				if(!me.td){
+					return ;
+				}
+				doAlign($(me.table),$(me.td),'center')
+			});
+			
+			toolbar.addIcon('fas fa-align-right middle-icon',function(){
+				if(!me.td){
+					return ;
+				}
+				doAlign($(me.table),$(me.td),'right')
+			});
+			
+			toolbar.addIcon('fas fa-check middle-icon',function(){
+				me.close();
+			});
+		}
+		
+		TableSession.prototype.close = function(){
+			var table = $(this.table);
+			table.off('click','th,td',this.clickHandler);
+			table.find('[contenteditable]').each(function(){
+				this.removeEventListener('paste',plainPasteHandler);
+				this.removeAttribute('contenteditable');
+			});
+			if(this.contentEditableBar){
+				this.contentEditableBar.remove();
+			}
+			this.wrapper.editor.setOption('readOnly',false);
+			this.wrapper.disableRender = false;
+			var markdown = '';
+			if(table.index() != -1){
+				var element = parseHTML(table[0].outerHTML).body.firstChild;
+				markdown = toMarkdown($(element));
+			}
+			this.wrapper.editor.replaceRange(markdown, {line: this.line, ch: 0}, {line: this.endLine-1});
+			if(mobile){
+				this.wrapper.doRender(true);
+			}
+			this.closed = true;
+		}
+		
+		function doAlign(table,td,align){
+			var index = td.index();
+			table.find('tr').each(function(){
+				var tr = $(this);
+				tr.children().eq(index).css({'text-align':align})
+			})
+		}
+		
+		function addCol(table,td,after){
+			var index = td.index();
+			table.find('tr').each(function(){
+				var tr = $(this);
+				var td = tr.find('td').eq(index);
+				var th = tr.find('th').eq(index);
+				if(after){
+					th.after('<th></th>');
+					td.after('<td></td>');
+				} else {
+					th.before('<th></th>');
+					td.before('<td></td>');
+				}
+			});
+		}
+		
+		function addRow(table,td,after){
+			if(td[0].tagName == 'TH' && !after) return ;
+			var tr = td.parent();
+			var tdSize = tr.find('td').length;
+			if(tdSize == 0){
+				tdSize = tr.find('th').length;
+			}
+			var html = '<tr>';
+			for(var i=0;i<tdSize;i++){
+				html += '<td></td>';
+			}
+			html += '</tr>';
+			if(after){
+				tr.after(html);
+			}else{
+				tr.before(html);
+			}
+		}
+		
+		function deleteRow(table,td){
+			if(td[0].tagName == 'TH') return ;
+			if(table.find('tr').length == 2){
+				return ;
+			}
+			var tr = td.parent();
+			tr.remove();
+		}
+		
+		function deleteCol(table,td){
+			var ths = table.find('tr').eq(0).find('th');
+			if(ths.length == 1) return ;
+			var index = td.index();
+			table.find('tr').each(function(){
+				var tr = $(this);
+				var td = tr.find('td').eq(index);
+				if(td.length > 0){
+					td.remove();
+				}
+				var th = tr.find('th').eq(index);
+				if(th.length > 0){
+					th.remove();
+				}
+			});
+		}
+		
+		function getTd(ele){
+			if(ele==null){
+				return null;
+			} 
+			if(ele.tagName == 'TD' || ele.tagName == 'TH'){
+				return ele;
+			}
+			return getTd(ele.parentElement);
+		}
+		
+		var alignMap = {
+			'' : ' -- ',
+			'left' : ' :-- ',
+			'center' : ' :--: ',
+			'right' : ' --: '
+		}
+		
+		function toMarkdown(table){
+			var markdown = '';
+			var trs = table.find('tr');
+			for(var i=0;i<trs.length;i++){
+				var tr = trs.eq(i);
+				var ths = tr.find('th');
+				var headingRow = ths.length > 0;
+				if(headingRow){
+					markdown += getRowMarkdown(ths);
+					markdown += '\n';
+					for(var j=0;j<ths.length;j++){
+						var align = ths[j].style['text-align'];
+						markdown += "|" + alignMap[align];
+					}
+					markdown += "|";
+				} else {
+					markdown += getRowMarkdown(tr.find('td'));
+				}
+				if(i < trs.length - 1){
+					markdown += '\n';
+				}
+			}
+			return markdown;
+		}
+		
+		function getRowMarkdown(tds){
+			var markdown = '';
+			for(var j=0;j<tds.length;j++){
+				var td = tds.eq(j);
+				markdown += "|";
+				var md = turndownService.turndown(td.html());
+				md = md.trim().replace(/\n\r/g, '<br>').replace(/\n/g, "<br>")
+				markdown += md.length < 3 ? "  "+md : md;
+				
+			}
+			markdown += "|";
+			return markdown;
+		}
+		
+		return {create : function(wrapper){
+			return new TableHelper(wrapper);
+		}}
 	})();
 	
 	
@@ -1069,7 +1727,7 @@ var EditorWrapper = (function() {
 		
 		function SearchHelper(editor){
 			var html = '';
-			html += '<div id="editor_searchHelper" style="position:absolute;bottom:10px;width:100%;z-index:99;display:none;padding:20px;padding-bottom:5px">';
+			html += '<div id="heather_searchHelper" style="position:absolute;bottom:10px;width:100%;z-index:99;display:none;padding:20px;padding-bottom:5px">';
 			html += '<div style="width:100%;text-align:right;margin-bottom:5px"><i class="fas fa-times icon"  style="cursor:pointer;margin-right:0px"></i></div>';
 			html += ' <form>';
 			html += '<div class="input-group mb-3">';
@@ -1097,7 +1755,7 @@ var EditorWrapper = (function() {
 			html += '</div>';
 			
 			var ele = $(html);
-			$("#editor_in").append(ele);
+			$("#heather_in").append(ele);
 			
 			var searchUtil = SearchUtil.create(editor);
 			
@@ -1280,7 +1938,7 @@ var EditorWrapper = (function() {
 		})();
 		
 		function CursorHelper(editor){
-			var html = '<div id="editor_cursorHelper" style="position:absolute;bottom:5px;width:150px;left:calc(50% - 75px);display:none;z-index:9999" class="alpha30" >'		
+			var html = '<div id="heather_cursorHelper" style="position:absolute;bottom:5px;width:150px;left:calc(50% - 75px);display:none;z-index:9999" class="alpha30" >'		
 			html += '<div style="height:26.66%;padding:5px;cursor:pointer">';
 			html += '<i class="fas fa-times"  style="font-size:35px" title="关闭"></i>';		
 			html += '<div style="clear:both"></div>';
@@ -1298,7 +1956,7 @@ var EditorWrapper = (function() {
 			html += '</div>';
 			html += '</div>';
 			var ele = $(html);
-			$("#editor_in").append(ele);
+			$("#heather_in").append(ele);
 			var cursorUtil = CursorUtil.create(editor);
 			ele.on('click','[data-arrow]',function(){
 				var action = $(this).data('arrow');
@@ -1640,33 +2298,43 @@ var EditorWrapper = (function() {
 		var _EditorWrapper = new _EditorWrapper(); 
 
         function EditorWrapper(config) {
-            var html = '<div id="editor_wrapper">';
-            html += '<div id="editor_toc">';
+            var html = '<div id="heather_wrapper">';
+            html += '<div id="heather_toc">';
             html += '</div>';
-            html += '<div id="editor_in">';
-            html += '<div id="editor_toolbar"></div>';
+            html += '<div id="heather_in">';
+            html += '<div id="heather_toolbar"></div>';
             html += '<textarea  style="width: 100%; height: 100%"></textarea>';
-            html += '<div id="editor_stat"></div>';
-            html += '<div id="editor_innerBar"></div>';
+            html += '<div id="heather_stat"></div>';
+            html += '<div id="heather_innerBar"></div>';
             html += '</div>';
-            html += '<div class="markdown-body" id="editor_out"></div>';
+            html += '<div class="markdown-body" id="heather_out"></div>';
             html += '</div>';
 			
 			
             var $wrapperElement = $(html);
             $('body').append($wrapperElement);
             this.scrollTop = $(window).scrollTop();
-            $('body').addClass('editor_noscroll');
-            $('html').addClass('editor_noscroll');
-            this.wrapperElement = $wrapperElement[0]
+            $('body').addClass('heather_noscroll');
+            $('html').addClass('heather_noscroll');
+            this.wrapperElement = $wrapperElement[0];
+			this.selectionChangeListeners = [];
+			var me = this;
+			document.onselectionchange = function(){
+				for(var i=0;i<me.selectionChangeListeners.length;i++){
+					try{
+						me.selectionChangeListeners[i].call()
+					}catch(e){console.log(e)};
+				}
+			}
+			
             if (!mobile) {
-                $("#editor_in").show();
-                $("#editor_out").css({
+                $("#heather_in").show();
+                $("#heather_out").css({
                     'visibility': 'visible'
                 });
             }
-            $("#editor_wrapper").animate({
-                scrollLeft: $("#editor_toc").outerWidth()
+            $("#heather_wrapper").animate({
+                scrollLeft: $("#heather_toc").outerWidth()
             }, 0);
             this.eventHandlers = [];
 			this.themeHandler = ThemeHandler.create(config);
@@ -1674,8 +2342,8 @@ var EditorWrapper = (function() {
             theme.render();
 			this.theme = theme;
             var scrollBarStyle = mobile ? 'native' : 'overlay';
-            var editor = CodeMirror.fromTextArea(document.getElementById('editor_wrapper').querySelector('textarea'), {
-                mode: {name: "gfm"}
+            var editor = CodeMirror.fromTextArea(document.getElementById('heather_wrapper').querySelector('textarea'), {
+                mode: {name: "gfm"},
                 lineNumbers: false,
                 matchBrackets: true,
                 lineWrapping: true,
@@ -1687,20 +2355,7 @@ var EditorWrapper = (function() {
                     "Enter": "newlineAndIndentContinueMarkdownList"
                 }
             });
-
-            var turndownService = config.turndownService;
-
-            if (!turndownService) {
-                turndownService = new window.TurndownService({
-                    'headingStyle': 'atx',
-                    'codeBlockStyle': 'fenced',
-                    defaultReplacement: function(innerHTML, node) {
-                        return node.isBlock ? '\n\n' + node.outerHTML + '\n\n' : node.outerHTML
-                    }
-                });
-                turndownService.use(window.turndownPluginGfm.gfm);
-            }
-
+			
 			editor.setOption('dropContentHandler', function(fileName, content) {
 				var ext = fileName.split(".").pop().toLowerCase();
 				if (ext == "md") {
@@ -1709,17 +2364,29 @@ var EditorWrapper = (function() {
 					return turndownService.turndown(content);
 				} else return "";
 			});
+			
+			editor.setOption('dropContentHandler', function(fileName, content) {
+				var ext = fileName.split(".").pop().toLowerCase();
+				if (ext == "md") {
+					return content;
+				} else if (ext == "html" || ext == 'htm') {
+					return turndownService.turndown(content);
+				} else return "";
+			});
+			
             this.theme = theme;
-            this.sync = Sync.create(editor, $("#editor_out")[0], config);
+            this.sync = Sync.create(editor, $("#heather_out")[0], config);
             this.render = Render.create(config, theme);
 			this.searchHelper = SearchHelper.create(editor);
 			this.cursorHelper = CursorHelper.create(editor);
 			this.tooltip = Tooltip.create(editor);
 			this.tooltip.enable();
-            this.toolbar = Bar.create($("#editor_toolbar")[0]);
-            var innerBar = Bar.create($("#editor_innerBar")[0]);
+            this.toolbar = Bar.create($("#heather_toolbar")[0]);
+            var innerBar = Bar.create($("#heather_innerBar")[0]);
             innerBar.hide();
             this.innerBar = innerBar;
+			this.taskListHelper = TaskListHelper.create(this);
+			this.tableHelper = TableHelper.create(this);
             //sync 
             var wrapper = this;
             if (!mobile) {
@@ -1747,12 +2414,12 @@ var EditorWrapper = (function() {
                         var formatter = config.stat_formatter || function(wrapper) {
                             return "当前字数：" + wrapper.getValue().length
                         }
-                        $("#editor_stat").html(formatter(wrapper)).show();
+                        $("#heather_stat").html(formatter(wrapper)).show();
                         if (stat_timer) {
                             clearTimeout(stat_timer);
                         }
                         stat_timer = setTimeout(function() {
-                            $("#editor_stat").hide();
+                            $("#heather_stat").hide();
                         }, 1000);
                     }
 
@@ -1771,7 +2438,7 @@ var EditorWrapper = (function() {
 
             if (mobile) {
                 //swipe
-                $("#editor_toc").touchwipe({
+                $("#heather_toc").touchwipe({
                     wipeLeft: function() {
                         wrapper.toEditor()
                     },
@@ -1805,7 +2472,7 @@ var EditorWrapper = (function() {
                     return canWipe(element.parentElement);
                 }
 
-                $("#editor_out").touchwipe({
+                $("#heather_out").touchwipe({
                     wipeRight: function(e) {
                         if (canWipe(e.target)) {
                             wrapper.toEditor()
@@ -1823,7 +2490,7 @@ var EditorWrapper = (function() {
                 }
             });
 
-            $("#editor_toc").on('click', '[data-line]', function() {
+            $("#heather_toc").on('click', '[data-line]', function() {
                 var line = parseInt($(this).data('line'));
 
                 editor.scrollIntoView({
@@ -1861,6 +2528,25 @@ var EditorWrapper = (function() {
                 });
                 screenfull.on('change', screenFullChangeHandler);
             }
+			
+			if(this.fileUploadEnable()){
+				editor.on('paste', function(editor, evt) {
+					var clipboardData, pastedData;
+					clipboardData = evt.clipboardData || window.clipboardData;
+					var files = clipboardData.files;
+					if (files.length > 0) {
+						var f = files[0];
+						var type = f.type;
+						if (type.indexOf('image/') == -1) {
+							swal("请上传图片文件");
+							return;
+						}
+						FileUpload.create(f,wrapper).start();
+					}
+				});
+			}
+			
+			
 
             triggerEvent(this, 'load');
         }
@@ -1917,7 +2603,7 @@ var EditorWrapper = (function() {
                 var outToEditorHandler = function(e) {
                     var keyCode = e.which || e.keyCode;
                     if ((e.ctrlKey || e.metaKey) && keyCode == 37) {
-                        $("#editor_out").removeAttr("tabindex");
+                        $("#heather_out").removeAttr("tabindex");
                         wrapper.toEditor(function() {
 							cm.focus();
 							var info = cm.state.fullScreenRestore;
@@ -1929,7 +2615,7 @@ var EditorWrapper = (function() {
                 var tocToEditorHandler = function(e) {
                     var keyCode = e.which || e.keyCode;
                     if ((e.ctrlKey|| e.metaKey) && keyCode == 39) {
-                        $("#editor_toc").removeAttr("tabindex");
+                        $("#heather_toc").removeAttr("tabindex");
                         wrapper.toEditor(function() {
 							cm.focus();
 							var info = cm.state.fullScreenRestore;
@@ -1940,15 +2626,15 @@ var EditorWrapper = (function() {
 				
 				var toPreviewHandler = function(){
 					wrapper.toPreview(function() {
-						$("#editor_out").prop('tabindex', 0);
-						$("#editor_out").focus();
+						$("#heather_out").prop('tabindex', 0);
+						$("#heather_out").focus();
 					});
 				};
 				
 				var toTocHandler = function(){
 					wrapper.toToc(function() {
-						$("#editor_toc").prop('tabindex', 0);
-						$("#editor_toc").focus();
+						$("#heather_toc").prop('tabindex', 0);
+						$("#heather_toc").focus();
 					});
 				};
 				
@@ -1963,10 +2649,10 @@ var EditorWrapper = (function() {
                 if (isFullscreen) {
 					wrapper.editor.addKeyMap(keyMap);
 
-                    $("#editor_out").on('keydown', outToEditorHandler);
-                    $("#editor_toc").on('keydown', tocToEditorHandler);
+                    $("#heather_out").on('keydown', outToEditorHandler);
+                    $("#heather_toc").on('keydown', tocToEditorHandler);
 
-                    $(wrapper.getFullScreenElement()).addClass('editor_fullscreen');
+                    $(wrapper.getFullScreenElement()).addClass('heather_fullscreen');
 
                     //from CodeMirror display fullscreen.js
                     cm.state.fullScreenRestore = {
@@ -1984,10 +2670,10 @@ var EditorWrapper = (function() {
                 } else {
 
 					wrapper.editor.removeKeyMap(keyMap);
-                    $("#editor_out").off('keydown', outToEditorHandler);
-                    $("#editor_toc").off('keydown', tocToEditorHandler);
+                    $("#heather_out").off('keydown', outToEditorHandler);
+                    $("#heather_toc").off('keydown', tocToEditorHandler);
 
-                    $(wrapper.getFullScreenElement()).removeClass('editor_fullscreen');
+                    $(wrapper.getFullScreenElement()).removeClass('heather_fullscreen');
                     wrap.className = wrap.className.replace(/\s*CodeMirror-fullscreen\b/, "");
                     document.documentElement.style.overflow = "";
                     var info = cm.state.fullScreenRestore;
@@ -2003,6 +2689,9 @@ var EditorWrapper = (function() {
             }
         }
 		
+		EditorWrapper.prototype.fileUploadEnable = function(){
+			return !isUndefined(this.config.upload_url) && !isUndefined(this.config.upload_finish);
+		}
 		
 		EditorWrapper.prototype.execCommand = function(name) {
            var handler = _EditorWrapper.commands[name];
@@ -2012,7 +2701,10 @@ var EditorWrapper = (function() {
         }
 
         EditorWrapper.prototype.doRender = function(patch) {
-            this.render.renderAt(this.editor.getValue(), $("#editor_out")[0], patch);
+			if(this.disableRender === true){
+				return ;
+			}
+            this.render.renderAt(this.editor.getValue(), $("#heather_out")[0], patch);
             renderToc();
         }
 
@@ -2021,9 +2713,9 @@ var EditorWrapper = (function() {
             var removeHandler = function() {
                 Swal.close();
                 triggerEvent(me, 'remove');
-                $(me.getFullScreenElement()).removeClass('editor_fullscreen');
-                $('body').removeClass('editor_noscroll');
-                $('html').removeClass('editor_noscroll');
+                $(me.getFullScreenElement()).removeClass('heather_fullscreen');
+                $('body').removeClass('heather_noscroll');
+                $('html').removeClass('heather_noscroll');
                 $('html,body').scrollTop(me.scrollTop);
                 me.wrapperElement.parentNode.removeChild(me.wrapperElement);
                 wrapperInstance.wrapper = undefined;
@@ -2115,8 +2807,8 @@ var EditorWrapper = (function() {
 
         EditorWrapper.prototype.toEditor = function(callback, _ms) {
             var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
-             $("#editor_wrapper").animate({
-				scrollLeft: $("#editor_in").width()
+             $("#heather_wrapper").animate({
+				scrollLeft: $("#heather_in").width()
 			}, ms, function() {
 				if (callback) callback();
 			});
@@ -2129,7 +2821,7 @@ var EditorWrapper = (function() {
                 this.doRender(true);
             }
             var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
-            $("#editor_wrapper").animate({
+            $("#heather_wrapper").animate({
                 scrollLeft: 0
             }, ms, function() {
                 if (callback) callback();
@@ -2145,8 +2837,8 @@ var EditorWrapper = (function() {
                     this.doSync();
                 }
                 var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
-                $("#editor_wrapper").animate({
-                    scrollLeft: $("#editor_out")[0].offsetLeft
+                $("#heather_wrapper").animate({
+                    scrollLeft: $("#heather_out")[0].offsetLeft
                 }, ms, function() {
                     if (callback) callback();
                 });
@@ -2198,16 +2890,32 @@ var EditorWrapper = (function() {
             var editor = wrapper.editor;
             var config = wrapper.config;
 
-            var innerBarElement = $("#editor_innerBar");
+            var innerBarElement = $("#heather_innerBar");
 			
-            var icons = config.innerBar_icons || ['emoji', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table','move', 'undo', 'redo', 'close'];
+            var icons = config.innerBar_icons || ['emoji','upload', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table','move', 'undo', 'redo', 'close'];
             for (var i = 0; i < icons.length; i++) {
                 var icon = icons[i];
+				 if(icon == 'upload' && wrapper.fileUploadEnable()){
+					var label = document.createElement('label');
+					label.setAttribute('class','icon fas fa-upload');
+					label.setAttribute('style','display: inline-block;')
+					label.innerHTML = '<input type="file" accept="image/*" style="display:none"/>';
+					label.querySelector('input[type="file"]').addEventListener('change',function(){
+						var file = this.files[0];
+						if (file.type.startsWith("image/")){
+							FileUpload.create(file,wrapper).start();
+						} else {
+							swal('只能上传图片文件');
+						}
+					})
+					innerBar.addElement(label,0);
+				}
                 if(icon == 'emoji'){
 					innerBar.addIcon('far fa-grin-alt icon',function(){
 						wrapper.execCommand('emoji');
 					})
 				}
+				
 				if(icon == 'heading'){
 					innerBar.addIcon('fas fa-heading icon',function(){
 						wrapper.execCommand('heading');
@@ -2320,7 +3028,7 @@ var EditorWrapper = (function() {
                     if (elem[0].scrollHeight - elem.scrollTop() -
                         elem.outerHeight() < 0) {
                         var top = editor.cursorCoords(true).top - 2 * lh -
-                            bar.height() - $("#editor_toolbar").height();
+                            bar.height() - $("#heather_toolbar").height();
                         if (top > 0) {
                             innerBarElement.css({
                                 "top": (editor.cursorCoords(true).top - 2 *
@@ -2549,27 +3257,27 @@ var EditorWrapper = (function() {
                         src: config.res_colorpickerJs || 'colorpicker/dist/js/bootstrap-colorpicker.min.js'
                     });
                     editor.setOption('readOnly', true);
-                    $("#editor_searchHelper input").attr('value', '点击设置字体颜色');
-                    $("#editor_searchHelper").children().addClass('noclick');
-					$("#editor_cursorHelper").children().addClass('noclick');
+                    $("#heather_searchHelper input").attr('value', '点击设置字体颜色');
+                    $("#heather_searchHelper").children().addClass('noclick');
+					$("#heather_cursorHelper").children().addClass('noclick');
                     wrapper.searchHelper.open();
                     wrapper.cursorHelper.open();
-                    $("#editor_searchHelper").on('click', searchHelprHandler);
-                    $("#editor_cursorHelper").on('click', cursorHelprHandler);
-                    $("#editor_toolbar").children().addClass('noclick');
+                    $("#heather_searchHelper").on('click', searchHelprHandler);
+                    $("#heather_cursorHelper").on('click', cursorHelprHandler);
+                    $("#heather_toolbar").children().addClass('noclick');
                     $(configIcon).removeClass('noclick');
-                    $("#editor_toolbar").on('click', toolbarHandler);
-                    $("#editor_stat").text("点击设置字体颜色").show();
-                    $("#editor_stat").on('click', statHandler);
+                    $("#heather_toolbar").on('click', toolbarHandler);
+                    $("#heather_stat").text("点击设置字体颜色").show();
+                    $("#heather_stat").on('click', statHandler);
                     editor.on('cursorActivity', changeThemeHandler);
-                    $("#editor_out").on('click', '.mermaid', changeMemaidThemeHandler);
-                    cloneBar = $("#editor_innerBar").clone();
+                    $("#heather_out").on('click', '.mermaid', changeMemaidThemeHandler);
+                    cloneBar = $("#heather_innerBar").clone();
                     cloneBar.css({
                         'visibility': 'visible',
                         'top': '100px'
                     });
                     cloneBar.children().addClass('noclick');
-                    $("#editor_in").append(cloneBar);
+                    $("#heather_in").append(cloneBar);
                     cloneBar.on('click', barHandler);
                 }
 
@@ -2577,14 +3285,14 @@ var EditorWrapper = (function() {
                     isThemeMode = false;
                     cloneBar.off('click', barHandler);
                     cloneBar.remove();
-                    $("#editor_searchHelper").off('click', searchHelprHandler);
-                    $("#editor_cursorHelper").off('click', cursorHelprHandler);
-                    $("#editor_searchHelper input").removeAttr('value');
+                    $("#heather_searchHelper").off('click', searchHelprHandler);
+                    $("#heather_cursorHelper").off('click', cursorHelprHandler);
+                    $("#heather_searchHelper input").removeAttr('value');
                     editor.off('cursorActivity', changeThemeHandler);
-                    $("#editor_toolbar").off('click', toolbarHandler);
-                    $("#editor_stat").off('click', statHandler);
-                    $("#editor_out").off('click', '.mermaid', changeMemaidThemeHandler);
-                    $("#editor_stat").text("").hide();
+                    $("#heather_toolbar").off('click', toolbarHandler);
+                    $("#heather_stat").off('click', statHandler);
+                    $("#heather_out").off('click', '.mermaid', changeMemaidThemeHandler);
+                    $("#heather_stat").text("").hide();
                     $('.noclick').removeClass('noclick');
                     editor.setOption('readOnly', false);
                     wrapper.searchHelper.close();
@@ -2853,7 +3561,7 @@ var EditorWrapper = (function() {
         }
 
         function renderToc() {
-            var headings = $("#editor_out").children('h1,h2,h3,h4,h5,h6');
+            var headings = $("#heather_out").children('h1,h2,h3,h4,h5,h6');
             var toc = [];
 			
             for (var i = 0; i < headings.length; i++) {
@@ -2898,11 +3606,11 @@ var EditorWrapper = (function() {
             }
             try {
                 var div = document.createElement("div");
-                div.setAttribute('id', "editor_toc");
+                div.setAttribute('id', "heather_toc");
                 div.innerHTML = html;
-                morphdom($("#editor_toc")[0], div);
+                morphdom($("#heather_toc")[0], div);
             } catch (e) {
-                $("#editor_toc").html(html)
+                $("#heather_toc").html(html)
             };
         }
 

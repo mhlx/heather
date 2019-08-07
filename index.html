@@ -108,7 +108,6 @@ function loadJS(callback) {
 		ele.setAttribute("media",'print');
 	}));
     resources.push(createResource('script', document.body, 'jquery/jquery.min.js', null));
-    resources.push(createResource('script', document.body, 'js/htmlparser.js', null));
     resources.push(createResource('script', document.body, 'js/morphdom-umd.min.js', null));
     resources.push(createResource('script', document.body, 'codemirror/lib/codemirror.js', null));
     resources.push(createResource('script', document.body, 'codemirror/addon/mode/overlay.js', null));
@@ -127,7 +126,7 @@ function loadJS(callback) {
     resources.push(createResource('script', document.body, 'js/jquery.touchwipe.min.js', null));
     resources.push(createResource('script', document.body, 'js/fullscreen.js', null));
     resources.push(createResource('script', document.body, 'js/md.js', null));
-    resources.push(createResource('script', document.body, 'js/all.min.js', null));
+    resources.push(createResource('script', document.body, 'js/all.js', null));
     resources.push(createResource('script', document.body, 'FileSaver.js', null));
     indexCount();
 }
@@ -157,7 +156,16 @@ function loadJS(callback) {
 		   });
 		 }
 
-		var config = {};
+		var config = {
+			upload_url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
+			upload_finish:function(resp){
+				swal('仅供测试上传所用，固定返回同一地址')
+				return {
+					type : 'image',
+					url : 'https://www.qyh.me/image/news/8BE085FBC2F48482047C510EE0A36C4F.jpeg/600'
+				};
+			}
+		};
 		var wrapper = EditorWrapper.create(config);
 		//https://www.qyh.me/space/web/article/598
 		var userAgent = navigator.userAgent;
@@ -197,7 +205,7 @@ function loadJS(callback) {
 			}return 'default';
 		}
 		
-		$("#editor_out").on('contextmenu',function(e){
+		$("#heather_out").on('contextmenu',function(e){
 			var style = 'width:200px;margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;';
 			var html = '';
 			html += '<div><button style="'+style+'" id="export-markdown">导出markdown</button></div>';
