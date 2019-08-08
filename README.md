@@ -9,6 +9,10 @@
 1. 编辑完成之后通过 <kbd>Ctrl|Cmd</kbd> <kbd>Enter</kbd>保存编辑器的内容到一个块中
 2. 编辑工程中，通过点击 <kbd>Shift</kbd> <kbd>Ctrl|Cmd</kbd> <kbd>Enter</kbd>来分块，**一次只能分两块，以编辑器所在光标为分块点**
 
+---
+
+# 1.6
+
 ## 说明
 
 markdown编辑器，特性如下：
