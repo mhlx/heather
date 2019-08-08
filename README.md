@@ -349,7 +349,9 @@ wrapper.resetTheme();
 ### 执行指令
 
 `wrapper.execCommand(commandName)`
+
 系统内置指令
+
 | 名称   | 说明   |   快捷键_mac| 快捷键_pc| 
 |  -  |  -  | - | - |
 |  search  |  开启\|关闭一个搜索框  | <kbd>Ctrl</kbd> <kbd>S</kbd> |<kbd>Alt</kbd> <kbd>S</kbd>|
@@ -423,6 +425,108 @@ wrapper.bindKey({'Ctrl-G':'image'});
 ### 取消监听实例销毁
 
 `wrapper.offRemove(fun)`
+
+## 文件上传(1.6)
+
+### 开启
+
+通过配置`upload_url`和`upload_finish`即可开启文件上传，例如：
+
+``` javascript
+var config = {
+    upload_url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
+    upload_finish:function(resp){
+        swal('仅供测试上传所用，固定返回同一地址')
+        return {
+            type : 'image',
+            url : 'https://www.qyh.me/image/news/8BE085FBC2F48482047C510EE0A36C4F.jpeg/600'
+        };
+    }
+};
+var wrapper = EditorWrapper.create(config);
+```
+其中`upload_url`为上传的地址，`upload_finish`为上传成功后的回调函数，接受一个参数，该参数内容为服务器响应的内容
+，同时返回地址信息，地址信息分为三种：图片|视频|一般文件。
+
+1. 图片地址，固定格式为`{type:'image',url:'图片地址'}`
+2. 视频地址，一般格式为`{type:'video',url:'视频地址'}`，同时可以通过设置poster属性设定一个封面，例如：`{type:'video',url:'视频地址','poster':'封面图片地址'}`，如果需要设置多个source，可以设置sources属性，source属性应该为一个数组，单个数组元素内容格式为`{'type':'video/mp4|video/ogg等','src':'视频地址'}`
+3. 一般文件地址，固定格式为`{type:'file',url:'文件地址'}`
+
+### 设定上传前参数
+
+通过配置`upload_before`可以在上传前增加额外的参数，例如
+``` javascript
+config.upload_before = function(formData,file){
+  formData.append("key", file.name);
+}
+```
+
+### 设定文件上传名称
+
+通过配置`upload_fileName`可以设定文件上传名称，默认为`file`
+
+
+### 七牛云文件上传
+
+一个简单的七牛云文件上传的例子：
+
+前端：
+``` javascript
+var config = {
+  upload_url:'http://upload.qiniu.com/',
+  upload_before:function(formData,file){
+      $.ajax({
+          async:false,//这里一定要同步获取token
+          url : 'http://localhost:8081/test/test',
+          success:function(token){
+              formData.append("token", token);
+              formData.append("key", file.name);
+          }
+      })
+  },
+  upload_finish:function(resp){
+      resp = $.parseJSON(resp);
+      if(resp.error){
+          swal(resp.error);
+          return ;
+      }
+      return {
+          type : 'image',
+          url : 'http://img.qyh.me/'+resp.key
+      };
+  }
+};
+```
+
+后端：
+``` java
+package test;
+
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.qiniu.util.Auth;
+
+public class TestServlet extends HttpServlet{
+	
+	private static final long serialVersionUID = 1L;
+	private final String ak = "";
+	private final String sk = "";
+	@Override
+	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		Auth auth = Auth.create(ak, sk);
+		String upToken = auth.uploadToken("mhlx");
+		resp.addHeader("Access-Control-Allow-Origin", "*");
+		resp.getWriter().write(upToken);
+	}
+}
+
+```
+
 
 ## 导出PDF
 
