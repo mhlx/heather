@@ -22,6 +22,7 @@ markdown编辑器，特性如下：
 8. 离线访问
 9. mermaid、katex懒加载
 10. 全屏编辑
+11. 文件上传
 
 ### 在线demo
 
@@ -270,7 +271,8 @@ wrapper.toolbar.addIcon(clazz,hander,function(icon){
 
 #### 保持隐藏状态
 
-```javascriptwrapper.toolbar.keepHidden = true;
+```javascript
+wrapper.toolbar.keepHidden = true;
 wrapper.toolbar.hide();
 ```
 
@@ -286,7 +288,8 @@ wrapper.toolbar.hide();
 
 #### 配置编辑器主题
 
-```javascriptvar theme = wrapper.theme;
+```javascript
+var theme = wrapper.theme;
 theme.setEditorTheme(wrapper.editor,'abcdef',function(){
 	theme.render();
 })
@@ -294,35 +297,40 @@ theme.setEditorTheme(wrapper.editor,'abcdef',function(){
 
 #### 配置代码高亮主题
 
-```javascriptvar theme = wrapper.theme;
+```javascript
+var theme = wrapper.theme;
 theme.hljs.theme = 'a11y-light'
 theme.render();
 ```
 
 #### 配置顶部工具条颜色
 
-```javascriptvar theme = wrapper.theme;
+```javascript
+var theme = wrapper.theme;
 theme.toolbar.color = '#fff'
 theme.render();
 ```
 
 #### 配置辅助工具条颜色
 
-```javascriptvar theme = wrapper.theme;
+```javascript
+var theme = wrapper.theme;
 theme.bar.color = '#fff'
 theme.render();
 ```
 
 #### 配置状态条字体颜色
 
-```javascriptvar theme = wrapper.theme;
+```javascript
+var theme = wrapper.theme;
 theme.stat.color = '#fff'
 theme.render();
 ```
 
 #### 自定义css
 
-```javascriptvar css = '';
+```javascript
+var css = '';
 wrapper.theme.customCss = css;
 wrapper.theme.render();
 ```
@@ -332,7 +340,6 @@ wrapper.theme.render();
 ``` javascript
 wrapper.saveTheme();
 ```
-
 #### 重置主题
 
 ``` javascript
@@ -365,7 +372,9 @@ wrapper.resetTheme();
 
 `EditorWrapper.commands[commandName] = commandHandler`
 commandHandler接受一个参数`wrapper`，例如：
+
 新增一个插入图片的指令，并且为该指令绑定`Ctrl+G`的快捷键：
+
 ```javascript
 EditorWrapper.commands['image'] = function(wrapper){
   var editor = wrapper.editor;
@@ -389,8 +398,7 @@ wrapper.bindKey({'Ctrl-G':'image'});
 
 ### 快捷键绑定
 
-`wrapper.bindKey(keyMap)`
-keyMap对象属性为快捷键名称，例如`Ctrl-A`,属性值可以为string或者一个方法，如果为string类型，那么则会绑定对应名称的命令，如果为方法，则会直接绑定该方法
+`wrapper.bindKey(keyMap)`keyMap对象属性为快捷键名称，例如`Ctrl-A`,属性值可以为string或者一个方法，如果为string类型，那么则会绑定对应名称的命令，如果为方法，则会直接绑定该方法
 
 ### 解除快捷键绑定
 
@@ -431,11 +439,13 @@ keyMap对象属性为快捷键名称，例如`Ctrl-A`,属性值可以为string�
 <link rel="stylesheet" href="css/style.css" media="screen">
 <link rel="stylesheet" href="css/print.css" media="print">
 ```
+
 上述html中，`media="print"`的只会在打印时使用，`media="screen"`的则只会在页面渲染时使用，而`media="all"` 则在所有情况下都会使用，请参考 https://www.w3schools.com/tags/att_link_media.asp
 
 ### 打印前渲染
 
 mermaid渲染出来的元素大小会根据视窗大小自动调整，由于左右预览的原因，打印出来的大小会跟预期的大小不一致，此时可以通过监听打印事件使得在打印前再次渲染。
+
 ```javascript
 var wrapper = EditorWrapper.create({});
 var beforePrintHandler = function(mql) {
@@ -455,111 +465,10 @@ wrapper.onRemove(function(){
 ### 强制分页
 
 通过添加以下代码可以让pdf文件强制分页
+
 ```html
 <div style="page-break-after: always;"></div>
 ```
-
-## 文件上传(1.6)
-
-### 开启
-
-通过配置`upload_url`和`upload_finish`即可开启文件上传，例如：
-
-``` javascript
-var config = {
-    upload_url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
-    upload_finish:function(resp){
-        swal('仅供测试上传所用，固定返回同一地址')
-        return {
-            type : 'image',
-            url : 'https://www.qyh.me/image/news/8BE085FBC2F48482047C510EE0A36C4F.jpeg/600'
-        };
-    }
-};
-var wrapper = EditorWrapper.create(config);
-```
-其中`upload_url`为上传的地址，`upload_finish`为上传成功后的回调函数，接受一个参数，该参数内容为服务器响应的内容
-，同时返回地址信息，地址信息分为三种：图片|视频|一般文件。
-
-1. 图片地址，固定格式为`{type:'image',url:'图片地址'}`
-2. 视频地址，一般格式为`{type:'video',url:'视频地址'}`，同时可以通过设置poster属性设定一个封面，例如：`{type:'video',url:'视频地址','poster':'封面图片地址'}`，如果需要设置多个source，可以设置sources属性，source属性应该为一个数组，单个数组元素内容格式为`{'type':'video/mp4|video/ogg等','src':'视频地址'}`
-3. 一般文件地址，固定格式为`{type:'file',url:'文件地址'}`
-
-### 设定上传前参数
-
-通过配置`upload_before`可以在上传前增加额外的参数，例如
-``` javascript
-config.upload_before = function(formData,file){
-  formData.append("key", file.name);
-}
-```
-
-### 设定文件上传名称
-
-通过配置`upload_fileName`可以设定文件上传名称，默认为`file`
-
-
-### 七牛云文件上传
-
-一个简单的七牛云文件上传的例子：
-
-前端：
-``` javascript
-var config = {
-  upload_url:'http://upload.qiniu.com/',
-  upload_before:function(formData,file){
-      $.ajax({
-          async:false,//这里一定要同步获取token
-          url : 'http://localhost:8081/test/test',
-          success:function(token){
-              formData.append("token", token);
-              formData.append("key", file.name);
-          }
-      })
-  },
-  upload_finish:function(resp){
-      resp = $.parseJSON(resp);
-      if(resp.error){
-          swal(resp.error);
-          return ;
-      }
-      return {
-          type : 'image',
-          url : 'http://img.qyh.me/'+resp.key
-      };
-  }
-};
-```
-
-后端：
-``` java
-package test;
-
-import java.io.IOException;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import com.qiniu.util.Auth;
-
-public class TestServlet extends HttpServlet{
-	
-	private static final long serialVersionUID = 1L;
-	private final String ak = "";
-	private final String sk = "";
-	@Override
-	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		Auth auth = Auth.create(ak, sk);
-		String upToken = auth.uploadToken("mhlx");
-		resp.addHeader("Access-Control-Allow-Origin", "*");
-		resp.getWriter().write(upToken);
-	}
-}
-
-```
-
 
 ## 支持的浏览器
 

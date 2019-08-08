@@ -37,6 +37,8 @@
           line: pos.line, ch: pos.ch + 1
         });
         replacements[i] = "\n";
+		var endContinueListHandler = cm.getOption('endMarkdownListHandler');
+		if(endContinueListHandler) endContinueListHandler(cm);
       } else {
         var indent = match[1], after = match[5];
         var numbered = !(unorderedListRE.test(match[2]) || match[2].indexOf(">") >= 0);

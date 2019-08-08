@@ -26,6 +26,56 @@ var EditorWrapper = (function() {
 		this.getInputField().blur();
 	}
 	
+	CodeMirror.prototype.selectionStatus = function(){
+		//selectionStatus
+		var status = {
+			selected : '',
+			startLine : -1,
+			startCh : -1,
+			endLine : -1,
+			endCh : -1,
+			prev : '',
+			next : '',
+			prevLine : '',
+			nextLine : ''
+		}
+		var startCursor = this.getCursor(true);
+		var endCursor = this.getCursor(false);
+		
+		status.startLine = startCursor.line;
+		status.endLine = endCursor.line;
+		status.startCh = startCursor.ch;
+		status.endCh = endCursor.ch;
+		status.prevLine = startCursor.line == 0 ? '' :  this.getLine(startCursor.line-1);
+		status.nextLine = endCursor.line == this.lineCount() - 1 ? '' : this.getLine(endCursor.line+1);
+		
+		var startLine = this.getLine(status.startLine);
+		var text = this.getSelection();
+		if(text == ''){
+			if(startCursor.ch == 0){
+				status.next = startLine;
+			} else {
+				status.prev = startLine.substring(0,startCursor.ch);
+				status.next = startLine.substring(startCursor.ch,startLine.length);
+			}
+		} else {
+			
+			var endLine = this.getLine(status.endLine);
+			if(status.startCh == 0){
+				status.prev = '';
+			} else {
+				status.prev = startLine.substring(0,status.startCh);
+			}
+			if(status.endCh == endLine.length){
+				status.next = '';
+			} else {
+				status.next = endLine.substring(status.endCh,endLine.length);
+			}
+		}
+		status.selected = text;
+		return status;
+	}
+	
 	CodeMirror.prototype.getLines = function(line,endLine){
 		var str = '';
 		for(var i=line;i<endLine;i++){
@@ -50,6 +100,7 @@ var EditorWrapper = (function() {
 		'headingStyle': 'atx',
 		'codeBlockStyle': 'fenced',
 		'emDelimiter': '*',
+		'bulletListMarker':'-',
 		defaultReplacement: function(innerHTML, node) {
 			return node.isBlock ? '\n\n' + node.outerHTML + '\n\n' : node.outerHTML
 		}
@@ -131,13 +182,13 @@ var EditorWrapper = (function() {
 						  var type = (info.type || 'image').toLowerCase();
 						  switch(type){
 							case 'image':
-								editor.replaceRange('![]('+info.url+')', me.cursor);
 								editor.focus();
+								editor.replaceRange('![]('+info.url+')', me.cursor);
 								editor.setCursor({line:me.cursor.line,ch:me.cursor.ch+2})
 								break;
 							case 'file':
-								editor.replaceRange('[]('+info.url+')', me.cursor);
 								editor.focus();
+								editor.replaceRange('[]('+info.url+')', me.cursor);
 								editor.setCursor({line:me.cursor.line,ch:me.cursor.ch+1})
 								break;
 							case 'video':
@@ -394,7 +445,6 @@ var EditorWrapper = (function() {
         Bar.prototype.addItem = function(item) {
             insertItem(this, item, this.items.length);
         }
-
 
         function createElement(icon, handler) {
             var i = document.createElement('i');
@@ -1064,10 +1114,15 @@ var EditorWrapper = (function() {
 	var TaskListHelper = (function(){
 		
 		function TaskListHelper(wrapper){
-			$("#heather_out").on('click','.contains-task-list',function(e){
+			$("#heather_out").on('click','.task-list-item',function(e){
 				var root = e.target;
 				while(!root.classList.contains('contains-task-list')){
 					root = root.parentElement;
+				}
+				
+				var li = e.target;
+				while(!li.classList.contains('task-list-item')){
+					li = li.parentElement;
 				}
 				
 				wrapper.editor.setOption('readOnly',true);
@@ -1084,7 +1139,7 @@ var EditorWrapper = (function() {
 				var node = parseHTML(wrapper.render.getHtml(str)).body.firstChild;
 				cloneAttributes(node,root);
 				if(node.isEqualNode(root)){
-					var checkbox = root.querySelector('input[type="checkbox"]');
+					var checkbox = li.querySelector('input[type="checkbox"]');
 					if(checkbox.checked){
 						checkbox.removeAttribute('checked');
 					}else{
@@ -1288,6 +1343,7 @@ var EditorWrapper = (function() {
 			var me = this;
 			this.wrapper.editor.setOption('readOnly',true);
 			this.wrapper.disableRender = true;
+			
 			this.clickHandler = function(e){
 				var td = getTd(e.target);
 				if(!td.isContentEditable){
@@ -1301,13 +1357,11 @@ var EditorWrapper = (function() {
 					td.addEventListener('paste',plainPasteHandler);
 					td.setAttribute('contenteditable',true);
 					me.contenteditableBar = ContenteditableBar.create(me.wrapper,td);
-					setTimeout(function(){
-						td.scrollIntoView();
-					},100)
 				}
 				me.td = td;
 			}
 			$(this.table).on('click','th,td',this.clickHandler);
+			
 			var toolbar = document.createElement('div');
 			toolbar.setAttribute("style","margin-bottom:10px;margin-top:5px");
 			this.table.before(toolbar);
@@ -1407,11 +1461,13 @@ var EditorWrapper = (function() {
 			toolbar.addIcon('fas fa-check middle-icon',function(){
 				me.close();
 			});
+			this.toolbar = toolbar;
 		}
 		
 		TableSession.prototype.close = function(){
 			var table = $(this.table);
 			table.off('click','th,td',this.clickHandler);
+			this.toolbar.remove();
 			table.find('[contenteditable]').each(function(){
 				this.removeEventListener('paste',plainPasteHandler);
 				this.removeAttribute('contenteditable');
@@ -1987,7 +2043,6 @@ var EditorWrapper = (function() {
 
 
     var _EditorWrapper = (function() {
-		
 		function _EditorWrapper(){
 			this.wrapperInstance = {};
 			this.commands = {
@@ -2034,24 +2089,24 @@ var EditorWrapper = (function() {
 						});
 						if (heading) {
 							var v = parseInt(heading);
-							var text = editor.getSelection();
-							var _text = '\n';
-							for (var i = 0; i < v; i++) {
-								_text += '#';
-							}
-							_text += ' ';
-							if (text == '') {
-								editor.replaceRange(_text, editor.getCursor());
+							var status = editor.selectionStatus();
+							selectionBreak(status,function(text){
+								var prefix = '';
+								for (var i = 0; i < v; i++) {
+									prefix += '#';
+								}
+								prefix += ' ';
+								return prefix + text;
+							});
+							if (status.selected == '') {
+								editor.replaceRange(status.text, editor.getCursor());
 								editor.focus();
-								var start_cursor = editor.getCursor();
-								var cursorLine = start_cursor.line;
-								var cursorCh = start_cursor.ch;
 								editor.setCursor({
-									line: cursorLine,
-									ch: cursorCh + v
+									line: status.startLine,
+									ch: v+1
 								});
 							} else {
-								editor.replaceSelection(_text + text);
+								editor.replaceSelection(status.text);
 							}
 						}
 					}
@@ -2099,19 +2154,19 @@ var EditorWrapper = (function() {
 
 				quote : function(wrapper) {
 					var editor = wrapper.editor;
-					var text = editor.getSelection();
-					if (text == '') {
-						editor.replaceRange("\n> ", editor.getCursor());
+					var status = editor.selectionStatus();
+					selectionBreak(status,function(text){
+						return '> '+text;
+					});
+					if (status.selected == '') {
+						editor.replaceRange(status.text, editor.getCursor());
 						editor.focus();
-						var start_cursor = editor.getCursor();
-						var cursorLine = start_cursor.line;
-						var cursorCh = start_cursor.ch;
 						editor.setCursor({
-							line: cursorLine,
-							ch: cursorCh
+							line: status.startLine,
+							ch: 2
 						});
 					} else {
-						editor.replaceSelection("> " + text);
+						editor.replaceSelection(status.text);
 					}
 				},
 
@@ -2156,15 +2211,19 @@ var EditorWrapper = (function() {
 
 				codeBlock : function(wrapper) {
 					var editor = wrapper.editor;
-					var text = "\n```";
-					text += '\n';
-					text += editor.getSelection() + "";
-					text += '\n'
-					text += "```";
+					var status = editor.selectionStatus();
+					selectionBreak(status,function(text){
+						var newText = "``` ";
+						newText += '\n';
+						newText += text ;
+						newText += '\n'
+						newText += "```";
+						return newText;
+					});
 					editor.focus();
-					editor.replaceSelection(text);
+					editor.replaceSelection(status.text);
 					editor.setCursor({
-						line: editor.getCursor('start').line - 1,
+						line: status.startLine+1,
 						ch: 0
 					});
 				},
@@ -2189,38 +2248,12 @@ var EditorWrapper = (function() {
 
 				uncheck :  function(wrapper) {
 					var editor = wrapper.editor;
-					var text = editor.getSelection();
-					if (text == '') {
-						editor.replaceRange("\n- [ ] ", editor.getCursor());
-						editor.focus();
-						var start_cursor = editor.getCursor();
-						var cursorLine = start_cursor.line;
-						var cursorCh = start_cursor.ch;
-						editor.setCursor({
-							line: cursorLine,
-							ch: cursorCh
-						});
-					} else {
-						editor.replaceSelection("- [ ] " + text);
-					}
+					insertTaskList(editor,false);
 				},
 
 				check : function(wrapper) {
 					var editor = wrapper.editor;
-					var text = editor.getSelection();
-					if (text == '') {
-						editor.replaceRange("\n- [x] ", editor.getCursor());
-						editor.focus();
-						var start_cursor = editor.getCursor();
-						var cursorLine = start_cursor.line;
-						var cursorCh = start_cursor.ch;
-						editor.setCursor({
-							line: cursorLine,
-							ch: cursorCh
-						});
-					} else {
-						editor.replaceSelection("- [x] " + text);
-					}
+					insertTaskList(editor,true);
 				},
 
 				table : function(wrapper) {
@@ -2260,10 +2293,15 @@ var EditorWrapper = (function() {
 								for (var j = 0; j <= cols; j++) {
 									text += '|    ';
 								}
-								text += "\n";
+								if(i < rows - 2)
+									text += "\n";
 							}
 						}
-						editor.replaceSelection("\n" + text);
+						var status = editor.selectionStatus();
+						selectionBreak(status,function(selected){
+							return text;
+						});
+						editor.replaceSelection(status.text);
 					}).catch(swal.noop)
 				},
 				
@@ -2278,10 +2316,17 @@ var EditorWrapper = (function() {
 		}
 		
 		_EditorWrapper.prototype.create = function(config){
+			var me = this;
 			if (this.wrapperInstance.wrapper) {
 				this.wrapperInstance.wrapper.remove();
 			}
 			var wrapper = new EditorWrapper(config);
+			wrapper.eventHandlers.push({
+				name:'remove',
+				handler : function(){
+					delete me.wrapperInstance.wrapper;
+				}
+			})
 			this.wrapperInstance.wrapper = wrapper;
 			return wrapper;
 		}
@@ -2293,6 +2338,72 @@ var EditorWrapper = (function() {
 		_EditorWrapper.prototype.getWrapper = function(o){
 			return o.doc ? o.state.wrapper : o;
 		}
+		
+		function insertTaskList(editor,checked){
+			var status = editor.selectionStatus();
+			var text = '';
+			if(status.prev != ''){
+				if(status.next == ''){
+					if(!status.prev.startsWith("- [ ] ") && !status.prev.startsWith("- [x] ")){
+						text += '\n\n';
+					} else {
+						text += '\n';
+					}
+				} else {
+					text += '\n\n';
+				}
+			}else{
+				if(status.prevLine != '' && !status.prevLine.startsWith("- [ ] ") && !status.prevLine.startsWith("- [x] ")){
+					text += '\n';
+				}
+			}
+			var prefix = checked ? '- [x]  ' : '- [ ]  '
+			text += prefix+status.selected;
+			if(status.next != ''){
+				if(status.prev == ''){
+					if(!status.next.startsWith("- [ ] ") && !status.next.startsWith("- [x] ")){
+						text += '\n\n';
+					} else {
+						text += '\n';
+					}
+				} else {
+					text += '\n\n';
+				}
+			} else {
+				if(status.nextLine != '' && !status.nextLine.startsWith("- [ ] ") && !status.nextLine.startsWith("- [x] ")){
+					text += '\n';
+				}
+			}
+			editor.replaceSelection(text);
+		}
+		
+		function selectionBreak(status,callback){
+			var _text = '';
+			if(status.prev != ''){
+				_text += '\n\n';
+				status.startLine += 2;
+			} else {
+				if(status.prevLine != ''){
+					_text += '\n';
+					status.startLine += 1;
+				}
+			}
+			if(callback){
+				_text += callback(status.selected);
+			}
+			if(status.next != ''){
+				_text += '\n\n';
+				status.endLine += 2;
+			} else {
+				if(status.nextLine != ''){
+					_text += '\n';
+					status.endLine += 1;
+				}
+			}
+			status.text = _text;
+			return status;
+		}
+		
 		
 		
 		var _EditorWrapper = new _EditorWrapper(); 
@@ -2511,7 +2622,7 @@ var EditorWrapper = (function() {
             this.editor = editor;
             this.config = config;
 			this.doRender(false);
-			if(this.config.backupEnable !== false){
+			if(this.config.backup_enable !== false){
 				this.backup = Backup.create(this);
 			}
 			initKeyMap(this);
@@ -2718,8 +2829,6 @@ var EditorWrapper = (function() {
                 $('html').removeClass('heather_noscroll');
                 $('html,body').scrollTop(me.scrollTop);
                 me.wrapperElement.parentNode.removeChild(me.wrapperElement);
-                wrapperInstance.wrapper = undefined;
-                delete wrapperInstance.wrapper;
             }
             if (this.fullscreen) {
                 this.exitFullScreen().then(function() {

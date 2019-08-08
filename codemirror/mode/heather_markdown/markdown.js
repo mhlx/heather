@@ -398,7 +398,6 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
     } else if (state.trailingSpace) {
       styles.push("trailing-space-" + (state.trailingSpace % 2 ? "a" : "b"));
     }
-
     return styles.length ? styles.join(' ') : null;
   }
 
@@ -574,9 +573,10 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
       }
       if (len > 1) { // Strong
         if (!state.strong && leftFlanking && (ch === "*" || !rightFlanking || punctuation.test(before))){
-			setStrong = true;
+
+			 setStrong = true
 		}
-          
+         
         else if (state.strong == ch && rightFlanking && (ch === "*" || !leftFlanking || punctuation.test(after)))
           setStrong = false
       }

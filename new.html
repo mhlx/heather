@@ -20,131 +20,298 @@
       <link href="fontawesome-free/css/all.min.css"  media="all" rel="stylesheet">
 	  <link rel="stylesheet" href="highlight/styles/github.css">
 	  <style>
-	  	
-	.editor_icon {
+	  .heather_status_on{
+		color:green;
+	  }
+	  .heather_block_item_container{
+		 border-radius: 10px;
+		min-width: 150px; text-align: center;font-size: 16px;z-index:9999;background-color:#70B7FD
+	  }
+.heather_block_item{
+	
+    padding: 6px;
+    min-width: 120px;
+    margin-bottom: 10px;
+    height: 20px;
+    line-height: 20px;
+    
+	cursor:pointer;}
+.heather_middle_icon,
+.heather_icon {
 	margin-top: 5px;
 	cursor: pointer;
 	font-size: 16px;
 	margin-right: 20px;
 	margin-bottom: 5px
 }
-	  .editor_display_source{
-		display:none !important
-	  }
 
-	  .CodeMirror{
-	  font-size:15px;
-	  height:auto;
-	  }
-	  .CodeMirror-vscrollbar{
-	  display:none;
-	  }
-	  .editor_display_inline{
-	  display:inline !important}
-	  
-	  
-	.editor_bar {
-		z-index: 99;
-		padding-left: 10px;
-		padding-right: 10px;
-		visibility:hidden;
-		position: absolute;
-		background:white;
-		opacity:0.6;
+.heather_language_select{
+font-size:14px;}
+
+[data-on-edit] tr,th{
+height:60px
+}
+[data-on-edit]{
+min-height:60px
+}
+
+.heather_edit_table_cell {
+	min-width: 50px !important;
+	display: inline-block !important;
+	outline: 0px solid transparent;
+}
+
+.heather_display_source {
+	display: none !important
+}
+
+.CodeMirror {
+	font-size: 15px;
+	height: auto;
+}
+
+.CodeMirror-vscrollbar {
+	display: none;
+}
+
+.heather_display {
+	outline: 0px solid transparent;
+}
+
+[contenteditable] {
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+[contenteditable]:focus {
+	outline: 0px solid transparent;
+}
+
+.heather_bar {
+	z-index: 99;
+	padding-left: 10px;
+	padding-right: 10px;
+	visibility: hidden;
+	position: absolute;
+	color:#70B7FD
+}
+
+* {
+	-webkit-overflow-scrolling: touch;
+}
+
+@media (min-width:768px) {
+	::-webkit-scrollbar {
+		width: 6px;
 	}
-	  
-	  @media (min-width:768px) {
-			#editor_wrapper ::-webkit-scrollbar {
-				width: 6px;
-			}
-			#editor_wrapper ::-webkit-scrollbar-track {
-				box-shadow: none;
-				border-radius: 3px;
-			}
-			#editor_wrapper ::-webkit-scrollbar-thumb {
-				border-radius: 10px;
-				background-color: #bcd;
-			}
-			#editor_wrapper .pc-hide {
-				display: none;
-			}
-			#editor_hljs_tip .selected{
-				background-color:#70B7FD;
-			}
-			#editor_hljs_tip{
-				max-height:200px;
-				max-width:200px;
-			}
+	::-webkit-scrollbar-track {
+		box-shadow: none;
+		border-radius: 3px;
+	}
+	::-webkit-scrollbar-thumb {
+		border-radius: 10px;
+		background-color: #bcd;
+	}
+	.pc-hide {
+		display: none;
+	}
+	#heather_hljs_tip .selected {
+		background-color: #70B7FD;
+	}
+	#heather_hljs_tip {
+		max-height: 200px;
+		max-width: 200px;
+	}
+	.heather_edit_table {
+		width: 100% display: table
+	}
 }
 
 @media (max-width: 768px) {
- .CodeMirror{
-	  font-size:20px;
-	  }
-	#editor_hljs_tip{
-		max-height:120px;
-		max-width:200px;
+	.CodeMirror {
+		font-size: 20px;
 	}
-	#editor_hljs_tip .selected{
-		background-color:inherit;
+	#heather_hljs_tip {
+		max-height: 120px;
+		max-width: 200px;
 	}
-	.editor_bar {
+	#heather_hljs_tip .selected {
+		background-color: inherit;
+	}
+	.heather_bar {
 		white-space: nowrap;
 		max-width: 90% !important;
 		overflow-x: auto;
 		line-height: 60px;
 		height: 60px;
 	}
-	
-	.editor_icon {
+	.heather_middle_icon {
+		font-size: 24px
+	}
+	.heather_icon {
 		font-size: 30px
 	}
+	.heather_contenteditable_bar {
+		width: 90%;
+		left: 5%
+	}
+	.heather_language_select{
+font-size:20px;}
+}
 
+.heather_contenteditable_bar {
+	position: absolute;
+	visibility: hidden;
+	z-index: 99;
+	background-color: #70B7FD;
+	border-radius: 10px;
+	padding: 5px;
+	max-width:300px;
+}
+
+.heather_p{
+	height:50px;
+	background-color: #70B7FD;
+	z-index:1000;
+	line-height:50px;
+	text-align:center;
+}
+.heather_opacity-5 {
+	opacity:0.5
+}
+[data-on-edit] .CodeMirror,
+[data-on-edit] {
+    border: 1px solid;
+    box-shadow: 0 0 10px #f00;
+    border: 1px solid ;
+}
+
+#heather_display a {
+	pointer-events: none;
 }
 	  </style>
    </head>
   
    <body>
-	<div><button id="export-markdown" style="margin-right:10px">获取markdown(控制台)</button><button style="margin-right:10px" id="export-html">获取html(控制台)</button><button id="clear">清空</button></div>
-	  <div id="editor_display">
+	  <div id="heather_display">
 		
 	  </div>
 	  <textarea id="editor" style="display:none"></textarea>
 	  
       <script src="jquery/jquery.min.js"></script>
-      <script src="js/htmlparser.js"></script>
-      <script src="js/morphdom-umd.min.js"></script>
       <script src="codemirror/lib/codemirror.js"></script>
       <script src="codemirror/addon/mode/overlay.js"></script>
       <script src="codemirror/mode/javascript/javascript.js"></script>
       <script src="codemirror/mode/xml/xml.js"></script>
-      <script src="codemirror/mode/markdown/markdown.js"></script>
+      <script src="codemirror/mode/heather_markdown/markdown.js"></script>
       <script src="codemirror/mode/gfm/gfm.js"></script>
       <script src="codemirror/addon/selection/mark-selection.js"></script>
-      <script src="codemirror/addon/search/searchcursor.js"></script>
       <script src="codemirror/addon/edit/continuelist.js"></script>
       <script src="codemirror/addon/scroll/simplescrollbars.js"></script>
       <script src="sweet2alert/dist/sweetalert2.all.min.js"></script>
       <script src="highlight/highlight.pack.js"></script>
+	  
+      <script src="js/turndown.js"></script>
+      <script src="js/turndown-plugin-gfm.js"></script>
       <script src="js/md.js"></script>
       <script src="js/heather.js"></script>
+      <script src="FileSaver.js"></script>
 	   <script>
-		var heather = Heather.create(document.getElementById("editor_display"),document.getElementById("editor"));
-		$("#export-markdown").click(function(){
-			console.log(heather.getMarkdown())
-		});
-		$("#export-html").click(function(){
-			console.log(heather.getHtml())
-		});
-		$("#clear").click(function(){
-			heather.clear();
-		});
-		$.ajax({
-			url:'README.md',
-			success:function(data){
-				heather.loadMarkdown(data);
-			}
-		})
+		var heather = Heather.create(document.getElementById("heather_display"),document.getElementById("editor"));
+	
+		
+		$("#heather_display").on('contextmenu',function(e){
+			e.preventDefault();
+			var style = 'width:200px;margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;';
+			var html = '';
+			html += '<div><button style="'+style+'" id="export-markdown">导出markdown</button></div>';
+			html += '<div><button style="'+style+'" id="export-html">导出html</button></div>';
+			html += '<div><button style="'+style+'" id="export-styled-html">导出Styled Html</button></div>';
+			html += '<div><button style="'+style+'" id="export-print">打印</button></div>';
+			Swal({
+				animation:false,
+				html : html
+			});
+			$("#export-markdown").click(function(){
+				var blob = new Blob([heather.getMarkdown()], {type: "text/plain;charset=utf-8"});
+				saveAs(blob, "heather.md");
+			});
+			
+			$("#export-html").click(function(){
+				var blob = new Blob([heather.getHtml()], {type: "text/html;charset=utf-8"});
+				saveAs(blob, "heather.html");
+			});
+			$("#export-styled-html").click(function(){
+			
+				$('<div id="styled-container">'+heather.getHtml()+'</div>').appendTo($('body'));
+				var _html;
+				$("#styled-container").find('pre code').each(function(){
+					var language = this.getAttribute('class');
+					if(language && language.startsWith("language-")){
+						var lang = language.split('-')[1];
+						if(hljs.getLanguage(lang)){
+							this.innerHTML = hljs.highlight(lang, this.textContent, true).value;
+						}
+					}
+				});
+				try{
+					mermaid.initialize();
+					mermaid.init({}, '#styled-container .mermaid');
+				}catch(e){}
+				_html = $("#styled-container").html();
+				$("#styled-container").remove();
+				var html = '<html>\n';
+				html += '<head>\n';
+				html += '<meta charset="utf-8">';
+				html += '<meta http-equiv="X-UA-Compatible" content="IE=edge">';
+				html += '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />';					
+				html += '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.css">';
+				$.ajax({
+					url : 'css/markdown.css',
+					dataType: "text",
+					async:false,
+					success : function (data) {
+						html += '<style>\n';
+						html += data;
+						html += '</style>\n';
+					}
+				});
+				$.ajax({
+					url : 'css/print.css',
+					dataType: "text",
+					async:false,
+					success : function (data) {
+						html += '<style>\n';
+						html += data;
+						html += '</style>\n';
+					}
+				});
+				
+				$.ajax({
+					url : 'highlight/styles/github.css',
+					dataType: "text",
+					async:false,
+					success : function (data) {
+						html += '<style>\n';
+						html += data;
+						html += '</style>\n';
+					}
+				});
+				
+				
+				html += '</head>\n';
+				html += '<body>\n';
+				html += '<div class="markdown-body">\n'
+				html += _html+'\n';
+				html += '</div>\n';
+				html += '</body>\n';
+				html += '</html>';
+				var blob = new Blob([html], {type: "text/html;charset=utf-8"});
+				saveAs(blob, "heather.html");
+			});
+			});
+			
+		
 	  </script>
 	  
    </body>
