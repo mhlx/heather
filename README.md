@@ -1,17 +1,79 @@
-# heather
+# heather 2.0 
 
-## 2.0 (可能)
+heather2.0旨在开发一款所见即所得markdown编辑器
 
-2.0不再提供左右栏的结构，而是尝试将输入的markdown文本直接转化为html，用户点击渲染的html元素时，显示原始的markdown文本以供编辑
+## 支持的浏览器
 
-如果你对此感兴趣，可以到 https://md.qyh.me/new.html 尝试，原型版本提供以下操作：
+桌面端：
 
-1. 编辑完成之后通过 <kbd>Ctrl|Cmd</kbd> <kbd>Enter</kbd>保存编辑器的内容到一个块中
-2. 编辑工程中，通过点击 <kbd>Shift</kbd> <kbd>Ctrl|Cmd</kbd> <kbd>Enter</kbd>来分块，**一次只能分两块，以编辑器所在光标为分块点**
+1. chrome
+2. firefox
+
+移动端：
+
+1. safari
+2. chrome
+
+## markdown分块
+
+编辑器的主要思想就是将markdown文本分隔成不同的块，然后根据不同的块提供不同的编辑器，这样首先要解决的任务就是markdown文本的分块，比如存在如下markdown文本：
+``` markdown
+# 123
+123123
+1. 123
+```
+
+它将被分割成三块，分别为#123,123123和1. 123。
+
+分块的主要好处是可以提供针对性强而且相对简单的块编辑器，而不是笼统的将整个markdown文本放到一个`<div contenteditable="true"></div>`之类的可编辑div中(这将会把你陷入到富文本编辑器的神坑之中，愿你的生涯远离这个东西https://ckeditor.com/blog/ContentEditable-The-Good-the-Bad-and-the-Ugly/)
+
+我做了个简单的分块页面，用于测试markdown的分块，具体可以到 https://md.qyh.me/markdown_to_block_test.html 这里查看效果
+
+## 块编辑器
+
+当完成了markdown的分块后，需要为不同的块提供不同的不同的块编辑器，块编辑器应该始终是针对单个元素的，比如可以为`<p></p>`提供一个块编辑器，而`<p></p><p></p>`则应该直接提供源码(markdown)编辑器
+
+### HeadingEditor
+
+标题编辑器主要用于快速的编辑标题，例如
+
+[![heading_editor.gif](https://www.qyh.me/image/article/web/heading_editor.gif/600)](https://www.qyh.me/image/article/web/heading_editor.gif/900)
+
+### PreEditor
+
+代码编辑器旨在提供一个所见即所得的编辑器，例如：
+
+[![pre_editor.gif](https://www.qyh.me/image/article/web/pre_editor.gif/600)](https://www.qyh.me/image/article/web/pre_editor.gif/900)
+
+### ListEditor
+
+列表编辑器主要用于任务列表状态的快速变更以及有序列表和无序列表的快速转化，例如：
+
+[![list_editor.gif](https://www.qyh.me/image/article/web/list_editor.gif/600)](https://www.qyh.me/image/article/web/list_editor.gif/900)
+
+### TableEditor
+
+markdown的表格一直是一个头痛的问题，尤其是表格行列比较多的时候，这个时候往其中插入某一行和某一列能看花眼，而且一旦修改之后发现表格垮掉了，也往往要费好大的眼神才能看出来。TableEditor旨在解决这一系列的问题，例如：
+
+[![table_editor.gif](https://www.qyh.me/image/article/web/table_editor.gif/600)](https://www.qyh.me/image/article/web/table_editor.gif/900)
+
+### markdown编辑器
+
+对于一些无法提供块编辑器的(最多的就是markdown文本中包含html元素的)，则应该提供一个markdown编辑器，直接撰写markdown，例如：
+
+[![markdown_editor.gif](https://www.qyh.me/image/article/web/markdown_editor.gif/600)](https://www.qyh.me/image/article/web/markdown_editor.gif/900)
+
+同时，各个块编辑器应该可以直接转化为markdown编辑器，例如：
+
+[![to_markdown_editor.gif](https://www.qyh.me/image/article/web/to_markdown_editor.gif/600)](https://www.qyh.me/image/article/web/to_markdown_editor.gif/900)
+
+## 预计开发时间
+
+应该在9月底上线第一个版本。
 
 ---
 
-# 1.6
+# heather 1.6
 
 ## 说明
 
