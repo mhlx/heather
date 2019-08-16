@@ -404,14 +404,13 @@ var EditorWrapper = (function() {
 
     var Bar = (function() {
 
-        function Bar(element, config) {
+
+        function Bar(element) {
+            element.setAttribute('data-toolbar', '');
             this.element = $(element);
             this.keepHidden = false;
         }
 
-		Bar.prototype.remove = function() {
-            this.element.remove();
-        }
 
         Bar.prototype.hide = function() {
             this.element.css({
@@ -420,12 +419,20 @@ var EditorWrapper = (function() {
             this.hidden = true;
         }
 
+        Bar.prototype.remove = function() {
+            this.element.remove();
+        }
+
         Bar.prototype.height = function() {
             return this.element.height();
         }
-		
-		Bar.prototype.width = function() {
+
+        Bar.prototype.width = function() {
             return this.element.width();
+        }
+
+        Bar.prototype.length = function() {
+            return this.element[0].childNodes.length;
         }
 
         Bar.prototype.show = function() {
@@ -443,42 +450,43 @@ var EditorWrapper = (function() {
             insertItem(this, item, this.items.length);
         }
 
+        Bar.prototype.clear = function() {
+            $(this.element).html('');
+        }
+
         function createElement(icon, handler) {
             var i = document.createElement('i');
             i.setAttribute('class', icon);
             i.setAttribute('style', 'cursor: pointer;margin-right:20px');
-			if(handler){
-				i.addEventListener('click', function() {
-					handler(i);
-				})
-			}
+            if (handler) {
+                if (mobile) {
+                    i.addEventListener('click', function(e) {
+                        if (e.cancelable) {
+                            e.preventDefault();
+                        }
+                        handler(i);
+                    })
+                } else {
+                    i.addEventListener('mousedown', function(e) {
+                        if (e.cancelable) {
+                            e.preventDefault();
+                        }
+                        handler(i);
+                    })
+                }
+            }
             return i;
         }
-
-
-        Bar.prototype.getSize = function() {
-            return this.element.find('i').length;
-        }
-
 
         Bar.prototype.insertIcon = function(clazz, handler, index, callback) {
             var newIcon = createElement(clazz, handler);
             if (callback) callback(newIcon);
-            var toolbar = this.element[0];
-            if (index >= this.getSize()) {
-                toolbar.appendChild(newIcon);
-            } else {
-                if (index <= 0) {
-                    toolbar.insertBefore(newIcon, toolbar.childNodes[0])
-                } else {
-                    toolbar.insertBefore(newIcon, toolbar.childNodes[index])
-                }
-            }
+            this.insertElement(newIcon, index);
         }
-		
-		Bar.prototype.insertElement = function(element, index) {
+
+        Bar.prototype.insertElement = function(element, index) {
             var toolbar = this.element[0];
-            if (index >= this.getSize()) {
+            if (index >= this.length()) {
                 toolbar.appendChild(element);
             } else {
                 if (index <= 0) {
@@ -489,20 +497,20 @@ var EditorWrapper = (function() {
             }
         }
 
-        Bar.prototype.addIcon = function(clazz, handler, callback) {
-            this.insertIcon(clazz, handler, this.getSize(), callback);
-        }
-		
-		Bar.prototype.addElement = function(element) {
-            this.insertElement(element, this.getSize());
+        Bar.prototype.addElement = function(element) {
+            this.insertElement(element, this.length());
         }
 
-        Bar.prototype.removeIcon = function(deleteChecker) {
-            var icons = this.element[0].querySelectorAll("i");
-            for (var i = icons.length - 1; i >= 0; i--) {
-                var icon = icons[i];
-                if (deleteChecker(icon)) {
-                    this.element[0].removeChild(icon);
+        Bar.prototype.addIcon = function(clazz, handler, callback) {
+            this.insertIcon(clazz, handler, this.length(), callback);
+        }
+
+        Bar.prototype.removeElement = function(deleteChecker) {
+            var elements = this.element[0].childNodes;
+            for (var i = elements.length - 1; i >= 0; i--) {
+                var element = elements[i];
+                if (deleteChecker(element)) {
+                    this.element[0].removeChild(element);
                 }
             }
         }
@@ -3003,7 +3011,9 @@ var EditorWrapper = (function() {
 					label.innerHTML = '<input type="file" accept="image/*" style="display:none"/>';
 					label.querySelector('input[type="file"]').addEventListener('change',function(){
 						var file = this.files[0];
-						FileUpload.create(file,wrapper).start();
+						this.value = null;
+						if(file.name)
+							FileUpload.create(file,wrapper).start();
 					})
 					innerBar.addElement(label,0);
 				}
