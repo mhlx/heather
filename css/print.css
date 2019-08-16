@@ -1,7 +1,8 @@
 @media print{
-	#editor-out{
-		overflow:auto;
+	#heather_out {
+		padding-bottom:0px !important;
 	}
+
 	#heather_toc{
 		display:none !important;
 	}

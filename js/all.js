@@ -157,7 +157,6 @@ var EditorWrapper = (function() {
 				this.beforeUpload(formData,this.file);
 			}
 			var xhr = new XMLHttpRequest();
-			var fileUploadProgress = this.fileUploadProgress;
 			var bar = document.createElement("div");
 			bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="fas fa-times middle-icon" style="position: absolute;top: 0;right: 0;"><i></div>'
 			bar.querySelector('i').addEventListener('click',function(){
@@ -165,7 +164,6 @@ var EditorWrapper = (function() {
 			});
 			var widget = editor.addLineWidget(editor.getCursor().line, bar, {coverGutter: false, noHScroll: true})
 			xhr.upload.addEventListener("progress", function(e){
-				var prefix = "!["+me.signature+"_";
 				if (e.lengthComputable) {
 					var percentComplete = parseInt(e.loaded*100 / e.total)+"";
 					var pb = bar.querySelector('.heather_progressbar').firstChild;
@@ -406,7 +404,6 @@ var EditorWrapper = (function() {
 
     var Bar = (function() {
 
-
         function Bar(element, config) {
             this.element = $(element);
             this.keepHidden = false;
@@ -479,7 +476,7 @@ var EditorWrapper = (function() {
             }
         }
 		
-		 Bar.prototype.insertElement = function(element, index) {
+		Bar.prototype.insertElement = function(element, index) {
             var toolbar = this.element[0];
             if (index >= this.getSize()) {
                 toolbar.appendChild(element);
@@ -1220,8 +1217,27 @@ var EditorWrapper = (function() {
 			};
 			
 			var selectionChangeListener = function(){
-				if(me.composing == false && window.getSelection().toString().length > 0){
-					posContenteditableBar(bar,element);
+				var sel = window.getSelection();
+				if(me.composing == false && sel.type == 'Range' && sel.rangeCount > 0){
+					var elem = sel.getRangeAt(0);
+					var node = elem.commonAncestorContainer;
+					while(node != null ){
+						if(node == element){
+							var coords = getCoords();
+							var top = coords.top - 80 - bar.height() - $(window).scrollTop();
+							bar.element.css({'top':top < 0 ? coords.top + coords.height+30 : top+$(window).scrollTop()+"px"});
+							if(!mobile){
+								if(bar.width() + coords.left > $(window).width()){
+									bar.element.css({'right':30+"px"})
+								} else {
+									bar.element.css({'left':coords.left+"px"})
+								}
+							}
+							bar.show();
+							break;
+						}
+						node = node.parentElement;
+					}
 				} else {
 					bar.hide();
 				}
@@ -1251,30 +1267,6 @@ var EditorWrapper = (function() {
 			this.bar.remove();
 			this.element.removeEventListener('compositionstart',this.startHandler);
 			this.element.removeEventListener('compositionend',this.endHandler);
-		}
-		
-		function posContenteditableBar(bar,element){
-			var sel = window.getSelection();
-			var elem = sel.getRangeAt(0);
-			var node = elem.commonAncestorContainer;
-			while(node != null ){
-				if(node == element){
-					var coords = getCoords();
-					var top = coords.top - 80 - bar.height() - $(window).scrollTop();
-					bar.element.css({'top':top < 0 ? coords.top + coords.height+30 : top+$(window).scrollTop()+"px"});
-					if(!mobile){
-						if(bar.width() + coords.left > $(window).width()){
-							bar.element.css({'right':30+"px"})
-						} else {
-							bar.element.css({'left':coords.left+"px"})
-						}
-					}
-					bar.show();
-					return;
-				}
-				node = node.parentElement;
-			}
-			bar.hide();
 		}
 		
 		function getCoords() {
@@ -1575,17 +1567,17 @@ var EditorWrapper = (function() {
 			'right' : ' --: '
 		}
 		
-		function toMarkdown(table){
+		function toMarkdown(table) {
 			var markdown = '';
 			var trs = table.find('tr');
-			for(var i=0;i<trs.length;i++){
+			for (var i = 0; i < trs.length; i++) {
 				var tr = trs.eq(i);
 				var ths = tr.find('th');
 				var headingRow = ths.length > 0;
-				if(headingRow){
+				if (headingRow) {
 					markdown += getRowMarkdown(ths);
 					markdown += '\n';
-					for(var j=0;j<ths.length;j++){
+					for (var j = 0; j < ths.length; j++) {
 						var align = ths[j].style['text-align'];
 						markdown += "|" + alignMap[align];
 					}
@@ -1593,26 +1585,26 @@ var EditorWrapper = (function() {
 				} else {
 					markdown += getRowMarkdown(tr.find('td'));
 				}
-				if(i < trs.length - 1){
+				if (i < trs.length - 1) {
 					markdown += '\n';
 				}
 			}
 			return markdown;
 		}
-		
-		function getRowMarkdown(tds){
+
+		function getRowMarkdown(tds) {
 			var markdown = '';
-			for(var j=0;j<tds.length;j++){
+			for (var j = 0; j < tds.length; j++) {
 				var td = tds.eq(j);
 				markdown += "|";
 				var md = turndownService.turndown(td.html());
 				md = md.trim().replace(/\n\r/g, '<br>').replace(/\n/g, "<br>")
-				markdown += md.length < 3 ? "  "+md : md;
-				
+				markdown += md.length < 3 ? "  " + md : md;
 			}
 			markdown += "|";
 			return markdown;
 		}
+
 		
 		return {create : function(wrapper){
 			return new TableHelper(wrapper);
@@ -3004,18 +2996,14 @@ var EditorWrapper = (function() {
             var icons = config.innerBar_icons || ['emoji','upload', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table','move', 'undo', 'redo', 'close'];
             for (var i = 0; i < icons.length; i++) {
                 var icon = icons[i];
-				 if(icon == 'upload' && wrapper.fileUploadEnable()){
+				if(icon == 'upload' && wrapper.fileUploadEnable()){
 					var label = document.createElement('label');
 					label.setAttribute('class','icon fas fa-upload');
 					label.setAttribute('style','display: inline-block;')
 					label.innerHTML = '<input type="file" accept="image/*" style="display:none"/>';
 					label.querySelector('input[type="file"]').addEventListener('change',function(){
 						var file = this.files[0];
-						if (file.type.startsWith("image/")){
-							FileUpload.create(file,wrapper).start();
-						} else {
-							swal('只能上传图片文件');
-						}
+						FileUpload.create(file,wrapper).start();
 					})
 					innerBar.addElement(label,0);
 				}
@@ -3113,14 +3101,6 @@ var EditorWrapper = (function() {
 				}
             }
 			
-            var cursorActivityHandler = function(bar) {
-                var lh = editor.defaultTextHeight();
-                innerBarElement.css({
-                    "top": (editor.cursorCoords(true).top + 2 * lh) + "px",
-                });
-                bar.show();
-            }
-
             var mobileCursorActivityHandler = function(bar) {
                 var lh = editor.defaultTextHeight();
                 var top = editor.cursorCoords(true, 'local').top;
@@ -3172,14 +3152,33 @@ var EditorWrapper = (function() {
             }
 
             if (!CodeMirror.browser.mobile) {
-                editor.on('cursorActivity', function() {
-                    cursorActivityHandler(innerBar);
-                });
+				var posBar = function(){
+					var lh = editor.defaultTextHeight();
+					innerBarElement.css({
+						"top": (editor.cursorCoords(true).top + 2 * lh) + "px",
+					});
+					innerBar.show();
+				}
+                editor.on('cursorActivity', posBar);
+				var lastScrollTo;
+				var changeHandler = function(){
+					var lh = editor.defaultTextHeight();
+					var top = editor.cursorCoords(true, 'local').top;
+					var scrollTo = top  - 301;
+					if((!lastScrollTo && scrollTo > 0) || scrollTo > lastScrollTo+2*lh){
+						$(editor.getScrollerElement()).stop(true).animate({ scrollTop: scrollTo }, 500,function(){	
+							posBar();
+						});
+						lastScrollTo = scrollTo;
+					}
+				}
+			
+				editor.on('change',changeHandler);
                 editor.getScrollerElement().addEventListener('touchmove', function(evt) {
                     innerBar.hide();
                 });
                 editor.on('scroll', function() {
-                    innerBar.hide();
+					innerBar.hide();
                 })
             } else {
 
