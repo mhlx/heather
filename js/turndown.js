@@ -30,7 +30,7 @@ function isBlock (node) {
 
 var voidElements = [
   'area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input',
-  'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr'
+  'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr','video'
 ];
 
 function isVoid (node) {
@@ -100,26 +100,6 @@ rules.list = {
   }
 };
 
-rules.listItem = {
-  filter: 'li',
-
-  replacement: function (content, node, options) {
-    content = content
-      .replace(/^\n+/, '') // remove leading newlines
-      .replace(/\n+$/, '\n') // replace trailing newlines with just a single one
-      .replace(/\n/gm, '\n '); // indent
-    var prefix = options.bulletListMarker + ' ';
-    var parent = node.parentNode;
-    if (parent.nodeName === 'OL') {
-      var start = parent.getAttribute('start');
-      var index = Array.prototype.indexOf.call(parent.children, node);
-      prefix = (start ? Number(start) + index : index + 1) + '.  ';
-    }
-    return (
-      prefix + content + (node.nextSibling && !/\n$/.test(content) ? '\n' : '')
-    )
-  }
-};
 
 rules.indentedCodeBlock = {
   filter: function (node, options) {
@@ -153,7 +133,6 @@ rules.fencedCodeBlock = {
   replacement: function (content, node, options) {
     var className = node.firstChild.className || '';
     var language = (className.match(/language-(\S+)/) || [null, ''])[1];
-
     return (
       '\n\n' + options.fence + language + '\n' +
       node.firstChild.textContent +
@@ -599,12 +578,13 @@ function Node (node) {
 }
 
 function isBlank (node) {
-  return (
-    ['A', 'TH', 'TD', 'IFRAME', 'SCRIPT', 'AUDIO', 'VIDEO'].indexOf(node.nodeName) === -1 &&
+	return false;
+ /* return (
+    ['A', 'TH', 'TD', 'IFRAME', 'SCRIPT', 'AUDIO', 'VIDEO','TABLE'].indexOf(node.nodeName) === -1 &&
     /^\s*$/i.test(node.textContent) &&
     !isVoid(node) &&
     !hasVoid(node)
-  )
+  )*/
 }
 
 function flankingWhitespace (node) {

@@ -1,6 +1,16 @@
 var EditorWrapper = (function() {
 
     'use strict';
+	
+    String.prototype.replaceAll = function(search, replacement) {
+        var target = this;
+        return target.replace(new RegExp(search, 'g'), replacement);
+    };
+	
+	Node.prototype.blockDefault = function(){
+		return this.nodeType == 1 && "block" == window.getComputedStyle(this, "").display;
+	}
+	
     CodeMirror.prototype.renderAllDoc = function(scrollToTop) {
         var editor = this;
         editor.setOption('readOnly', true);
@@ -95,17 +105,305 @@ var EditorWrapper = (function() {
 	var mac = CodeMirror.browser.mac;
 	var mobile = CodeMirror.browser.mobile;
     var ios = CodeMirror.browser.ios;
+	var veryThinHtml = '&#8203;';
+    var veryThinChar = '​';
+		
+	var cleanHtml = function(html) {
+		return html.replaceAll(veryThinChar, "");
+    }
 	
-	var turndownService = new window.TurndownService({
-		'headingStyle': 'atx',
-		'codeBlockStyle': 'fenced',
-		'emDelimiter': '*',
-		'bulletListMarker':'-',
-		defaultReplacement: function(innerHTML, node) {
-			return node.isBlock ? '\n\n' + node.outerHTML + '\n\n' : node.outerHTML
+	var selectionChangeListeners = [];
+	document.onselectionchange = function(){
+		for(var i=0;i<selectionChangeListeners.length;i++){
+			try{
+				selectionChangeListeners[i].call()
+			}catch(e){console.log(e)};
 		}
-	});
-	turndownService.use(window.turndownPluginGfm.gfm);
+	}		
+	var registerSelectionChangeListener = function(selectionChangeListener) {
+		selectionChangeListeners.push(selectionChangeListener);
+	}
+
+	var unregisterSelectionChangeListener = function(selectionChangeListener) {
+		var listeners = selectionChangeListeners;
+		for (var i = 0; i < listeners.length; i++) {
+			if (listeners[i] == selectionChangeListener) {
+				listeners.splice(i, 1);
+				break;
+			}
+		}
+	}
+	
+	var turndownService = (function(){
+		var turndownService = new window.TurndownService({
+			'headingStyle': 'atx',
+			'codeBlockStyle': 'fenced',
+			'emDelimiter': '*',
+			'bulletListMarker': '-',
+			defaultReplacement: function(innerHTML, node) {
+				return node.blockDefault() ? '\n\n' + node.outerHTML + '\n\n' : node.outerHTML
+			}
+		});
+		var alignMap = {
+			'': ' -- ',
+			'left': ' :-- ',
+			'center': ' :--: ',
+			'right': ' --: '
+		}
+
+
+		turndownService.use(window.turndownPluginGfm.gfm);
+			turndownService.addRule('paragraph', {
+			filter: ['p'],
+			replacement: function(content) {
+				var lines = content.replaceAll('\r', '').split('\n');
+				var rst = '';
+				for (var i = 0; i < lines.length; i++) {
+					var line = lines[i];
+					if (line == '  ') {
+						rst += '<br>';
+					} else {
+						rst += line;
+					}
+					if (i < lines.length - 1)
+						rst += '\n'
+				}
+				return '\n\n' + rst + '\n\n';
+			}
+		});
+		turndownService.addRule('fenceblock', {
+			filter: function(node, options) {
+				return (
+					options.codeBlockStyle === 'fenced' &&
+					node.nodeName === 'PRE' &&
+					node.firstChild &&
+					node.firstChild.nodeName === 'CODE'
+				)
+			},
+
+			replacement: function(content, node, options) {
+				var className = node.firstChild.className || '';
+				var language = (className.match(/language-(\S+)/) || [null, ''])[1];
+
+				var textContent = node.firstChild.textContent;
+				var lines = textContent.split('\n');
+				var lastLine = lines[lines.length - 1];
+				var lineBreaker = lastLine.replaceAll('\n', '') == '' ? '' : '\n';
+				return '\n\n' + options.fence + language + '\n' + textContent + lineBreaker + options.fence + '\n\n';
+			}
+		});
+
+		turndownService.addRule('table', {
+			filter: function(node) {
+				return node.nodeName === 'TABLE'
+			},
+			replacement: function(content, node, options) {
+				return toMarkdown($(node));
+			}
+		});
+
+		turndownService.addRule('list', {
+			filter: ['ul', 'ol'],
+			replacement: function(content, node, options) {
+				node.innerHTML = cleanHtml(node.innerHTML);
+				return listToMarkdown(node, options, 2);
+			}
+		});
+
+		function listToMarkdown(node, options, indent) {
+			var ol = node.tagName == 'OL';
+			var childNodes = node.childNodes;
+			var rootContent = '';
+			for (var i = 0; i < childNodes.length; i++) {
+				var child = childNodes[i];
+				if (child.nodeType != 1 && child.tagName != 'LI') {
+					return '<pre>' + node.outerHTML + 'is not a valid UL|OL</pre>';
+				}
+				var prefix = options.bulletListMarker;
+				if (ol) {
+					prefix = (i + 1) + '.';
+				}
+				var content = '';
+				var subChildNodes = child.childNodes;
+				var checkbox = getCheckbox(child);
+				var taskList = checkbox != null;
+				if (taskList) {
+					subChildNodes = child.childNodes;
+					if (checkbox.checked) {
+						prefix = options.bulletListMarker + ' [x]';
+					} else {
+						prefix = options.bulletListMarker + ' [ ]';
+					}
+					//check second is paragraph or text node
+					var secondChild = subChildNodes[1];
+					var appendEmptyNode = true;
+					if (secondChild != null) {
+						if (secondChild.nodeType == 3) {
+							appendEmptyNode = false;
+						} else {
+							if (secondChild.nodeType == 1 && secondChild.tagName == 'P') {
+								if(secondChild.innerHTML.trim() != ''){
+									appendEmptyNode = false;
+								} else {
+									$(secondChild).remove();
+								}
+							}
+						}
+					}
+					//insert very thin character node
+					if (appendEmptyNode) {
+						var firstSubChild = subChildNodes[0];
+						$(firstSubChild).after(document.createTextNode(veryThinChar));
+					}
+				}
+				var start = taskList ? 1 : 0;
+				for (var j = start; j < subChildNodes.length; j++) {
+					var subChild = subChildNodes[j];
+					var markdown;
+					if (subChild.nodeType == 1 && (subChild.tagName == 'OL' || subChild.tagName == 'LI')) {
+						markdown = listToMarkdown(subChild, options, indent + 2);
+					} else {
+						var outerHTML = '';
+						if (subChild.nodeType == 3) {
+							outerHTML = '<p>' + subChild.nodeValue + '</p>';
+						} else {
+							outerHTML = subChild.outerHTML;
+						}
+						markdown = turndownService.turndown(outerHTML);
+						var firstLineSpaces = getSpaces(indent - 1);
+						var spaces = firstLineSpaces + getSpaces(taskList ? 2 : prefix.length);
+						var lines = markdown.split('\n');
+						var rst = '';
+						var needToDeleteStartLines = true;
+						for (var k = 0; k < lines.length; k++) {
+							var _spaces = ((taskList ? j == 1 : j == 0) && k == 0) ? firstLineSpaces : spaces;
+							if (needToDeleteStartLines) {
+								if (!lines[k].replaceAll("\n", '') == '') {
+									rst += _spaces + lines[k];
+									if (k < lines.length - 1) {
+										rst += '\n'
+									}
+									needToDeleteStartLines = false;
+								}
+							} else {
+								rst += _spaces + lines[k];
+								if (k < lines.length - 1) {
+									rst += '\n'
+								}
+							}
+						}
+						markdown = rst;
+					}
+					content += markdown;
+					if (j < subChildNodes.length - 1) {
+						content += '\n\n';
+					}
+				}
+				rootContent += prefix + content;
+				if (i < childNodes.length - 1) {
+					rootContent += '\n';
+				}
+			}
+			return '\n\n' + rootContent + '\n\n';
+		}
+
+		function getSpaces(indent) {
+			var spaces = '';
+			for (var k = 0; k < indent; k++) {
+				spaces += ' ';
+			}
+			return spaces;
+		}
+
+		function toMarkdown(table) {
+			var markdown = '';
+			var trs = table.find('tr');
+			for (var i = 0; i < trs.length; i++) {
+				var tr = trs.eq(i);
+				var ths = tr.find('th');
+				var headingRow = ths.length > 0;
+				if (headingRow) {
+					markdown += getRowMarkdown(ths);
+					markdown += '\n';
+					for (var j = 0; j < ths.length; j++) {
+						var align = ths[j].style['text-align'];
+						markdown += "|" + alignMap[align];
+					}
+					markdown += "|";
+				} else {
+					markdown += getRowMarkdown(tr.find('td'));
+				}
+				if (i < trs.length - 1) {
+					markdown += '\n';
+				}
+			}
+			return markdown;
+		}
+
+		function getRowMarkdown(tds) {
+			var markdown = '';
+			for (var j = 0; j < tds.length; j++) {
+				var td = tds.eq(j);
+				markdown += "|";
+				var md = turndownService.turndown(td.html());
+				md = md.trim().replace(/\n\r/g, '<br>').replace(/\n/g, "<br>")
+				markdown += md.length < 3 ? "  " + md : md;
+			}
+			markdown += "|";
+			return markdown;
+		}
+		
+		return turndownService;
+	})();
+	
+	var getCheckbox = function(li) {
+		var firstChild = li.childNodes[0];
+		if (firstChild == null) {
+			return null;
+		}
+		if (firstChild.nodeType != 1) {
+			if(firstChild.nodeType == 3){
+				//get next element if exists
+				var elem = firstChild;
+				var removes = [];
+				while(elem != null){
+					if(elem.nodeType == 1){
+						break;
+					}
+					if(elem.nodeValue.trim() != ''){
+						return null;
+					}
+					removes.push(elem);
+					elem = elem.nextSibling;
+				}
+				for(var i=0;i<removes.length;i++){
+					$(removes[i]).remove();
+				}
+				if(elem == null){
+					return null;
+				}
+				firstChild = elem;
+			}
+		}
+		if (firstChild.type == 'checkbox') {
+			return firstChild;
+		}
+		if (firstChild.hasAttribute('data-toolbar')) {
+			firstChild = firstChild.nextSibling;
+		}
+		if (firstChild != null && firstChild.nodeType == 1 && firstChild.tagName == 'P') {
+			var firstChildFirstChild = firstChild.firstChild;
+			if (firstChildFirstChild != null && firstChildFirstChild.nodeType == 1 &&
+				firstChildFirstChild.type == 'checkbox') {
+				//move checkbox to first	
+				var clone = firstChildFirstChild.cloneNode(true);
+				$(li).prepend(clone);
+				$(firstChildFirstChild).remove();
+				return clone;
+			}
+		}
+	}
+		
 
     var plainPasteHandler = function(e){
 		var text = (e.originalEvent || e).clipboardData.getData('text/plain');
@@ -1120,9 +1418,14 @@ var EditorWrapper = (function() {
 		
 		function TaskListHelper(wrapper){
 			$("#heather_out").on('click','.task-list-item',function(e){
+				e.preventDefault();
+				e.stopPropagation();
 				var root = e.target;
 				while(!root.classList.contains('contains-task-list')){
 					root = root.parentElement;
+					if(root == null){
+						return ;
+					}
 				}
 				
 				var li = e.target;
@@ -1144,12 +1447,15 @@ var EditorWrapper = (function() {
 				var node = parseHTML(wrapper.render.getHtml(str)).body.firstChild;
 				cloneAttributes(node,root);
 				if(node.isEqualNode(root)){
-					var checkbox = li.querySelector('input[type="checkbox"]');
-					if(checkbox.checked){
-						checkbox.removeAttribute('checked');
-					}else{
-						checkbox.setAttribute('checked','checked');
+					var checkbox = getCheckbox(li);
+					if(checkbox != null){
+						if(checkbox.checked){
+							checkbox.removeAttribute('checked');
+						}else{
+							checkbox.setAttribute('checked','checked');
+						}
 					}
+					
 					//html to markdown
 					var element = parseHTML(root.outerHTML).body.firstChild;
 					var markdown = turndownService.turndown(element.outerHTML);
@@ -1166,150 +1472,198 @@ var EditorWrapper = (function() {
 		}}
 	})();
 	
-	var ContenteditableBar = (function(){
-		function ContenteditableBar(wrapper,element){
-			var me = this;
-			this.composing = false;
-			var bar = document.createElement('div');
-			bar.setAttribute('class','heather_contenteditable_bar');
-			document.body.appendChild(bar);
-			bar = Bar.create(bar);
-			var clazz = "heather_status_on";
-			bar.addIcon('fas fa-bold middle-icon',undefined,function(ele){
-				var event = mobile ? 'touchstart' : 'mousedown';
-				ele.addEventListener(event,function(){
-					document.execCommand('bold');
-					document.queryCommandState('bold') ? ele.classList.add(clazz) : ele.classList.remove(clazz);
-				})
-				me.boldBtn = ele;
-			});
-			bar.addIcon('fas fa-italic middle-icon',undefined,function(ele){
-				var event = mobile ? 'touchstart' : 'mousedown';
-				ele.addEventListener(event,function(){
-					document.execCommand('italic');
-					document.queryCommandState('italic') ? ele.classList.add(clazz) : ele.classList.remove(clazz);
-				})
-				me.italicBtn = ele;
-			});
-			bar.addIcon('fas fa-strikethrough middle-icon',undefined,function(ele){
-				var event = mobile ? 'touchstart' : 'mousedown';
-				ele.addEventListener(event,function(){
-					document.execCommand('strikeThrough');
-					document.queryCommandState('strikeThrough') ? ele.classList.add(clazz) : ele.classList.remove(clazz);
-				})
-				me.strikeThroughBtn = ele;
-			});
-			bar.addIcon('fas fa-code middle-icon',undefined,function(ele){
-				var event = mobile ? 'touchstart' : 'mousedown';
-				ele.addEventListener(event,function(){
-					var selection = window.getSelection().toString();
-					if(selection.length > 0){
-						document.execCommand("insertHTML",false,'<code>'+selection+'</code>');
-					}
-				})
-			});
-			bar.addIcon('fas fa-eraser middle-icon',undefined,function(ele){
-				var event = mobile ? 'touchstart' : 'mousedown';
-				ele.addEventListener(event,function(){
-					var selection = window.getSelection().toString();
-					if(selection.length > 0){
-						document.execCommand('removeFormat');
-					}
-				})
-			});
-			var startHandler = function(e){
-				me.composing = true;
-			};
-			var endHandler = function(e){
-				me.composing = false;
-			};
-			
-			var selectionChangeListener = function(){
+	var ContenteditableBar = (function() {
+
+        function ContenteditableBar(element) {
+            var me = this;
+            this.composing = false;
+            var bar = document.createElement('div');
+            bar.setAttribute('class', 'heather_contenteditable_bar');
+            document.body.appendChild(bar);
+            bar = Bar.create(bar);
+            var clazz = "heather_status_on";
+            bar.addIcon('fas fa-bold heather_middle_icon', function(ele) {
+                document.execCommand('bold');
+                document.queryCommandState('bold') ? ele.classList.add(clazz) : ele.classList.remove(clazz);
+            }, function(ele) {
+                me.boldBtn = ele;
+            });
+            bar.addIcon('fas fa-italic heather_middle_icon', function(ele) {
+                document.execCommand('italic');
+                document.queryCommandState('italic') ? ele.classList.add(clazz) : ele.classList.remove(clazz);
+            }, function(ele) {
+                me.italicBtn = ele;
+            });
+            bar.addIcon('fas fa-strikethrough heather_middle_icon', function(ele) {
+                document.execCommand('strikeThrough');
+                document.queryCommandState('strikeThrough') ? ele.classList.add(clazz) : ele.classList.remove(clazz);
+            }, function(ele) {
+                me.strikeThroughBtn = ele;
+            });
+            bar.addIcon('fas fa-code heather_middle_icon', function() {
+                var selection = window.getSelection().toString();
+                if (selection.length > 0) {
+                    document.execCommand("insertHTML", false, '<code>' + selection + '</code>');
+                }
+            });
+            bar.addIcon('fas fa-link heather_middle_icon', function(ele) {
 				var sel = window.getSelection();
-				if(me.composing == false && sel.type == 'Range' && sel.rangeCount > 0){
-					var elem = sel.getRangeAt(0);
-					var node = elem.commonAncestorContainer;
-					while(node != null ){
-						if(node == element){
-							var coords = getCoords();
-							var top = coords.top - 80 - bar.height() - $(window).scrollTop();
-							bar.element.css({'top':top < 0 ? coords.top + coords.height+30 : top+$(window).scrollTop()+"px"});
-							if(!mobile){
-								if(bar.width() + coords.left > $(window).width()){
-									bar.element.css({'right':30+"px"})
-								} else {
-									bar.element.css({'left':coords.left+"px"})
-								}
-							}
-							bar.show();
-							break;
-						}
-						node = node.parentElement;
-					}
-				} else {
-					bar.hide();
+				if(sel.rangeCount == 0){
+					return ;
 				}
-				document.queryCommandState('bold') ? me.boldBtn.classList.add(clazz) : me.boldBtn.classList.remove(clazz);
-				document.queryCommandState('italic') ? me.italicBtn.classList.add(clazz) : me.italicBtn.classList.remove(clazz);				
-				document.queryCommandState('strikeThrough') ? me.strikeThroughBtn.classList.add(clazz) : me.strikeThroughBtn.classList.remove(clazz);			
-			}
-			wrapper.selectionChangeListeners.push(selectionChangeListener);
-			element.addEventListener('compositionstart',startHandler);
-			element.addEventListener('compositionend',endHandler);
-			this.startHandler = startHandler;
-			this.endHandler = endHandler;
-			this.bar = bar;
-			this.selectionChangeListener = selectionChangeListener;
-			this.element = element;
-			this.wrapper = wrapper;
-		}
-		
-		ContenteditableBar.prototype.remove = function(){
-			var listeners = this.wrapper.selectionChangeListeners;
-			for(var i=0;i<listeners.length;i++){
-				if(listeners[i] == this.selectionChangeListener){
-					listeners.splice(i,1);
-					break;
+				var range = sel.getRangeAt(0);
+                var startContainerParent = range.startContainer.parentElement;
+                var isLink = startContainerParent.tagName == 'A';
+                var href = '';
+                if (startContainerParent == range.endContainer.parentElement && isLink) {
+                    href = startContainerParent.getAttribute('href');
+                }
+                var href = prompt("请输入链接地址", href);
+                if (href != null) {
+                    href = href.trim();
+                    if (href == '') {
+                        if (isLink) {
+                            $(startContainerParent).contents().unwrap();
+                        }
+                    } else {
+                        document.execCommand('createLink', false, href);
+                    }
+                }
+            }, function(ele) {
+                me.linkBtn = ele;
+            });
+            bar.addIcon('fas fa-eraser heather_middle_icon', function(ele) {
+                document.execCommand('removeFormat');
+            });
+
+            var startHandler = function(e) {
+                me.composing = true;
+            };
+            var endHandler = function(e) {
+                me.composing = false;
+            };
+            //chrome 通过退格键删除选中内容时不触发 selectionChange 事件
+            var inputHandler = function(e) {
+                if (window.getSelection().type != 'Range') {
+                    bar.hide();
+                }
+            };
+
+            var selectionChangeListener = function() {
+                var sel = window.getSelection();
+				if(sel.rangeCount == 0){
+					return ;
 				}
-			}
-			this.bar.remove();
-			this.element.removeEventListener('compositionstart',this.startHandler);
-			this.element.removeEventListener('compositionend',this.endHandler);
-		}
-		
-		function getCoords() {
+                var elem = sel.getRangeAt(0);
+                var container = elem.commonAncestorContainer
+                var node = container;
+                while (node != null) {
+                    if (node == element) {
+                        if (me.composing == false && sel.type == 'Range') {
+                            posContenteditableBar(bar, element);
+                        } else {
+                            bar.hide();
+                        }
+                        document.queryCommandState('bold') ? me.boldBtn.classList.add(clazz) : me.boldBtn.classList.remove(clazz);
+                        document.queryCommandState('italic') ? me.italicBtn.classList.add(clazz) : me.italicBtn.classList.remove(clazz);
+                        document.queryCommandState('strikeThrough') ? me.strikeThroughBtn.classList.add(clazz) : me.strikeThroughBtn.classList.remove(clazz);
+                        return;
+                    }
+                    node = node.parentElement;
+                }
+
+                bar.hide();
+            }
+            registerSelectionChangeListener(selectionChangeListener);
+            element.addEventListener('compositionstart', startHandler);
+            element.addEventListener('compositionend', endHandler);
+            element.addEventListener('input', inputHandler);
+            this.startHandler = startHandler;
+            this.endHandler = endHandler;
+            this.inputHandler = inputHandler;
+            this.bar = bar;
+            this.selectionChangeListener = selectionChangeListener;
+            this.element = element;
+        }
+
+        ContenteditableBar.prototype.remove = function() {
+            var me = this;
+            unregisterSelectionChangeListener(this.selectionChangeListener);
+            me.bar.remove();
+            me.element.removeEventListener('compositionstart', me.startHandler);
+            me.element.removeEventListener('compositionend', me.endHandler);
+            me.element.removeEventListener('input', me.inputHandler);
+        }
+
+        function posContenteditableBar(bar, element) {
 			var sel = window.getSelection();
-			var elem = sel.getRangeAt(0);
-			var box = elem.getBoundingClientRect();
-			var body = document.body;
-			var docEl = document.documentElement;
-			var scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
-			var scrollLeft = window.pageXOffset || docEl.scrollLeft || body.scrollLeft;
-			var clientTop = docEl.clientTop || body.clientTop || 0;
-			var clientLeft = docEl.clientLeft || body.clientLeft || 0;
-			var top  = box.top +  scrollTop - clientTop;
-			var left = box.left + scrollLeft - clientLeft;
-			return { top: Math.round(top), left: Math.round(left),height:Math.round(box.height) };
-		}
-		
-		return {create:function(wrapper,element){
-			return new ContenteditableBar(wrapper,element);
-		}}
-	})();
+			if(sel.rangeCount == 0){
+				bar.hide();return ;
+			}
+            var elem = sel.getRangeAt(0);
+            var coords = getCoords(elem);
+            var top = coords.top - 80 - bar.height() - $(window).scrollTop();
+            bar.element.css({
+                'top': top < 0 ? coords.top + coords.height + 30 : top + $(window).scrollTop() + "px"
+            });
+            if (!mobile) {
+                if (bar.width() + coords.left > $(window).width()) {
+                    bar.element.css({
+                        'right': 30 + "px"
+                    })
+                } else {
+                    bar.element.css({
+                        'left': coords.left + "px"
+                    })
+                }
+            }
+            bar.show();
+        }
+
+        function getCoords(elem) {
+            var box = elem.getBoundingClientRect();
+            var body = document.body;
+            var docEl = document.documentElement;
+            var scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
+            var scrollLeft = window.pageXOffset || docEl.scrollLeft || body.scrollLeft;
+            var clientTop = docEl.clientTop || body.clientTop || 0;
+            var clientLeft = docEl.clientLeft || body.clientLeft || 0;
+            var top = box.top + scrollTop - clientTop;
+            var left = box.left + scrollLeft - clientLeft;
+            return {
+                top: Math.round(top),
+                left: Math.round(left),
+                height: Math.round(box.height)
+            };
+        }
+
+        return {
+            create: function(element) {
+                return new ContenteditableBar(element);
+            }
+        }
+    })();
 	
 	var TableHelper = (function(){
 		
-		function TableHelper(wrapper){
+		function TableHelper(wrapper,$elem){
 			var me = this;
-			this.oneTimeHandlers = [];
-			$("#heather_out").on('click','table',function(e){
+			$elem = $elem || $("#heather_out");
+			var tableHandler = function(e){
+				e.preventDefault();
+                e.stopPropagation();
 				var root = e.target;
-				while(root != null && root.tagName != 'TABLE'){
+				var table = e.target;
+				while(table != null && table.tagName != 'TABLE'){
+					table = table.parentElement;
+				}
+				while(root != null && !root.hasAttribute('data-line')){
 					root = root.parentElement;
 				}
-				if(root == null){
+				if(table == null || root == null){
 					return ;
 				}
+				
 				var line = parseInt(root.getAttribute('data-line'));
 				var endLine = parseInt(root.getAttribute('data-end-line'));
 				var str = wrapper.editor.getLines(line,endLine);
@@ -1320,23 +1674,34 @@ var EditorWrapper = (function() {
 					return ;
 				}
 				
-				if(isUndefined(this.tableSession) || this.tableSession.closed === true){
+				if(isUndefined(me.tableSession) || me.tableSession.closed === true){
 					var node = parseHTML(wrapper.render.getHtml(str)).body.firstChild;
 					cloneAttributes(node,root);
 					if(node.isEqualNode(root)){
-						this.tableSession = new TableSession(wrapper,root,line,endLine);
-						this.tableSession.start();
+						me.tableSession = new TableSession(wrapper,table,root,line,endLine);
+						me.tableSession.start();
 					}
-				}
+				};
+			}
 				
-			})
+			$elem.on('click','table',tableHandler);
+			this.$elem = $elem;
+			this.tableHandler = tableHandler;
 		}
 		
-		function TableSession(wrapper,table,line,endLine){
+		TableHelper.prototype.remove = function(){
+			this.$elem.off('click','table',this.tableHandler);
+			if(this.tableSession){
+				this.tableSession.close();
+			}
+		}
+		
+		function TableSession(wrapper,table,root,line,endLine){
 			this.wrapper = wrapper;
 			this.table = table;
 			this.line = line;
 			this.endLine = endLine;
+			this.root = root;
 		}
 		
 		TableSession.prototype.start = function(){
@@ -1356,7 +1721,7 @@ var EditorWrapper = (function() {
 					});
 					td.addEventListener('paste',plainPasteHandler);
 					td.setAttribute('contenteditable',true);
-					me.contenteditableBar = ContenteditableBar.create(me.wrapper,td);
+					me.contenteditableBar = ContenteditableBar.create(td);
 				}
 				me.td = td;
 			}
@@ -1465,6 +1830,8 @@ var EditorWrapper = (function() {
 		}
 		
 		TableSession.prototype.close = function(){
+			if(this.closed === true) return;
+			this.closed = true;
 			var table = $(this.table);
 			table.off('click','th,td',this.clickHandler);
 			this.toolbar.remove();
@@ -1477,16 +1844,12 @@ var EditorWrapper = (function() {
 			}
 			this.wrapper.editor.setOption('readOnly',false);
 			this.wrapper.disableRender = false;
-			var markdown = '';
-			if(table.index() != -1){
-				var element = parseHTML(table[0].outerHTML).body.firstChild;
-				markdown = toMarkdown($(element));
-			}
+			var element = parseHTML(this.root.outerHTML).body.firstChild;
+			var markdown = turndownService.turndown(element.outerHTML);
 			this.wrapper.editor.replaceRange(markdown, {line: this.line, ch: 0}, {line: this.endLine-1});
 			if(mobile){
 				this.wrapper.doRender(true);
 			}
-			this.closed = true;
 		}
 		
 		function doAlign(table,td,align){
@@ -1568,54 +1931,8 @@ var EditorWrapper = (function() {
 			return getTd(ele.parentElement);
 		}
 		
-		var alignMap = {
-			'' : ' -- ',
-			'left' : ' :-- ',
-			'center' : ' :--: ',
-			'right' : ' --: '
-		}
-		
-		function toMarkdown(table) {
-			var markdown = '';
-			var trs = table.find('tr');
-			for (var i = 0; i < trs.length; i++) {
-				var tr = trs.eq(i);
-				var ths = tr.find('th');
-				var headingRow = ths.length > 0;
-				if (headingRow) {
-					markdown += getRowMarkdown(ths);
-					markdown += '\n';
-					for (var j = 0; j < ths.length; j++) {
-						var align = ths[j].style['text-align'];
-						markdown += "|" + alignMap[align];
-					}
-					markdown += "|";
-				} else {
-					markdown += getRowMarkdown(tr.find('td'));
-				}
-				if (i < trs.length - 1) {
-					markdown += '\n';
-				}
-			}
-			return markdown;
-		}
-
-		function getRowMarkdown(tds) {
-			var markdown = '';
-			for (var j = 0; j < tds.length; j++) {
-				var td = tds.eq(j);
-				markdown += "|";
-				var md = turndownService.turndown(td.html());
-				md = md.trim().replace(/\n\r/g, '<br>').replace(/\n/g, "<br>")
-				markdown += md.length < 3 ? "  " + md : md;
-			}
-			markdown += "|";
-			return markdown;
-		}
-
-		
-		return {create : function(wrapper){
-			return new TableHelper(wrapper);
+		return {create : function(wrapper,$elem){
+			return new TableHelper(wrapper,$elem);
 		}}
 	})();
 	
@@ -2408,7 +2725,9 @@ var EditorWrapper = (function() {
 		
 		var _EditorWrapper = new _EditorWrapper(); 
 
+
         function EditorWrapper(config) {
+			var me = this;
             var html = '<div id="heather_wrapper">';
             html += '<div id="heather_toc">';
             html += '</div>';
@@ -2428,15 +2747,6 @@ var EditorWrapper = (function() {
             $('body').addClass('heather_noscroll');
             $('html').addClass('heather_noscroll');
             this.wrapperElement = $wrapperElement[0];
-			this.selectionChangeListeners = [];
-			var me = this;
-			document.onselectionchange = function(){
-				for(var i=0;i<me.selectionChangeListeners.length;i++){
-					try{
-						me.selectionChangeListeners[i].call()
-					}catch(e){console.log(e)};
-				}
-			}
 			
             if (!mobile) {
                 $("#heather_in").show();
@@ -2476,28 +2786,6 @@ var EditorWrapper = (function() {
 				} else return "";
 			});
 			
-			editor.setOption('dropContentHandler', function(fileName, content) {
-				var ext = fileName.split(".").pop().toLowerCase();
-				if (ext == "md") {
-					return content;
-				} else if (ext == "html" || ext == 'htm') {
-					return turndownService.turndown(content);
-				} else return "";
-			});
-			
-            this.theme = theme;
-            this.sync = Sync.create(editor, $("#heather_out")[0], config);
-            this.render = Render.create(config, theme);
-			this.searchHelper = SearchHelper.create(editor);
-			this.cursorHelper = CursorHelper.create(editor);
-			this.tooltip = Tooltip.create(editor);
-			this.tooltip.enable();
-            this.toolbar = Bar.create($("#heather_toolbar")[0]);
-            var innerBar = Bar.create($("#heather_innerBar")[0]);
-            innerBar.hide();
-            this.innerBar = innerBar;
-			this.taskListHelper = TaskListHelper.create(this);
-			this.tableHelper = TableHelper.create(this);
             //sync 
             var wrapper = this;
             if (!mobile) {
@@ -2535,6 +2823,13 @@ var EditorWrapper = (function() {
                     }
 
                 });
+				
+				var changeHandler = function(){
+					me.getExtraEditorSpace();
+				}
+			
+				editor.on('change',changeHandler);
+				
                 //sync
                 var scrollHandler = function() {
                     wrapper.doSync();
@@ -2545,6 +2840,10 @@ var EditorWrapper = (function() {
                 }
                 this.syncEnable = syncEnable;
                 this.scrollHandler = scrollHandler;
+				
+				
+				
+				
             }
 
             if (mobile) {
@@ -2619,14 +2918,26 @@ var EditorWrapper = (function() {
                     }
                 }, 500)
             })
+			
+            this.theme = theme;
+            this.sync = Sync.create(editor, $("#heather_out")[0], config);
+            this.render = Render.create(config, theme);
+			this.searchHelper = SearchHelper.create(editor);
+			this.cursorHelper = CursorHelper.create(editor);
+			this.tooltip = Tooltip.create(editor);
+			this.tooltip.enable();
+            this.toolbar = Bar.create($("#heather_toolbar")[0]);
+			this.taskListHelper = TaskListHelper.create(this);
+			this.tableHelper = TableHelper.create(this);
             this.editor = editor;
             this.config = config;
 			this.doRender(false);
 			if(this.config.backup_enable !== false){
 				this.backup = Backup.create(this);
 			}
+            this.innerBar = InnerBar.create(this);
+			this.inlinePreview = InlinePreview.create(this);
 			initKeyMap(this);
-            initInnerBar(this);
             initToolbar(this);
             this.fullscreen = false;
             if (screenfull.enabled) {
@@ -2657,10 +2968,401 @@ var EditorWrapper = (function() {
 				});
 			}
 			
-			
 
             triggerEvent(this, 'load');
         }
+		
+		var InlinePreview = (function(){
+			function InlinePreview(wrapper){
+				this.wrapper = wrapper;
+				this.editor = wrapper.editor;
+				this.widget = undefined;
+				this.started = false;
+			}
+			
+			InlinePreview.prototype.start = function(){
+				if(this.started) return ;
+				var editor = this.editor;
+				var me = this;
+				
+				var changeHandler = function(){
+					if(me.disableCursorActivity !== true){
+						me.disableCursorActivity = true;
+						me.widget.update();
+					}
+				}
+			
+				var cursorActivityHandler = function(){
+					if(me.disableCursorActivity === true){
+						return ;
+					}
+					me.widget.update();
+				}
+				
+				this.widget = Widget.create(this);
+				
+				var afterRenderHandler = function(){
+					me.disableCursorActivity = false;
+					me.widget.update();
+				}
+				this.editor.on('cursorActivity',cursorActivityHandler);
+				this.editor.on('change',changeHandler);
+				this.wrapper.on('afterRender',afterRenderHandler);
+				this.afterRenderHandler = afterRenderHandler;
+				this.changeHandler = changeHandler;
+				this.cursorActivityHandler = cursorActivityHandler;
+				this.started = true;
+			}
+			
+			
+			
+			InlinePreview.prototype.stop = function(){
+				if(!this.started) return ;
+				if(this.widget){
+					this.widget.remove();
+				}
+				this.editor.off('cursorActivity',this.cursorActivityHandler);
+				this.editor.off('change',this.changeHandler);
+				this.wrapper.off('afterRender',this.afterRenderHandler);
+				this.started = false;
+			}
+			
+			InlinePreview.prototype.isStarted = function(){
+				return this.started;
+			}
+			
+			var Widget = (function(){
+				var Widget = function(preview){
+					this.preview = preview;
+					this.create();
+				}
+				
+				Widget.prototype.create = function(){
+					var editor = this.preview.editor;
+					if(!editor.somethingSelected()){
+						var nodeStatus = getNodeStatus(editor);
+						var node = nodeStatus.node;
+						if(node){
+							//create wrap node
+							var div = document.createElement('div');
+							div.classList.add('markdown-body');
+							div.classList.add('inline-preview');
+							div.appendChild(node);
+							
+							this.startLine = nodeStatus.startLine;
+							this.endLine = nodeStatus.endLine;
+							this.widget =  editor.addLineWidget(this.endLine, div, {coverGutter: false, noHScroll: true});
+							this.tableHelper = TableHelper.create(this.preview.wrapper,$(this.widget.node));
+						}
+					}
+				}
+				
+				Widget.prototype.update = function(){
+					if(!this.widget){
+						this.create();
+					} else {
+						var editor = this.preview.editor;
+						if(!$.contains(editor.getWrapperElement(),this.widget.node)){
+							this.remove();
+							this.create();
+						} else {
+							if(editor.somethingSelected()){
+								this.remove();
+							} else {
+								var nodeStatus = getNodeStatus(editor);
+								var node = nodeStatus.node;
+								if(!node){
+									this.remove();
+								} else {
+									if(nodeStatus.startLine <= this.startLine && nodeStatus.endLine == this.endLine){
+										var div = document.createElement('div');
+										div.classList.add('markdown-body');
+										div.classList.add('inline-preview');
+										div.appendChild(node);
+										morphdom(this.widget.node,div);
+									} else {
+										this.remove();
+										this.create();
+									}
+								}
+							}
+						}
+					}
+				}
+				
+				Widget.prototype.remove = function(){
+					if(this.widget)
+						this.preview.editor.removeLineWidget(this.widget);
+					if(this.tableHelper)
+						this.tableHelper.remove();
+					this.widget == undefined;
+					this.tableHelper = undefined;
+				}
+				
+				var getNodeStatus = function(editor){
+					var line = editor.getCursor().line;
+					var node ;
+					var endLine;
+					var startLine;
+					$("#heather_out").find('[data-line]').each(function(){
+						var _startLine = parseInt(this.getAttribute('data-line'));
+						var _endLine = parseInt(this.getAttribute('data-end-line')) - 1;
+						if(_startLine <= line && _endLine >=line){
+							node = this;
+							endLine = _endLine;
+							startLine = _startLine;
+							return false;
+						}
+						if(_startLine > line){
+							return false;
+						}
+					});
+					return {
+						node : node ? node.cloneNode(true) : node,
+						endLine : endLine,
+						startLine : startLine,
+					};
+				}
+				
+				return {create:function(preview){
+					return new Widget(preview);
+				}}
+			})();
+			
+			return {create:function(wrapper){
+				return new InlinePreview(wrapper);
+			}}
+		})();
+		
+		var InnerBar = (function(){
+			function InnerBar(wrapper){
+				var bar = Bar.create($("#heather_innerBar")[0]);
+				bar.hide();
+				this.bar = bar;
+				this.wrapper = wrapper;
+				init(this);
+			}
+			
+			function init(bar){
+				var config = bar.wrapper.config;
+				var innerBar = bar.bar;
+				var wrapper = bar.wrapper;
+				var editor = wrapper.editor;
+				var icons = config.innerBar_icons || ['emoji','upload', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table','move', 'undo', 'redo', 'close'];
+				for (var i = 0; i < icons.length; i++) {
+					var icon = icons[i];
+					if(icon == 'upload' && wrapper.fileUploadEnable()){
+						var label = document.createElement('label');
+						label.setAttribute('class','icon fas fa-upload');
+						label.setAttribute('style','display: inline-block;')
+						label.innerHTML = '<input type="file" accept="image/*" style="display:none"/>';
+						label.querySelector('input[type="file"]').addEventListener('change',function(){
+							var file = this.files[0];
+							this.value = null;
+							if(file.name)
+								FileUpload.create(file,wrapper).start();
+						})
+						innerBar.addElement(label,0);
+					}
+					if(icon == 'emoji'){
+						innerBar.addIcon('far fa-grin-alt icon',function(){
+							wrapper.execCommand('emoji');
+						})
+					}
+					
+					if(icon == 'heading'){
+						innerBar.addIcon('fas fa-heading icon',function(){
+							wrapper.execCommand('heading');
+						})
+					}
+					if(icon == 'bold'){
+						innerBar.addIcon('fas fa-bold icon',function(){
+							wrapper.execCommand('bold');
+						})
+					}
+					if(icon == 'italic'){
+						innerBar.addIcon('fas fa-italic icon',function(){
+							wrapper.execCommand('italic');
+						})
+					}
+					if(icon == 'quote'){
+						innerBar.addIcon('fas fa-quote-left icon',function(){
+							wrapper.execCommand('quote');
+						})
+					}
+					
+					if(icon == 'strikethrough'){
+						innerBar.addIcon('fas fa-strikethrough icon',function(){
+							wrapper.execCommand('strikethrough');
+						})
+					}
+					
+					if(icon == 'link'){
+						innerBar.addIcon('fas fa-link icon',function(){
+							wrapper.execCommand('link');
+						})
+					}
+					
+					if(icon == 'code'){
+						innerBar.addIcon('fas fa-code icon',function(){
+							wrapper.execCommand('code');
+						})
+					}
+					
+					if(icon == 'code-block'){
+						innerBar.addIcon('fas fa-file-code icon',function(){
+							wrapper.execCommand('codeBlock');
+						})
+					}
+					
+					if(icon == 'uncheck'){
+						innerBar.addIcon('far fa-square icon',function(){
+							wrapper.execCommand('uncheck');
+						})
+					}
+					
+					if(icon == 'check'){
+						innerBar.addIcon('far fa-check-square icon',function(){
+							wrapper.execCommand('check');
+						})
+					}
+					
+					if(icon == 'table'){
+						innerBar.addIcon('fas fa-table icon',function(){
+							wrapper.execCommand('table');
+						})
+					}
+					
+					if(icon == 'undo'){
+						innerBar.addIcon('fas fa-undo icon',function(){
+							wrapper.editor.execCommand('undo');
+						})
+					}
+					
+					if(icon == 'redo'){
+						innerBar.addIcon('fas fa-redo icon',function(){
+							wrapper.editor.execCommand('redo');
+						})
+					}
+					
+					if(icon == 'move'){
+						innerBar.addIcon('fas fa-arrows-alt icon pc-hide',function(){
+							wrapper.cursorHelper.open();
+						})
+					}
+					
+					if(icon == 'close'){
+						innerBar.addIcon('fas fa-times icon',function(){
+							innerBar.hide();
+						})
+					}
+				}
+			
+				 var mobileCursorActivityHandler = function(bar) {
+					var lh = editor.defaultTextHeight();
+					var top = editor.cursorCoords(true, 'local').top;
+					var scrollTo = top -
+						bar.height() - 2 * lh;
+					if (scrollTo < 0) {
+						innerBarElement.css({
+							"top": (editor.cursorCoords(true).top + 2 * lh) + "px"
+						});
+						bar.show();
+					} else {
+						var scrollElement = editor.getScrollerElement();
+						var elem = $(scrollElement);
+						if (elem[0].scrollHeight - elem.scrollTop() -
+							elem.outerHeight() < 0) {
+							var top = editor.cursorCoords(true).top - 2 * lh -
+								bar.height() - $("#heather_toolbar").height();
+							if (top > 0) {
+								innerBarElement.css({
+									"top": (editor.cursorCoords(true).top - 2 *
+										lh - bar.height()) + "px"
+								});
+
+								bar.show();
+							} else {
+								innerBarElement.css({
+									"top": (editor.cursorCoords(true).top + 2 * lh) + "px"
+								});
+								bar.show();
+							}
+
+						} else {
+							var _top = editor.cursorCoords(true).top;
+							var showBar = function() {
+								editor.scrollTo(0, scrollTo);
+								setTimeout(function() {
+									var h = editor.cursorCoords(true).top;
+									var top = h > bar.height() + 2 * lh;
+									innerBarElement.css({
+										"top": top ? (h - 2 * lh - bar.height()) + "px" : (h + 2 * lh) + "px"
+									});
+									bar.show();
+								}, 50)
+							}
+
+							showBar();
+						}
+					}
+				}
+
+				editor.getScrollerElement().addEventListener('touchmove', function(evt) {
+					innerBar.hide();
+				});
+				
+				if (!mobile) {
+					editor.on('cursorActivity', function(){
+						bar.pos();
+					});
+					editor.on('scroll', function() {
+						innerBar.hide();
+					})
+				} else {
+					editor.on('cursorActivity', function() {
+						mobileCursorActivityHandler(innerBar);
+					});
+				}
+			
+			}
+			
+			InnerBar.prototype.pos = function(){
+				if(!mobile){
+					var editor = this.wrapper.editor;
+					var lh = editor.defaultTextHeight();
+					this.bar.element.css({
+						"top": (editor.cursorCoords(true).top + 2 * lh) + "px",
+					});
+					this.bar.show();
+				}
+			}
+			
+			InnerBar.prototype.isKeepHidden = function(){
+				return this.bar.keepHidden;
+			}
+			
+			InnerBar.prototype.keepHidden = function(){
+				this.bar.keepHidden = true;
+				this.bar.hide();
+			}
+			
+			InnerBar.prototype.unkeepHidden = function(){
+				this.bar.keepHidden = false;
+			}
+			
+			InnerBar.prototype.show = function(){
+				this.bar.show();
+			}
+			
+			InnerBar.prototype.hide = function(){
+				this.bar.hide();
+			}
+			
+			return {create:function(wrapper,config){
+				return new InnerBar(wrapper,config);
+			}}
+		})();
 		
 		function initKeyMap(wrapper){
 			var keyMap = mac ? {
@@ -2708,7 +3410,7 @@ var EditorWrapper = (function() {
         }
 
         function changeWhenFullScreenChange(wrapper, isFullscreen) {
-            if (!CodeMirror.browser.mobile) {
+            if (!mobile) {
                 var cm = wrapper.editor;
                 var wrap = cm.getWrapperElement();
                 var outToEditorHandler = function(e) {
@@ -2749,12 +3451,24 @@ var EditorWrapper = (function() {
 					});
 				};
 				
+				var toggleInlinePreviewHandler = function(){
+					var inlinePreview = wrapper.inlinePreview;
+					if(inlinePreview.isStarted()){
+						inlinePreview.stop();
+					}else{
+						inlinePreview.start();
+					}
+				}
+				
+				
 				var keyMap = mac ? {
 					'Cmd-Right': toPreviewHandler,
-					'Cmd-Left' : toTocHandler
+					'Cmd-Left' : toTocHandler,
+					'Cmd-P':toggleInlinePreviewHandler
 				} : {
 					'Ctrl-Right': toPreviewHandler,
-					'Ctrl-Left' : toTocHandler
+					'Ctrl-Left' : toTocHandler,
+					'Ctrl-P':toggleInlinePreviewHandler
 				} 
 
                 if (isFullscreen) {
@@ -2779,7 +3493,7 @@ var EditorWrapper = (function() {
                     cm.refresh();
 
                 } else {
-
+					wrapper.inlinePreview.stop();
 					wrapper.editor.removeKeyMap(keyMap);
                     $("#heather_out").off('keydown', outToEditorHandler);
                     $("#heather_toc").off('keydown', tocToEditorHandler);
@@ -2800,6 +3514,20 @@ var EditorWrapper = (function() {
             }
         }
 		
+		EditorWrapper.prototype.getExtraEditorSpace = function(){
+			var editor = this.editor;
+			var me = this;
+			var lh = editor.defaultTextHeight();
+			editor.focus();
+			var top = editor.cursorCoords(true, 'local').top;
+			var scrollTo = top  - 301;
+			if(scrollTo > 0){
+				$(editor.getScrollerElement()).stop(true).animate({ scrollTop: scrollTo }, 500,function(){	
+					me.innerBar.pos();
+				});
+			}
+		}
+		
 		EditorWrapper.prototype.fileUploadEnable = function(){
 			return !isUndefined(this.config.upload_url) && !isUndefined(this.config.upload_finish);
 		}
@@ -2817,6 +3545,7 @@ var EditorWrapper = (function() {
 			}
             this.render.renderAt(this.editor.getValue(), $("#heather_out")[0], patch);
             renderToc();
+            triggerEvent(this, 'afterRender');
         }
 
         EditorWrapper.prototype.remove = function() {
@@ -2869,9 +3598,9 @@ var EditorWrapper = (function() {
                 this.syncEnable = true;
             }
         }
-
-        EditorWrapper.prototype.getHtml = function() {
-            return this.render.getHtml(this.editor.getValue());
+		
+		EditorWrapper.prototype.getHtml = function(markdown) {
+            return this.render.getHtml(markdown || this.editor.getValue());
         }
 
         EditorWrapper.prototype.getValue = function() {
@@ -2898,8 +3627,8 @@ var EditorWrapper = (function() {
 
         EditorWrapper.prototype.off = function(name, handler) {
             for (var i = 0; i < this.eventHandlers.length; i++) {
-                var handler = this.eventHandlers[i];
-                if (handler.name == name && handler.handler == handler) {
+                var eventHandler = this.eventHandlers[i];
+                if (eventHandler.name === name && eventHandler.handler === handler) {
                     this.eventHandlers.splice(i, 1);
                     break;
                 }
@@ -2993,215 +3722,7 @@ var EditorWrapper = (function() {
 				}
 			}
         }
-
-        function initInnerBar(wrapper) {
-            var innerBar = wrapper.innerBar;
-            var editor = wrapper.editor;
-            var config = wrapper.config;
-
-            var innerBarElement = $("#heather_innerBar");
-			
-            var icons = config.innerBar_icons || ['emoji','upload', 'heading', 'bold', 'italic', 'quote', 'strikethrough', 'link', 'code', 'code-block', 'uncheck', 'check', 'table','move', 'undo', 'redo', 'close'];
-            for (var i = 0; i < icons.length; i++) {
-                var icon = icons[i];
-				if(icon == 'upload' && wrapper.fileUploadEnable()){
-					var label = document.createElement('label');
-					label.setAttribute('class','icon fas fa-upload');
-					label.setAttribute('style','display: inline-block;')
-					label.innerHTML = '<input type="file" accept="image/*" style="display:none"/>';
-					label.querySelector('input[type="file"]').addEventListener('change',function(){
-						var file = this.files[0];
-						this.value = null;
-						if(file.name)
-							FileUpload.create(file,wrapper).start();
-					})
-					innerBar.addElement(label,0);
-				}
-                if(icon == 'emoji'){
-					innerBar.addIcon('far fa-grin-alt icon',function(){
-						wrapper.execCommand('emoji');
-					})
-				}
-				
-				if(icon == 'heading'){
-					innerBar.addIcon('fas fa-heading icon',function(){
-						wrapper.execCommand('heading');
-					})
-				}
-				if(icon == 'bold'){
-					innerBar.addIcon('fas fa-bold icon',function(){
-						wrapper.execCommand('bold');
-					})
-				}
-				if(icon == 'italic'){
-					innerBar.addIcon('fas fa-italic icon',function(){
-						wrapper.execCommand('italic');
-					})
-				}
-				if(icon == 'quote'){
-					innerBar.addIcon('fas fa-quote-left icon',function(){
-						wrapper.execCommand('quote');
-					})
-				}
-				
-				if(icon == 'strikethrough'){
-					innerBar.addIcon('fas fa-strikethrough icon',function(){
-						wrapper.execCommand('strikethrough');
-					})
-				}
-				
-				if(icon == 'link'){
-					innerBar.addIcon('fas fa-link icon',function(){
-						wrapper.execCommand('link');
-					})
-				}
-				
-				if(icon == 'code'){
-					innerBar.addIcon('fas fa-code icon',function(){
-						wrapper.execCommand('code');
-					})
-				}
-				
-				if(icon == 'code-block'){
-					innerBar.addIcon('fas fa-file-code icon',function(){
-						wrapper.execCommand('codeBlock');
-					})
-				}
-				
-				if(icon == 'uncheck'){
-					innerBar.addIcon('far fa-square icon',function(){
-						wrapper.execCommand('uncheck');
-					})
-				}
-				
-				if(icon == 'check'){
-					innerBar.addIcon('far fa-check-square icon',function(){
-						wrapper.execCommand('check');
-					})
-				}
-				
-				if(icon == 'table'){
-					innerBar.addIcon('fas fa-table icon',function(){
-						wrapper.execCommand('table');
-					})
-				}
-				
-				if(icon == 'undo'){
-					innerBar.addIcon('fas fa-undo icon',function(){
-						wrapper.editor.execCommand('undo');
-					})
-				}
-				
-				if(icon == 'redo'){
-					innerBar.addIcon('fas fa-redo icon',function(){
-						wrapper.editor.execCommand('redo');
-					})
-				}
-				
-				if(icon == 'move'){
-					innerBar.addIcon('fas fa-arrows-alt icon pc-hide',function(){
-						wrapper.cursorHelper.open();
-					})
-				}
-				
-				if(icon == 'close'){
-					innerBar.addIcon('fas fa-times icon',function(){
-						innerBar.hide();
-					})
-				}
-            }
-			
-            var mobileCursorActivityHandler = function(bar) {
-                var lh = editor.defaultTextHeight();
-                var top = editor.cursorCoords(true, 'local').top;
-                var scrollTo = top -
-                    bar.height() - 2 * lh;
-                if (scrollTo < 0) {
-                    innerBarElement.css({
-                        "top": (editor.cursorCoords(true).top + 2 * lh) + "px"
-                    });
-                    bar.show();
-                } else {
-                    var scrollElement = editor.getScrollerElement();
-                    var elem = $(scrollElement);
-                    if (elem[0].scrollHeight - elem.scrollTop() -
-                        elem.outerHeight() < 0) {
-                        var top = editor.cursorCoords(true).top - 2 * lh -
-                            bar.height() - $("#heather_toolbar").height();
-                        if (top > 0) {
-                            innerBarElement.css({
-                                "top": (editor.cursorCoords(true).top - 2 *
-                                    lh - bar.height()) + "px"
-                            });
-
-                            bar.show();
-                        } else {
-                            innerBarElement.css({
-                                "top": (editor.cursorCoords(true).top + 2 * lh) + "px"
-                            });
-                            bar.show();
-                        }
-
-                    } else {
-                        var _top = editor.cursorCoords(true).top;
-                        var showBar = function() {
-                            editor.scrollTo(0, scrollTo);
-                            setTimeout(function() {
-                                var h = editor.cursorCoords(true).top;
-                                var top = h > bar.height() + 2 * lh;
-                                innerBarElement.css({
-                                    "top": top ? (h - 2 * lh - bar.height()) + "px" : (h + 2 * lh) + "px"
-                                });
-                                bar.show();
-                            }, 50)
-                        }
-
-                        showBar();
-                    }
-                }
-            }
-
-            if (!CodeMirror.browser.mobile) {
-				var posBar = function(){
-					var lh = editor.defaultTextHeight();
-					innerBarElement.css({
-						"top": (editor.cursorCoords(true).top + 2 * lh) + "px",
-					});
-					innerBar.show();
-				}
-                editor.on('cursorActivity', posBar);
-				var lastScrollTo;
-				var changeHandler = function(){
-					var lh = editor.defaultTextHeight();
-					var top = editor.cursorCoords(true, 'local').top;
-					var scrollTo = top  - 301;
-					if((!lastScrollTo && scrollTo > 0) || scrollTo > lastScrollTo+2*lh){
-						$(editor.getScrollerElement()).stop(true).animate({ scrollTop: scrollTo }, 500,function(){	
-							posBar();
-						});
-						lastScrollTo = scrollTo;
-					}
-				}
-			
-				editor.on('change',changeHandler);
-                editor.getScrollerElement().addEventListener('touchmove', function(evt) {
-                    innerBar.hide();
-                });
-                editor.on('scroll', function() {
-					innerBar.hide();
-                })
-            } else {
-
-                editor.on('cursorActivity', function() {
-                    mobileCursorActivityHandler(innerBar);
-                });
-
-                editor.getScrollerElement().addEventListener('touchmove', function(evt) {
-                    innerBar.hide();
-                });
-            }
-        }
-
+	
         function initToolbar(wrapper) {
             var editor = wrapper.editor;
             var theme = wrapper.theme;
@@ -3480,8 +4001,7 @@ var EditorWrapper = (function() {
                 }
 
                 if (icon == 'innerBar') {
-                    wrapper.innerBar.keepHidden = true;
-                    wrapper.innerBar.hide();
+                    wrapper.innerBar.keepHidden();
                     wrapper.toolbar.addIcon('far icon fa-square', function(ele) {
                         toggleInnerbar(ele);
                     });
@@ -3581,11 +4101,11 @@ var EditorWrapper = (function() {
             var innerBar = wrapper.innerBar;
 
             function toggleInnerbar(ele) {
-                innerBar.keepHidden = !innerBar.keepHidden;
-                if (innerBar.keepHidden) {
-                    innerBar.hide();
+                if (!innerBar.isKeepHidden()) {
+                    innerBar.keepHidden();
                     $(ele).addClass("fa-square").removeClass("fa-check-square");
                 } else {
+					innerBar.unkeepHidden();
                     $(ele).addClass("fa-check-square").removeClass("fa-square");
                 }
             }
