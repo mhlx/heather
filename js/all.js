@@ -2023,7 +2023,7 @@ var EditorWrapper = (function() {
 					cm.setSelection(cursor.from(), cursor.to());
 
 					var coords = cm.cursorCoords(cursor.from(), 'local');
-					cm.scrollTo(0, coords.top);
+					//cm.scrollTo(0, coords.top);
 					cursor.replace(typeof query == "string" ? text : text.replace(/\$(\d)/g,
 						function(_, i) {}));
 				};
@@ -2648,14 +2648,6 @@ var EditorWrapper = (function() {
 			return wrapper;
 		}
 		
-		_EditorWrapper.prototype.getEditor = function(o){
-			return o.doc ? o : o.editor;
-		}
-		
-		_EditorWrapper.prototype.getWrapper = function(o){
-			return o.doc ? o.state.wrapper : o;
-		}
-		
 		function insertTaskList(editor,checked){
 			var status = editor.selectionStatus();
 			var text = '';
@@ -2912,7 +2904,7 @@ var EditorWrapper = (function() {
                         ch: 0
                     }, "local").top;
                     editor.scrollTo(null, top);
-                    if (mobile || wrapper.fullscreen) {
+                    if (mobile || wrapper.inFullscreen()) {
                         wrapper.toEditor();
                         //wrapper.editor.focus();
                     }
@@ -2939,17 +2931,7 @@ var EditorWrapper = (function() {
 			this.inlinePreview = InlinePreview.create(this);
 			initKeyMap(this);
             initToolbar(this);
-            this.fullscreen = false;
-            if (screenfull.enabled) {
-                var screenFullChangeHandler = function() {
-                    wrapper.fullscreen = screenfull.isFullscreen;
-                    changeWhenFullScreenChange(wrapper, screenfull.isFullscreen);
-                }
-                wrapper.onRemove(function() {
-                    screenfull.off('change', screenFullChangeHandler);
-                });
-                screenfull.on('change', screenFullChangeHandler);
-            }
+            this.fullscreenMode = FullscreenMode.create(this);
 			
 			if(this.fileUploadEnable()){
 				editor.on('paste', function(editor, evt) {
@@ -3012,6 +2994,18 @@ var EditorWrapper = (function() {
 				this.changeHandler = changeHandler;
 				this.cursorActivityHandler = cursorActivityHandler;
 				this.started = true;
+				
+				const Toast = Swal.mixin({
+				  toast: true,
+				  position: 'top-end',
+				  showConfirmButton: false,
+				  timer: 3000
+				})
+
+				Toast.fire({
+				  type: 'success',
+				  title: '预览开启'
+				})
 			}
 			
 			
@@ -3025,6 +3019,18 @@ var EditorWrapper = (function() {
 				this.editor.off('change',this.changeHandler);
 				this.wrapper.off('afterRender',this.afterRenderHandler);
 				this.started = false;
+				
+				const Toast = Swal.mixin({
+				  toast: true,
+				  position: 'top-end',
+				  showConfirmButton: false,
+				  timer: 3000
+				})
+
+				Toast.fire({
+				  type: 'success',
+				  title: '预览关闭'
+				})
 			}
 			
 			InlinePreview.prototype.isStarted = function(){
@@ -3053,6 +3059,7 @@ var EditorWrapper = (function() {
 							this.endLine = nodeStatus.endLine;
 							this.widget =  editor.addLineWidget(this.endLine, div, {coverGutter: false, noHScroll: true});
 							this.tableHelper = TableHelper.create(this.preview.wrapper,$(this.widget.node));
+							this.preview.wrapper.getExtraEditorSpace();
 						}
 					}
 				}
@@ -3259,6 +3266,7 @@ var EditorWrapper = (function() {
 				}
 			
 				 var mobileCursorActivityHandler = function(bar) {
+					var innerBarElement = bar.element
 					var lh = editor.defaultTextHeight();
 					var top = editor.cursorCoords(true, 'local').top;
 					var scrollTo = top -
@@ -3377,7 +3385,11 @@ var EditorWrapper = (function() {
 				"Shift-Cmd-I" : 'check',
 				'Ctrl-S' : 'search',
 				"Cmd-Enter":function(){
-					wrapper.requestFullScreen();
+					if(wrapper.inFullscreen()){
+						wrapper.exitFullScreen();
+					} else {
+						wrapper.requestFullScreen();
+					}
 				}
 			} : {
 				"Ctrl-B" : 'bold',
@@ -3391,7 +3403,11 @@ var EditorWrapper = (function() {
 				"Alt-I" : 'check',
 				'Alt-S' : 'search',
 				"Ctrl-Enter":function(){
-					wrapper.requestFullScreen();
+					if(wrapper.inFullscreen()){
+						wrapper.exitFullScreen();
+					} else {
+						wrapper.requestFullScreen();
+					}
 				}
 			}
 			wrapper.bindKey(keyMap);
@@ -3408,124 +3424,39 @@ var EditorWrapper = (function() {
                 }
             }
         }
-
-        function changeWhenFullScreenChange(wrapper, isFullscreen) {
-            if (!mobile) {
-                var cm = wrapper.editor;
-                var wrap = cm.getWrapperElement();
-                var outToEditorHandler = function(e) {
-                    var keyCode = e.which || e.keyCode;
-                    if ((e.ctrlKey || e.metaKey) && keyCode == 37) {
-                        $("#heather_out").removeAttr("tabindex");
-                        wrapper.toEditor(function() {
-							cm.focus();
-							var info = cm.state.fullScreenRestore;
-							window.scrollTo(info.scrollLeft, info.scrollTop);
-                        });
-                    }
-                }
-
-                var tocToEditorHandler = function(e) {
-                    var keyCode = e.which || e.keyCode;
-                    if ((e.ctrlKey|| e.metaKey) && keyCode == 39) {
-                        $("#heather_toc").removeAttr("tabindex");
-                        wrapper.toEditor(function() {
-							cm.focus();
-							var info = cm.state.fullScreenRestore;
-							window.scrollTo(info.scrollLeft, info.scrollTop);
-                        });
-                    }
-                }
-				
-				var toPreviewHandler = function(){
-					wrapper.toPreview(function() {
-						$("#heather_out").prop('tabindex', 0);
-						$("#heather_out").focus();
-					});
-				};
-				
-				var toTocHandler = function(){
-					wrapper.toToc(function() {
-						$("#heather_toc").prop('tabindex', 0);
-						$("#heather_toc").focus();
-					});
-				};
-				
-				var toggleInlinePreviewHandler = function(){
-					var inlinePreview = wrapper.inlinePreview;
-					if(inlinePreview.isStarted()){
-						inlinePreview.stop();
-					}else{
-						inlinePreview.start();
-					}
-				}
-				
-				
-				var keyMap = mac ? {
-					'Cmd-Right': toPreviewHandler,
-					'Cmd-Left' : toTocHandler,
-					'Cmd-P':toggleInlinePreviewHandler
-				} : {
-					'Ctrl-Right': toPreviewHandler,
-					'Ctrl-Left' : toTocHandler,
-					'Ctrl-P':toggleInlinePreviewHandler
-				} 
-
-                if (isFullscreen) {
-					wrapper.editor.addKeyMap(keyMap);
-
-                    $("#heather_out").on('keydown', outToEditorHandler);
-                    $("#heather_toc").on('keydown', tocToEditorHandler);
-
-                    $(wrapper.getFullScreenElement()).addClass('heather_fullscreen');
-
-                    //from CodeMirror display fullscreen.js
-                    cm.state.fullScreenRestore = {
-                        scrollTop: window.pageYOffset,
-                        scrollLeft: window.pageXOffset,
-                        width: wrap.style.width,
-                        height: wrap.style.height
-                    };
-                    wrap.style.width = "";
-                    wrap.style.height = "auto";
-                    wrap.className += " CodeMirror-fullscreen";
-                    document.documentElement.style.overflow = "hidden";
-                    cm.refresh();
-
-                } else {
-					wrapper.inlinePreview.stop();
-					wrapper.editor.removeKeyMap(keyMap);
-                    $("#heather_out").off('keydown', outToEditorHandler);
-                    $("#heather_toc").off('keydown', tocToEditorHandler);
-
-                    $(wrapper.getFullScreenElement()).removeClass('heather_fullscreen');
-                    wrap.className = wrap.className.replace(/\s*CodeMirror-fullscreen\b/, "");
-                    document.documentElement.style.overflow = "";
-                    var info = cm.state.fullScreenRestore;
-                    wrap.style.width = info.width;
-                    wrap.style.height = info.height;
-                    window.scrollTo(info.scrollLeft, info.scrollTop);
-                    cm.refresh();
-
-                }
-                wrapper.toEditor(function() {
-					wrapper.doRender(false);
-				}, 0);
-            }
-        }
 		
 		EditorWrapper.prototype.getExtraEditorSpace = function(){
-			var editor = this.editor;
-			var me = this;
-			var lh = editor.defaultTextHeight();
-			editor.focus();
-			var top = editor.cursorCoords(true, 'local').top;
-			var scrollTo = top  - 301;
-			if(scrollTo > 0){
-				$(editor.getScrollerElement()).stop(true).animate({ scrollTop: scrollTo }, 500,function(){	
-					me.innerBar.pos();
-				});
+			var timer = this.extraEditorSpaceTimer;
+			if(timer){
+				clearTimeout(timer);
 			}
+			var me = this;
+			this.extraEditorSpaceTimer = setTimeout(function(){
+				var min = me.config.minLine ||7;
+				var length = me.config.lineLength || 15;
+				var editor = me.editor;
+				var lh = editor.defaultTextHeight();
+				editor.focus();
+				var cursor = editor.getCursor();
+				var bottom = $(window).height()-editor.charCoords(cursor).top;
+				if(bottom < min*lh){
+					var space = length*lh;
+					$('.CodeMirror-code').css({'margin-bottom': space+'px'});
+					$('#heather_out').css({'padding-bottom': space+'px'})
+					var elem = editor.getScrollerElement();
+					var scrollTo = editor.charCoords(cursor,'local').top - space;
+					var bar = me.innerBar;
+					var keepHidden = !bar.isKeepHidden();
+					if(keepHidden)
+						bar.keepHidden();
+					$(editor.getScrollerElement()).stop(true).animate({ scrollTop: scrollTo }, 'slow',function(){	
+						if(keepHidden){
+							bar.unkeepHidden();
+							bar.pos();
+						}
+					});
+				}
+			},200)
 		}
 		
 		EditorWrapper.prototype.fileUploadEnable = function(){
@@ -3559,27 +3490,155 @@ var EditorWrapper = (function() {
                 $('html,body').scrollTop(me.scrollTop);
                 me.wrapperElement.parentNode.removeChild(me.wrapperElement);
             }
-            if (this.fullscreen) {
-                this.exitFullScreen().then(function() {
-                    removeHandler();
-                });
-            } else {
-                removeHandler();
-            }
+            this.fullscreenMode.off();
+			removeHandler();
         }
 
         EditorWrapper.prototype.doSync = function() {
             this.sync.doSync();
         }
+		
+		var FullscreenMode = (function(){
+			function FullscreenMode(wrapper){
+				this.fullscreen = false;
+				this.keyMap = createKeyMap(wrapper);
+				this.wrapper = wrapper;
+				var editor = this.wrapper.editor;
+				this.outToEditorHandler = function(e) {
+                    var keyCode = e.which || e.keyCode;
+                    if ((e.ctrlKey || e.metaKey) && keyCode == 37) {
+                        $("#heather_out").removeAttr("tabindex");
+                        wrapper.toEditor(function() {
+							editor.focus();
+							var info = editor.state.fullScreenRestore;
+							window.scrollTo(info.scrollLeft, info.scrollTop);
+                        });
+                    }
+                }
+				this.tocToEditorHandler = function(e) {
+                    var keyCode = e.which || e.keyCode;
+                    if ((e.ctrlKey|| e.metaKey) && keyCode == 39) {
+                        $("#heather_toc").removeAttr("tabindex");
+                        wrapper.toEditor(function() {
+							editor.focus();
+							var info = editor.state.fullScreenRestore;
+							window.scrollTo(info.scrollLeft, info.scrollTop);
+                        });
+                    }
+                }
+			}
+			
+			FullscreenMode.prototype.on = function(){
+				if(this.fullscreen) return ;
+				var wrapper = this.wrapper;
+				var editor = wrapper.editor;
+				editor.addKeyMap(this.keyMap);
+
+				$("#heather_out").on('keydown', this.outToEditorHandler);
+				$("#heather_toc").on('keydown', this.tocToEditorHandler);
+
+				$(wrapper.getFullScreenElement()).addClass('heather_fullscreen');
+
+				var wrap = editor.getWrapperElement();
+				//from CodeMirror display fullscreen.js
+				editor.state.fullScreenRestore = {
+					scrollTop: window.pageYOffset,
+					scrollLeft: window.pageXOffset,
+					width: wrap.style.width,
+					height: wrap.style.height
+				};
+				
+				wrap.style.width = "";
+				wrap.style.height = "auto";
+				wrap.className += " CodeMirror-fullscreen";
+				document.documentElement.style.overflow = "hidden";
+				editor.refresh();
+				wrapper.toEditor(function() {
+					wrapper.doRender(false);
+				}, 0);
+				this.fullscreen = true;
+			}
+			
+			FullscreenMode.prototype.isFullscreen = function(){
+				return this.fullscreen;
+			}
+			
+			FullscreenMode.prototype.off = function(){
+				if(!this.fullscreen) return ;
+				var wrapper = this.wrapper;
+				wrapper.inlinePreview.stop();
+				var editor = this.wrapper.editor;
+				editor.removeKeyMap(this.keyMap);
+				$("#heather_out").off('keydown', this.outToEditorHandler);
+				$("#heather_toc").off('keydown', this.tocToEditorHandler);
+				$(this.wrapper.getFullScreenElement()).removeClass('heather_fullscreen');
+				var wrap = editor.getWrapperElement();
+				wrap.className = wrap.className.replace(/\s*CodeMirror-fullscreen\b/, "");
+				document.documentElement.style.overflow = "";
+				var info = editor.state.fullScreenRestore;
+				wrap.style.width = info.width;
+				wrap.style.height = info.height;
+				window.scrollTo(info.scrollLeft, info.scrollTop);
+				editor.refresh();
+				wrapper.toEditor(function() {
+					wrapper.doRender(false);
+				}, 0);
+				this.fullscreen = false;
+			}
+			
+			function createKeyMap(wrapper){
+				var cm = wrapper.editor;
+                var wrap = cm.getWrapperElement();
+				
+				var toPreviewHandler = function(){
+					wrapper.toPreview(function() {
+						$("#heather_out").prop('tabindex', 0);
+						$("#heather_out").focus();
+					});
+				};
+				
+				var toTocHandler = function(){
+					wrapper.toToc(function() {
+						$("#heather_toc").prop('tabindex', 0);
+						$("#heather_toc").focus();
+					});
+				};
+				
+				var toggleInlinePreviewHandler = function(){
+					var inlinePreview = wrapper.inlinePreview;
+					if(inlinePreview.isStarted()){
+						inlinePreview.stop();
+					}else{
+						inlinePreview.start();
+					}
+				}
+				
+				
+				return mac ? {
+					'Cmd-Right': toPreviewHandler,
+					'Cmd-Left' : toTocHandler,
+					'Cmd-P':toggleInlinePreviewHandler
+				} : {
+					'Ctrl-Right': toPreviewHandler,
+					'Ctrl-Left' : toTocHandler,
+					'Ctrl-P':toggleInlinePreviewHandler
+				} 
+			}
+			
+			return {create : function(wrapper){
+				return new FullscreenMode(wrapper);
+			}}
+			
+		})();
 
         EditorWrapper.prototype.requestFullScreen = function() {
-            if (!mobile) {
-                if (screenfull.enabled) {
-                    screenfull.request(this.getFullScreenElement());
-                } else {
-                    swal("当前浏览器不支持全屏模式")
-                }
-            }
+            if (!mobile){
+				this.fullscreenMode.on();
+			}
+        }
+		
+		EditorWrapper.prototype.inFullscreen = function() {
+            return this.fullscreenMode.isFullscreen();
         }
 
         EditorWrapper.prototype.getFullScreenElement = function() {
@@ -3587,8 +3646,8 @@ var EditorWrapper = (function() {
         }
 
         EditorWrapper.prototype.exitFullScreen = function() {
-            if (!mobile && screenfull.enabled) {
-                return screenfull.exit();
+            if (!mobile) {
+               this.fullscreenMode.off();
             }
         }
 
@@ -3668,7 +3727,7 @@ var EditorWrapper = (function() {
 
         EditorWrapper.prototype.toPreview = function(callback, _ms) {
             var me = this;
-            if (mobile || me.fullscreen) {
+            if (mobile || me.inFullscreen()) {
                 this.editor.unfocus();
                 if (mobile) {
                     this.doRender(true);
@@ -3988,7 +4047,7 @@ var EditorWrapper = (function() {
             })();
 
             var configIcon;
-            var icons = config.toolbar_icons || ['toc', 'innerBar', 'backup', 'search', 'config', 'expand'];
+            var icons = config.toolbar_icons || ['toc', 'innerBar', 'backup', 'search', 'config'];
             
 			
 
@@ -4057,31 +4116,6 @@ var EditorWrapper = (function() {
                         configIcon = ele;
                     })
                 }
-
-                if (icon == 'expand') {
-                    wrapper.toolbar.addIcon('fas fa-expand icon mobile-hide', function(ele) {
-                        if ($(ele).hasClass('fa-expand')) {
-                            wrapper.requestFullScreen();
-                        } else {
-                            wrapper.exitFullScreen();
-                        }
-                    }, function(ele) {
-                        if (screenfull.enabled) {
-
-                            var toggleHandler = function() {
-                                if (screenfull.isFullscreen) {
-                                    $(ele).removeClass('fa-expand').addClass('fa-compress');
-                                } else {
-                                    $(ele).removeClass('fa-compress').addClass('fa-expand');
-                                }
-                            };
-                            wrapper.onRemove(function() {
-                                screenfull.off('change', toggleHandler);
-                            })
-                            screenfull.on('change', toggleHandler);
-                        }
-                    });
-                }
             }
 
             var isToc = false;
@@ -4103,7 +4137,7 @@ var EditorWrapper = (function() {
             function toggleInnerbar(ele) {
                 if (!innerBar.isKeepHidden()) {
                     innerBar.keepHidden();
-                    $(ele).addClass("fa-square").removeClass("fa-check-square");
+					$(ele).addClass("fa-square").removeClass("fa-check-square");
                 } else {
 					innerBar.unkeepHidden();
                     $(ele).addClass("fa-check-square").removeClass("fa-square");
