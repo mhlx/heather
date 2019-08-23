@@ -223,7 +223,7 @@ var EditorWrapper = (function() {
 									if(secondChild.innerHTML.trim() != ''){
 										appendEmptyNode = false;
 									} else {
-										$(secondChild).remove();
+										secondChild.remove();
 									}
 								}
 							}
@@ -363,7 +363,7 @@ var EditorWrapper = (function() {
 					elem = elem.nextSibling;
 				}
 				for(var i=0;i<removes.length;i++){
-					$(removes[i]).remove();
+					removes[i].remove();
 				}
 				if(elem == null){
 					return null;
@@ -384,7 +384,7 @@ var EditorWrapper = (function() {
 				//move checkbox to first	
 				var clone = firstChildFirstChild.cloneNode(true);
 				$(li).prepend(clone);
-				$(firstChildFirstChild).remove();
+				firstChildFirstChild.remove();
 				return clone;
 			}
 		}
@@ -1295,7 +1295,7 @@ var EditorWrapper = (function() {
 		function loadHljsTheme(theme) {
 			if (theme.hljs.theme) {
 				var hljsTheme = theme.hljs.theme;
-				var hljsThemeFunction = theme.config.res_hljsTheme || function(hljsTheme) {
+				var hljsThemeFunction = _EditorWrapper.res_hljsTheme || function(hljsTheme) {
 					return 'highlight/styles/' + hljsTheme + '.css';
 				}
 				if ($('#hljs-theme-' + hljsTheme + '').length == 0) {
@@ -1311,7 +1311,7 @@ var EditorWrapper = (function() {
 		function loadEditorTheme(theme, callback) {
 			if (theme.editor.theme) {
 				var editorTheme = theme.editor.theme;
-				var editorThemeFunction = theme.config.res_editorTheme || function(editorTheme) {
+				var editorThemeFunction = _EditorWrapper.res_editorTheme || function(editorTheme) {
 					return 'codemirror/theme/' + editorTheme + '.css';
 				}
 				if ($('#codemirror-theme-' + editorTheme + '').length == 0) {
@@ -2496,7 +2496,7 @@ var EditorWrapper = (function() {
 				Widget.prototype.remove = function(){
 					var me = this;
 					if(this.widget){
-						$(me.widget).remove();
+						me.widget.remove();
 						me.widget == undefined;
 					}
 				}
@@ -3207,6 +3207,10 @@ var EditorWrapper = (function() {
 			}
         }
 		
+		EditorWrapper.prototype.getOutElement = function(keys) {
+			return document.getElementById('heather_out');
+        }
+		
         function initToolbar(wrapper) {
             var editor = wrapper.editor;
             var theme = wrapper.theme;
@@ -3373,11 +3377,11 @@ var EditorWrapper = (function() {
                         id: 'colorpicker-css',
                         type: 'text/css',
                         rel: 'stylesheet',
-                        href: config.res_colorpickerCss || 'colorpicker/dist/css/bootstrap-colorpicker.min.css'
+                        href: _EditorWrapper.res_colorpickerCss || 'colorpicker/dist/css/bootstrap-colorpicker.min.css'
                     });
                     $('<script>').appendTo('body').attr({
                         id: 'colorpicker-js',
-                        src: config.res_colorpickerJs || 'colorpicker/dist/js/bootstrap-colorpicker.min.js'
+                        src: _EditorWrapper.res_colorpickerJs || 'colorpicker/dist/js/bootstrap-colorpicker.min.js'
                     });
                     editor.setOption('readOnly', true);
                     $("#heather_searchHelper input").attr('value', '点击设置字体颜色');
@@ -3724,7 +3728,7 @@ var EditorWrapper = (function() {
 		function NearWysiwyg(wrapper){
 			this.wrapper = wrapper;
 			this.editor = wrapper.editor;
-			this.rootElem = document.getElementById('heather_out');
+			this.rootElem = wrapper.getOutElement();
 			this.inlineMath = new InlineMath(this.wrapper);
 			this.wrapper.turndownService.addRule('mermaid', {
 				filter: function (node) {
@@ -3996,6 +4000,12 @@ var EditorWrapper = (function() {
 				updateElementToMarkdownSource(wysiwyg,hasLine,startLine,endLine,elem);
 				wysiwyg.currentEditor = undefined;
 			});
+			editor.on('cancel',function(elem){
+				if(!hasLine){
+					elem.remove();
+				}
+				wysiwyg.currentEditor = undefined;
+			});
 			
 			editor.start();
 			editor.focus();
@@ -4233,7 +4243,7 @@ var EditorWrapper = (function() {
 							var expression = getKatexExpression(katexElem);
 							var nodeValue = backspace === true ? '$'+expression : '$'+expression+'$';
 							var textNode = document.createTextNode(nodeValue);
-							$(katexElem).remove();
+							katexElem.remove();
 							range.insertNode(textNode);
 							// if ancestor.parentElement is encoding="application/x-tex"
 							// the set cursor first 
@@ -4342,7 +4352,7 @@ var EditorWrapper = (function() {
 						var prev = katexElem.previousSibling;
 						while(prev != null && prev.nodeType == 3){
 							if(prev.nodeValue == veryThinChar){
-								$(prev).remove();
+								prev.remove();
 								prev = prev.previousSibling;
 							} else {
 								break;
@@ -4352,7 +4362,7 @@ var EditorWrapper = (function() {
 						var next = katexElem.nextSibling;
 						while(next != null && next.nodeType == 3){
 							if(next.nodeValue == veryThinChar){
-								$(next).remove();
+								next.remove();
 								next = next.nextSibling;
 							} else {
 								break;
@@ -4529,7 +4539,7 @@ var EditorWrapper = (function() {
 									var nextSibling = progressRoot[0].nextSibling;
 									if (nextSibling != null && nextSibling.nodeType == 3) {
 										if (nextSibling.nodeValue == veryThinChar) {
-											$(nextSibling).remove();
+											nextSibling.remove();
 										}
 									}
 
@@ -4581,7 +4591,7 @@ var EditorWrapper = (function() {
 						var nextSibling = root[0].nextSibling;
 						if (nextSibling != null && nextSibling.nodeType == 3) {
 							if (nextSibling.nodeValue == veryThinChar) {
-								$(nextSibling).remove();
+								nextSibling.remove();
 							}
 						}
 						root.remove();
@@ -4951,6 +4961,7 @@ var EditorWrapper = (function() {
 				   this.tdEditor.stop();
 				}
 				this.element.replaceWith(this.copy);
+				this.element = this.copy;
 				triggerEvent('cancel',this);
             }
 			TableEditor.prototype.getElement = function() {
@@ -5038,7 +5049,7 @@ var EditorWrapper = (function() {
 						cancelButtonColor: '#d33'
 					}).then((result) => {
 						if (result.value) {
-							$(me.element).remove();
+							me.element.remove();
 							me.stop();
 						}
 					})
@@ -5109,6 +5120,7 @@ var EditorWrapper = (function() {
 				var inlineMath = createInlineMathSession(this.wrapper,this.element);
 				inlineMath.start();
 				this.inlineMath = inlineMath;
+				this.contenteditableBar = new ContenteditableBar(this.element);
 				triggerEvent('start',this);
 			}
 
@@ -5119,6 +5131,7 @@ var EditorWrapper = (function() {
 				this.stoped = true;
 				this.bar.remove();
 				this.inlineMath.stop();
+				this.contenteditableBar.remove();
 				this.element.removeAttribute('contenteditable');
 				triggerEvent('stop',this);
 			}
@@ -5129,8 +5142,10 @@ var EditorWrapper = (function() {
 				}
 				this.stoped = true;
 				this.bar.remove();
+				this.contenteditableBar.remove();
 				this.inlineMath.stop();
 				this.element.replaceWith(this.copy);
+				this.element = this.copy;
 				triggerEvent('cancel',this);
 			}
 			
@@ -5154,6 +5169,8 @@ var EditorWrapper = (function() {
 				editor.inlineMath.stop();
 				editor.inlineMath = createInlineMathSession(editor.wrapper,editor.element);
 				editor.inlineMath.start();
+				editor.contenteditableBar.remove();
+				editor.contenteditableBar = new ContenteditableBar(editor.element);
 			}
 
 			return {
@@ -5200,7 +5217,7 @@ var EditorWrapper = (function() {
 						cancelButtonColor: '#d33'
 					}).then((result) => {
 						if (result.value) {
-							$(me.element).remove();
+							me.element.remove();
 							me.stop();
 						}
 					})
@@ -5283,7 +5300,7 @@ var EditorWrapper = (function() {
                         cancelButtonColor: '#d33'
                     }).then((result) => {
                         if (result.value) {
-                            $(paragraph).remove();
+                            paragraph.remove();
 							me.stop();
                         }
                     })
@@ -5353,6 +5370,7 @@ var EditorWrapper = (function() {
                 this.bar.remove();
 				this.inlineMath.stop();
 				this.element.replaceWith(this.copy);
+				this.element = this.copy;
 				triggerEvent('cancel',this);
             }
 
@@ -5456,7 +5474,7 @@ var EditorWrapper = (function() {
                         cancelButtonColor: '#d33'
                     }).then((result) => {
                         if (result.value) {
-                            $(pre).remove();
+                            pre.remove();
 							me.stop();
                         }
                     })
@@ -5490,10 +5508,10 @@ var EditorWrapper = (function() {
 				this.stoped = true;
 				this.bar.remove();
 				this.preHelper.unbind();
-				$(this.preview).remove();
+				this.preview.remove();
 				var expression = this.element.textContent.replaceAll(veryThinChar,'').trimEnd();
 				if(isEmptyText(expression)){
-					$(this.element).remove();
+					this.element.remove();
 					triggerEvent('stop',this);
 				} else {
 					var me = this;
@@ -5517,9 +5535,10 @@ var EditorWrapper = (function() {
 				this.stoped = true;
 				this.bar.remove();
 				this.preHelper.unbind();
-				$(this.preview).remove();
+				this.preview.remove();
 				this.element.replaceWith(this.copy);
-				triggerEvent('cancel',me);
+				this.element = this.copy;
+				triggerEvent('cancel',this);
             }
 
             KatexBlockEditor.prototype.focus = function() {
@@ -5623,7 +5642,7 @@ var EditorWrapper = (function() {
                         cancelButtonColor: '#d33'
                     }).then((result) => {
                         if (result.value) {
-                            $(textarea).remove();
+                            textarea.remove();
 							me.stop();
                         }
                     })
@@ -5657,10 +5676,10 @@ var EditorWrapper = (function() {
 				}
 				this.stoped = true;
 				this.bar.remove();
-				$(this.preview).remove();
+				this.preview.remove();
 				var expression = this.element.value;
 				if(isEmptyText(expression)){
-					$(this.element).remove();
+					this.element.remove();
 					triggerEvent('stop',this);
 				} else {
 					var me = this;
@@ -5688,9 +5707,10 @@ var EditorWrapper = (function() {
 				}
 				this.stoped = true;
 				this.bar.remove();
-				$(this.preview).remove();
+				this.preview.remove();
 				this.element.replaceWith(this.copy);
-				triggerEvent('cancel',me);
+				this.element = this.copy;
+				triggerEvent('cancel',this);
             }
 
             MermaidEditor.prototype.focus = function() {
@@ -5761,7 +5781,7 @@ var EditorWrapper = (function() {
 						}
 						li.addEventListener('click',clickHandler);
 						var checkbox = this.checkbox.cloneNode(true);
-						$(this.checkbox).remove();
+						this.checkbox.remove();
 						var me = this;
 						this.compositeEditor.on('stop',function(){
 							checkbox.checked = li.hasAttribute('data-checked');
@@ -5963,6 +5983,7 @@ var EditorWrapper = (function() {
                     this.liEditor.stop();
                 }
 				this.element.replaceWith(this.copy);
+				this.element = this.copy;
 				triggerEvent('cancel',this);
             }
 			
@@ -6020,7 +6041,7 @@ var EditorWrapper = (function() {
 					$(array[array.length-1]).after(paragraph);
 					for(var i=0;i<array.length;i++){
 						paragraph.appendChild(array[i].cloneNode(true));
-						$(array[i]).remove();
+						array[i].remove();
 					}
 				}
 			}
@@ -6236,6 +6257,7 @@ var EditorWrapper = (function() {
 				this.preHelper.unbind();
                 this.bar.remove();
 				this.element.replaceWith(this.copy);
+				this.element = this.copy;
 				triggerEvent('cancel',this);
             }
 
@@ -6440,7 +6462,7 @@ var EditorWrapper = (function() {
 						cancelButtonColor: '#d33'
 					}).then((result) => {
 						if (result.value) {
-							$(me.element).remove();
+							me.element.remove();
 							me.stop()
 						}
 					})
@@ -6553,7 +6575,7 @@ var EditorWrapper = (function() {
 					this.embedEditor.stop();
 				}
 				if (this.element.childNodes.length == 0) {
-					$(this.element).remove();
+					this.element.remove();
 				} else {
 					this.element.removeEventListener('click', this.clickHandler);
 				}
@@ -6572,6 +6594,7 @@ var EditorWrapper = (function() {
 					this.embedEditor.cancel();
 				}
 				this.element.replaceWith(this.copy);
+				this.element = this.copy;
 				triggerEvent('cancel',this);
 			}
 			
@@ -6633,7 +6656,7 @@ var EditorWrapper = (function() {
 		
 		var MediaHelper = (function(){
 			function MediaHelper(wysiwyg){
-				var root = document.getElementById('heather_out');
+				var root = wysiwyg.wrapper.getOutElement();
 				
 				var getLinkElement = function(element){
 					var linkElement = element;
@@ -7130,7 +7153,7 @@ var EditorWrapper = (function() {
                 if (!prevBr) {
                     $(div).before('<br>');
                 }
-                $(div).remove();
+                div.remove();
             } else {
                 var nodeType = last.nodeType;
                 if (nodeType == 3 || (nodeType == 1 && !last.blockDefault() && last.tagName != 'BR')) {
@@ -7150,7 +7173,7 @@ var EditorWrapper = (function() {
                     }
                 }
                 $(div).after(div.innerHTML);
-                $(div).remove();
+                div.remove();
             }
         }
     }
@@ -7202,7 +7225,6 @@ var EditorWrapper = (function() {
 		return div;
 	}
 
-	
     return _EditorWrapper;
 
 })();

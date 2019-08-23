@@ -52,6 +52,7 @@
 </div> 
 <div id="loading" style=";position:absolute;left:0;">Heather</div>
 <script>
+var version = '2.0.alpha';
 function loadJS(callback) {
     var index = 0;
     var site = document.location.href;
@@ -61,10 +62,10 @@ function loadJS(callback) {
         var obj = document.createElement(type);
 
         if (type === 'script') {
-            if (url) obj.src = url;
+            if (url) obj.src = url+"?v="+version;
             if (code) obj.text = code;
         } else {
-            obj.href = url;
+            obj.href = url+"?v="+version;
             obj.rel = 'stylesheet';
         }
 		if(cb){
@@ -107,7 +108,7 @@ function loadJS(callback) {
     resources.push(createResource('link', document.head, 'css/print.css', null,function(ele){
 		ele.setAttribute("media",'print');
 	}));
-    resources.push(createResource('script', document.body, 'jquery/jquery.min.js', null));
+    resources.push(createResource('script', document.body, 'jquery/jquery.min.js?', null));
     resources.push(createResource('script', document.body, 'js/morphdom-umd.min.js', null));
     resources.push(createResource('script', document.body, 'codemirror/lib/codemirror.js', null));
     resources.push(createResource('script', document.body, 'codemirror/addon/mode/overlay.js', null));
@@ -125,7 +126,7 @@ function loadJS(callback) {
     resources.push(createResource('script', document.body, 'highlight/highlight.pack.js', null));
     resources.push(createResource('script', document.body, 'js/jquery.touchwipe.min.js', null));
     resources.push(createResource('script', document.body, 'js/md.js', null));
-    resources.push(createResource('script', document.body, 'js/all.js', null));
+    resources.push(createResource('script', document.body, 'js/heather.js', null));
     resources.push(createResource('script', document.body, 'FileSaver.js', null));
     indexCount();
 }
