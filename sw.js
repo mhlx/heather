@@ -21,12 +21,9 @@ self.addEventListener('fetch', function(event) {
         // and serve second one
         let responseClone = response.clone();
         
-        try{
-			caches.open('v1').then(function (cache) {
-				cache.put(event.request, responseClone);
-			});
-		}catch(e){}
-		
+        caches.open('v1').then(function (cache) {
+          cache.put(event.request, responseClone);
+        });
         return response;
       }).catch(function () {
         //return caches.match('/sw-test/gallery/myLittleVader.jpg');

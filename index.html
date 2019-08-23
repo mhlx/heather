@@ -124,7 +124,6 @@ function loadJS(callback) {
     resources.push(createResource('script', document.body, 'js/turndown-plugin-gfm.js', null));
     resources.push(createResource('script', document.body, 'highlight/highlight.pack.js', null));
     resources.push(createResource('script', document.body, 'js/jquery.touchwipe.min.js', null));
-    resources.push(createResource('script', document.body, 'js/fullscreen.js', null));
     resources.push(createResource('script', document.body, 'js/md.js', null));
     resources.push(createResource('script', document.body, 'js/all.js', null));
     resources.push(createResource('script', document.body, 'FileSaver.js', null));
@@ -164,9 +163,16 @@ function loadJS(callback) {
 					type : 'image',
 					url : 'https://www.qyh.me/image/news/8BE085FBC2F48482047C510EE0A36C4F.jpeg/600'
 				};
-			}
+			},
+			disableWysiwyg:false
 		};
 		var wrapper = EditorWrapper.create(config);
+		
+		if(!CodeMirror.browser.mobile){
+			wrapper.requestFullScreen();
+			//wrapper.inlinePreview.start();
+		}
+		
 		//https://www.qyh.me/space/web/article/598
 		var userAgent = navigator.userAgent;
 		if(userAgent.indexOf('Windows NT 10.0') != -1 && userAgent.indexOf('Firefox') != -1){
@@ -187,9 +193,7 @@ function loadJS(callback) {
 			mediaQueryList.removeListener(beforePrintHandler);
 		});
 		 
-		$(window).on('resize',function(){
-			wrapper.toEditor(undefined,0);
-		});
+		
 		
 		wrapper.toolbar.addIcon('far fa-question-circle icon',function(){
 			$.get('help.md',{},function(data){
@@ -204,7 +208,10 @@ function loadJS(callback) {
 				return wrapper.backup.docName;
 			}return 'default';
 		}
-		
+		if(!CodeMirror.browser.mobile){
+		$(window).on('resize',function(){
+				wrapper.toEditor(undefined,0);
+		});
 		$("#heather_out").on('contextmenu',function(e){
 			var style = 'width:200px;margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;';
 			var html = '';
@@ -303,6 +310,7 @@ function loadJS(callback) {
 				var blob = new Blob([html], {type: "text/html;charset=utf-8"});
 				saveAs(blob, getFileName() + ".html");
 			});
+			
 
 			$("#export-print").click(function(){
 				if(!CodeMirror.browser.chrome){
@@ -325,8 +333,9 @@ function loadJS(callback) {
 
 			e.preventDefault();
 		})
+		}
+		
 	});
-	
 	
 </script>
 </body>

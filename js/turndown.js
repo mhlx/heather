@@ -554,10 +554,15 @@ function RootNode (input) {
   } else {
     root = input.cloneNode(true);
   }
+  
   collapseWhitespace({
     element: root,
     isBlock: isBlock,
-    isVoid: isVoid
+    isVoid: isVoid,
+	isPre:function(node){
+		var nodeName = node.nodeName.toLowerCase();
+		return nodeName == 'pre'  || nodeName == 'textarea'  || (nodeName == 'annotation'&& node.hasAttribute('encoding') && node.getAttribute('encoding') == 'application/x-tex');
+	}
   });
 
   return root
