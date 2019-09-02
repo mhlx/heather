@@ -272,12 +272,13 @@
 }
 .heather_wysiwyg_toolbar{
 	z-index:9999998;
-	position:fixed;
+	position:absolute;
 	background:#f9f9f7;
 	width:100%;
 	padding-top:5px;
 	top:0px;
 	height:30px;
+	left:200%;
 }
 
 #heather_toc {
@@ -556,7 +557,7 @@ h6 {
 	box-shadow: inset 0 1px 1px rgba(0,0,0,.05);
 	margin-top:10px;
 	margin-bottom:10px;
-	left:0px !important;
+	left:0px;
 	margin-left:15%;
 	margin-right:15%;
 	z-index:99;
@@ -576,6 +577,8 @@ h6 {
 	visibility:hidden;
 	z-index:9999999;
 	position:fixed;
+	margin-left:0%;
+	margin-right:0%;
 }
 .mermaid-preview pre,
 .katex-inline-preview pre,
@@ -663,17 +666,6 @@ ul li[data-task-list][data-unchecked]:before
     margin-left:-30px;
 }
 
-.heather_language_input{
-	border:none;
-	background:transparent;
-	max-width:200px;
-}
-.heather_language_input:focus{
-    outline: none;
-}
-.heather_language_error{
-	color:red
-}
 #heather_wrapper blockquote{
 	min-height:20px;
 }
@@ -692,4 +684,58 @@ ul li[data-task-list][data-unchecked]:before
     line-height: 1.45;
     overflow: auto;
     padding: 16px;
+}
+
+.heather_sticky{
+	position:sticky;
+	top:0px;
+}
+
+.heather-menu-dialog{
+	list-style-type:none;
+}
+
+.heather-menu-card{
+	list-style-type:none;
+	text-align:left;
+	font-size:20px;
+	padding:0px;
+}
+.heather-menu-card .off{
+	display:none;
+}
+
+.heather-menu-dialog li{
+	padding-top:10px;
+	padding-bottom:10px;
+	cursor:pointer
+}
+.heather-menu-dialog li i{
+	margin-right:50px;
+}
+.heather-menu-breadcrums{
+	text-align:left;
+	padding:10px;
+}
+	.heather-menu-breadcrums .active{
+		color:#70B7FD
+	}
+@media (min-width:768px) {
+
+	.heather-menu-dialog .active{
+		background-color:#D3D3D3
+	}
+}
+
+
+.heather-menu-breadcrums span{
+	display:inline-block;
+	margin-right:25px;
+}
+
+
+
+#heather_out [data-edit]{
+	min-height:60px;
+	background-color: #D3D3D3;
 }
