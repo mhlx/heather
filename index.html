@@ -183,6 +183,15 @@ function loadJS(callback) {
 			});
 		}
 		
+		
+		var htmlPasteHelper = Wysiwyg.HtmlPasteHelper;
+		htmlPasteHelper.nodeHandler['g-emoji'] = {
+			remove : function(node){
+				node.after(document.createTextNode(node.textContent));
+				return true;
+			}
+		}
+		
 		var wrapper = EditorWrapper.create(config);
 		
 			
@@ -192,6 +201,8 @@ function loadJS(callback) {
 		wrapper.on('wysiwyg.enable',function(wysiwyg){
 			wysiwyg.bindKey({'Ctrl-K':'kbd'});
 		})
+		
+		
 		//add contenteditable bar element
 		var barElements = Wysiwyg.ContenteditableBar.defaultBarElements;
 		barElements.push({

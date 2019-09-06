@@ -132,6 +132,7 @@ var EditorWrapper = (function() {
     var selectionChangeListeners = [];
 	var selectionChangeTimer;
 	var selectionChangeTimerMill = 100;
+	
     document.onselectionchange = function() {
 		if(selectionChangeTimer){
 			clearTimeout(selectionChangeTimer);
@@ -161,7 +162,7 @@ var EditorWrapper = (function() {
 		hljsTheme : function(hljsTheme) {
 			return 'highlight/styles/' + hljsTheme + '.css';
 		}
-	} 
+	}
 	
 	///default commands 
 	var commands = {
@@ -499,7 +500,7 @@ var EditorWrapper = (function() {
                     return node.nodeName === 'TABLE'
                 },
                 replacement: function(content, node, options) {
-                    return '\n\n' + toMarkdown($(node)) + '\n\n';
+                    return '\n\n' + tableToMarkdown($(node)) + '\n\n';
                 }
             });
 
@@ -566,14 +567,27 @@ var EditorWrapper = (function() {
                 return spaces;
             }
 
-            function toMarkdown(table) {
+            function tableToMarkdown(table) {
+				
+				//if td|th has colspan | rowspan attribute
+				//can not parsed to markdown
+				//return raw html
+				if(table.find('[colspan][rowspan]').length > 0){
+					return table.outerHTML;
+				}
+				
                 var markdown = '';
                 var trs = table.find('tr');
+				
                 for (var i = 0; i < trs.length; i++) {
                     var tr = trs.eq(i);
-                    var ths = tr.find('th');
-                    var headingRow = ths.length > 0;
+                    var headingRow = i == 0;
                     if (headingRow) {
+						
+						var ths = tr.find('th');
+						if(ths.length == 0){
+							ths = tr.find('td');
+						}
                         markdown += getRowMarkdown(ths);
                         markdown += '\n';
                         for (var j = 0; j < ths.length; j++) {
@@ -2055,8 +2069,9 @@ var EditorWrapper = (function() {
                 if (ext == "md") {
                     return content;
                 } else if (ext == "html" || ext == 'htm') {
-                    return wrapper.turndownService.turndown(content);
-                } else return "";
+					var markdown =  NearWysiwyg.HtmlPasteHelper.getMarkdownFromPasteHtml(content,wrapper);
+					return markdown == null ? '' : markdown;
+				} else return "";
             });
 
             if (!mobile) {
@@ -2193,22 +2208,33 @@ var EditorWrapper = (function() {
             initToolbar(this);
             this.fullscreenMode = new FullscreenMode(this);
             this.nearWysiwyg = NearWysiwyg.create(this);
-            if (this.fileUploadEnable()) {
-                editor.on('paste', function(editor, evt) {
-                    var clipboardData, pastedData;
-                    clipboardData = evt.clipboardData || window.clipboardData;
-                    var files = clipboardData.files;
-                    if (files.length > 0) {
-                        var f = files[0];
-                        var type = f.type;
-                        if (type.indexOf('image/') == -1) {
-                            swal("请上传图片文件");
-                            return;
-                        }
-                        new FileUpload(f, wrapper).start();
-                    }
-                });
-            }
+			editor.on('paste', function(editor, evt) {
+				var clipboardData, pastedData;
+				clipboardData = evt.clipboardData || window.clipboardData;
+				var files = clipboardData.files;
+				if (files.length > 0) {
+					if(wrapper.fileUploadEnable()){
+						var f = files[0];
+						var type = f.type;
+						if (type.indexOf('image/') == -1) {
+							swal("请上传图片文件");
+							return;
+						}
+						new FileUpload(f, wrapper).start();
+					}
+				} else {
+					var html = clipboardData.getData('text/html');
+					evt.preventDefault();
+					evt.stopPropagation();
+					var markdown = NearWysiwyg.HtmlPasteHelper.getMarkdownFromPasteHtml(html,wrapper);
+					if(markdown != null){
+						editor.replaceSelection('\n\n'+markdown);
+					} else {
+						var text =  clipboardData.getData('text/plain');
+						editor.replaceSelection('\n\n'+text);
+					}
+				}
+			});
             if (!mobile) {
                 this.enableAutoRender();
             }
@@ -3628,8 +3654,14 @@ var EditorWrapper = (function() {
 				'a':['href','title']
 			}
 			
+			var unwrapSet = new Set(['DIV','ARTICLE']);
 			var nodeHandler = {
-				'br' : {remove:true},
+				'p':{remove:function(node){
+					//remove <p><br></p> node
+					var childNodes = node.childNodes;
+					return childNodes.length == 1 && childNodes[0].nodeType == 1 && childNodes[0].tagName == 'BR';
+				}},
+				'svg':{remove:true},
 				'span':{
 					remove:function(node){
 						if(node.innerHTML == '&nbsp;'){
@@ -3641,7 +3673,12 @@ var EditorWrapper = (function() {
 					}
 				},
 				'*':{remove:function(node){
-					if(!node.hasChildNodes()) return true;
+					if(!node.hasChildNodes()){
+						if(node.blockDefault()) return node.tagName != 'TD' && node.tagName != 'TH';
+						var tagName = node.tagName;
+						return tagName == 'A';//TODO need more
+					}
+					
 					return false;
 				}}
 			}	
@@ -3693,11 +3730,38 @@ var EditorWrapper = (function() {
 				}
 			}
 			
-			var getNodesFromPasteHTML = function(html){
+			
+			var getMarkdownFromPasteHtml = function(html,wrapper){
+				var nodes = getNodesFromPasteHTML(html);
+				if(nodes.length > 0){
+					var markdown = '';
+					var i = 0;
+					for(const node of nodes){
+						if(node.hasAttribute('data-html')){
+							node.removeAttribute('data-html');
+							markdown += node.outerHTML;
+						} else {
+							markdown += wrapper.turndownService.turndown(node.outerHTML);
+						}
+						if(i < nodes.length - 1){
+							markdown += '\n\n';
+						}
+						i++;
+					}
+					return markdown;
+				}
+				
+				return null;
+			}
+			
+			
+			function getNodesFromPasteHTML(html){
 				var root = parseHTML(html).body;
+				unwrapNode(unwrapSet,root);
 				var childNodes = root.childNodes;
 				var nodes = [];
 				for(const childNode of childNodes){
+					var _nodes = [];
 					var node = childNode;
 					var nodeType = node.nodeType;
 					if(nodeType != 1 && nodeType != 3) continue;
@@ -3708,65 +3772,86 @@ var EditorWrapper = (function() {
 						}
 						var p = document.createElement('p');
 						p.innerHTML = nodeValue;
-						node = p;
+						_nodes.push(p);
+					} else {
+						_nodes.push(node);
+					}
+					for(const _node of _nodes){
+						var n = _node;
+						var factory = getEditorFactoryByElement(n); 
+						if(factory != null && hasMethod(factory,'processPasteNode')){
+							n =  factory.processPasteNode(n);
+							cleanAttribute(n);
+						} else {
+							cleanNode(root,n);
+							if(!root.contains(n)) continue;
+							cleanAttribute(n);
+							if(factory == null){
+								n.setAttribute('data-html','')
+							}
+						}
+						nodes.push(n);
 					}
 					
-					if(node.tagName == 'DIV'){
-						var subChildNodes = node.childNodes;
-						if(subChildNodes.length == 1){
-							var subChildNode = subChildNodes[0];
-							//only one first child
-							//detect is block default
-							if(!subChildNode.blockDefault()){
-								//not a block node 
-								//wrap it to paragraph
-								var p = document.createElement('p');
-								p.appendChild(subChildNode);
-								$(node).after(p);
-								node.remove();
-								node = p;
-							} else {
-								//block node 
-								//just put it behind div
-								var cloneNode = subChildNode.cloneNode(true);
-								$(node).after(cloneNode);
-								node.remove();
-								node = cloneNode;
-							}
-						} else {
-							//detect every node is none block
-							var isAllNodeBlock = true;
-							for(const child of subChildNodes){
-								if(child.blockDefault()){
-									isAllNodeBlock = false;
-									break;
-								}
-							}
-							if(isAllNodeBlock){
-								//div to paragrah
-								var p = document.createElement('p');
-								p.innerHTML = node.innerHTML;
-								$(node).after(p);
-								node.remove();
-								node = p;
-							}
-						}
-					}
-					var factory = getEditorFactoryByElement(node); 
-					if(factory != null && hasMethod(factory,'processPasteNode')){
-						node =  factory.processPasteNode(node);
-					} else {
-						cleanNode(root,node);
-						if(!root.contains(node)) continue;
-						cleanAttribute(node);
-						
-						if(factory == null){
-							node.setAttribute('data-html','')
-						}
-					}
-					nodes.push(node);
 				}
 				return nodes;
+			}
+			
+			function unwrapNode(tagNames,node){
+				if(tagNames.has(node.tagName)){
+					node.normalize();
+					var array = [];
+					var array2 = [];
+					var childNodes = node.childNodes;
+					if (childNodes.length > 0) {
+						for (var i = 0; i < childNodes.length; i++) {
+							var childNode = childNodes[i];
+							if (childNode.nodeType == 1) {
+								if (childNode.blockDefault()) {
+									
+									if(array.length > 0){
+										array2.push(array);
+										array = [];
+									}
+									
+								} else {
+									array.push(childNode);
+								}
+							} else {
+								array.push(childNode);
+							}
+						}
+						if(array.length > 0){
+							array2.push(array);
+						}
+					}
+					for(const array of array2){
+						var paragraph = document.createElement('p');
+						$(array[array.length - 1]).after(paragraph);
+						for (var i = 0; i < array.length; i++) {
+							paragraph.appendChild(array[i].cloneNode(true));
+							array[i].remove();
+						}
+					}
+					
+					var childNodes = node.childNodes;
+					var nodes = [];
+					var parent = node.parentNode;
+					while (node.firstChild){
+						var first = node.firstChild;
+						parent.insertBefore(first, node);
+						nodes.push(first);
+					};
+					parent.removeChild(node);
+					for(const _node of nodes){
+						unwrapNode(tagNames,_node);
+					}
+				} else {
+					var children = node.children;
+					for(const child of node.children){
+						unwrapNode(tagNames,child);
+					}
+				}
 			}
 			
 			function removeAttributes(element,checker){
@@ -3781,15 +3866,15 @@ var EditorWrapper = (function() {
 				}
 			}
 			
-			
 			return {
-				getNodesFromPasteHTML : getNodesFromPasteHTML,
+				getMarkdownFromPasteHtml : getMarkdownFromPasteHtml,
 				attributeRule:attributeRule,
 				nodeHandler:nodeHandler
 			}
+			
 		})();
 		
-		var htmlPasteHandler = function(e){
+		var htmlPasteEventListener = function(e){
 			var editor = this;
 			var isRoot = isUndefined(editor.parent);
 			if(!isRoot){
@@ -3800,28 +3885,12 @@ var EditorWrapper = (function() {
 			e.preventDefault();
 			e.stopPropagation();
 			
-			var nodes = HtmlPasteHelper.getNodesFromPasteHTML(html);
-			if(nodes.length > 0){
-				var markdown = '';
-				var wrapper = editor.wrapper;
-				var i = 0;
-				
+			var markdown = HtmlPasteHelper.getMarkdownFromPasteHtml(html,editor.wrapper);
+			if(markdown != null){
 				var element = editor.getElement();
 				var next = element.nextElementSibling;
 				var prev = element.previousElementSibling;
 				editor.stop();
-				for(const node of nodes){
-					if(node.hasAttribute('data-html')){
-						node.removeAttribute('data-html');
-						markdown += node.outerHTML;
-					} else {
-						markdown += wrapper.turndownService.turndown(node.outerHTML);
-					}
-					if(i < nodes.length - 1){
-						markdown += '\n\n';
-					}
-					i++;
-				}
 				var cm = editor.wrapper.editor;
 				if(next == null){
 					var addFirstLine = prev != null || editor.wrapper.getOutElement().contains(element);
@@ -3906,7 +3975,10 @@ var EditorWrapper = (function() {
 					editor.endLine = parseInt(editor.getElement().getAttribute('data-end-line'));
 				}
 			});
+			
 			this.wrapper.on('wysiwyg.editor.start',function(editor){
+				me.currentEditNextElement = getNextEditElement(editor.getElement(),me);
+				me.currentEditPrevElement = getPrevEditElement(editor.getElement(),me);
 				me.currentEditor = editor;
 				me.observer.observe(editor.getElement(), {
 					childList: true,
@@ -4255,15 +4327,9 @@ var EditorWrapper = (function() {
 				//find next element that's has data-line attribute;
 				var editor = this.currentEditor;
 				this.stopEdit();
-				var next = $(editor.getElement()).next('[data-line]');
-				if(next.length > 0){
-					startEdit(this,next[0]);
-				}
-			} else {
-				var first = this.rootElem.querySelector('[data-line]');
-				if(first != null){
-					startEdit(this,first);
-				}
+			}
+			if(this.currentEditNextElement != null){
+				startEdit(this,this.currentEditNextElement);
 			}
         }
 		
@@ -4277,19 +4343,50 @@ var EditorWrapper = (function() {
 				//find prev element that's has data-line attribute;
 				var editor = this.currentEditor;
 				this.stopEdit();
-				var prev = $(editor.getElement()).prev('[data-line]');
-				if(prev.length > 0){
-					startEdit(this,prev[0]);
-				}
-			} else {
-				var nodes = this.rootElem.querySelectorAll('[data-line]');
-				if(nodes.length > 0){
-					var last = nodes[nodes.length- 1];
-					startEdit(this,last);
-				}
 			}
+			
+			if(this.currentEditPrevElement != null){
+				startEdit(this,this.currentEditPrevElement);
+			} 
+			
         }
 		
+		function getNextEditElement(element,wysiwyg){
+			var next = element.nextElementSibling;
+			while(next != null){
+				if(getEditorFactoryByElement(next) != null){
+					return next;
+				}
+				next = next.nextElementSibling;
+			}
+			if(next == null){
+				for(const child of wysiwyg.rootElem.children){
+					if(getEditorFactoryByElement(child) != null){
+						return child;
+					}
+				}	
+			}
+			return null;
+		}
+		
+		function getPrevEditElement(element,wysiwyg){
+			var prev = element.previousElementSibling;
+			while(prev != null){
+				if(getEditorFactoryByElement(prev) != null){
+					return prev;
+				}
+				prev = prev.previousElementSibling;
+			}
+			if(prev == null){
+				var children = wysiwyg.rootElem.children;
+				for(var i=children.length-1;i>=0;i--){
+					if(getEditorFactoryByElement(children[i]) != null){
+						return children[i];
+					}
+				}
+			}
+			return null;
+		}
 		function markOnEdit(wysiwyg,editor){
 			var old = wysiwyg.rootElem.querySelector('[data-edit]');
 			if(old != null)
@@ -5328,6 +5425,7 @@ var EditorWrapper = (function() {
         var TableEditorFactory = (function() {
 
             var TdEditor = (function() {
+				
                 function TdEditor(table, td, wrapper, embed) {
                     this.table = table;
                     this.td = td;
@@ -5335,6 +5433,7 @@ var EditorWrapper = (function() {
                     this.embed = true;
 					triggerEditorEvent('create', this);
                 }
+				
                 TdEditor.prototype.start = function() {
 					this.mediaHelper = new MediaHelper(this.td);
 					DocumentCommandHelper.bindInlineBackspaceListener(this.td);
@@ -5502,11 +5601,7 @@ var EditorWrapper = (function() {
                     });
                 }
 
-                return {
-                    create: function(table, td, wrapper, embed) {
-                        return new TdEditor(table, td, wrapper, embed);
-                    }
-                }
+               return TdEditor;
             })();
 
             function TableEditor(element, wrapper, embed) {
@@ -5533,7 +5628,7 @@ var EditorWrapper = (function() {
                             if (me.child) {
                                 me.child.stop();
                             }
-                            var tdEditor = TdEditor.create(me.element, td, me.wrapper);
+                            var tdEditor = new TdEditor(me.element, td, me.wrapper);
 							tdEditor.parent = me;
                             tdEditor.start();
 							td.focus();
@@ -5571,7 +5666,7 @@ var EditorWrapper = (function() {
 								next =  nextTr.find('td,th').eq(0);
 							} 
 							me.child.stop();
-							var tdEditor = TdEditor.create(me.element, next[0], me.wrapper);
+							var tdEditor = new TdEditor(me.element, next[0], me.wrapper);
 							tdEditor.start();
 							next.focus();
 							me.child = tdEditor;
@@ -5648,6 +5743,9 @@ var EditorWrapper = (function() {
             }
 
             return {
+				processPasteNode: function(node) {
+					return node;
+                },
                 create: function(element, wrapper, embed) {
                     return new TableEditor(element, wrapper, embed);
                 },
@@ -5853,7 +5951,7 @@ var EditorWrapper = (function() {
                 var paragraph = this.element;
                 paragraph.setAttribute('contenteditable', 'true');
 				this.pasteHandler = function(e){
-					htmlPasteHandler.call(me,e)
+					htmlPasteEventListener.call(me,e)
 				}
                 paragraph.addEventListener('paste', this.pasteHandler);
                 var fileUploadMgr = new FileUploadMgr(paragraph, this.wrapper.config);
@@ -6766,10 +6864,16 @@ var EditorWrapper = (function() {
 			   this.stop();
             }			
             function getLanguage(code) {
-                var language = code.getAttribute('class');
-                if (language && language.startsWith("language-")) {
-                    return language.split('-')[1];
-                }
+                var classes = code.getAttribute('class');
+				if(classes != null){
+					var classArray = classes.split(' ');
+					for(const clazz of classArray){
+						if(clazz.startsWith("language-")){
+							return clazz.split('-')[1];
+						}
+					}					
+				}
+
             }
 
             function highlight(pre, language) {
@@ -8258,13 +8362,11 @@ var EditorWrapper = (function() {
 		editor.replaceSelection(text);
 	}
 	
-	
-	
-	function wrapToParagraph(li, checkbox) {
-		li.normalize();
+	function wrapToParagraph(node, checkbox) {
+		node.normalize();
 		var array = [];
 		//wrap inline|text nodes to paragraph
-		var childNodes = li.childNodes;
+		var childNodes = node.childNodes;
 		if (childNodes.length > 0) {
 			for (var i = 0; i < childNodes.length; i++) {
 				var childNode = childNodes[i];
