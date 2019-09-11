@@ -708,7 +708,8 @@ ul li[data-task-list][data-unchecked]:before
 .heather-menu-dialog li{
 	padding-top:10px;
 	padding-bottom:10px;
-	cursor:pointer
+	cursor:pointer;
+	outline:none;
 }
 .heather-menu-dialog li i{
 	margin-right:50px;

@@ -793,7 +793,14 @@ function process (parentNode) {
 
     var replacement = '';
     if (node.nodeType === 3) {
-      replacement = node.isCode ? node.nodeValue : self.escape(node.nodeValue);
+		if(node.isCode){
+			replacement = node.nodeValue;
+		} else {
+			var div = document.createElement('div');
+			div.appendChild(node.cloneNode(true));
+			replacement = self.escape(div.innerHTML);
+		}
+     // replacement = node.isCode ? node.nodeValue : self.escape(node.nodeValue);
     } else if (node.nodeType === 1) {
       replacement = replacementForNode.call(self, node);
     }

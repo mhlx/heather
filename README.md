@@ -1,83 +1,246 @@
-# heather 2.0 
+# heather 2.0
 
-heather2.0旨在开发一款所见即所得markdown编辑器
+## write markdown without markdown!
 
-## 支持的浏览器
+2.0提供了一个**独立的**wysiwyg的编辑器，**它不支持直接书写markdown文本**(例如mark text，虽然那可能是更好的做法)，编辑完成之后，它可以将内容直接转化为markdown文本
 
-桌面端：
+## 安装
 
-1. chrome
-2. firefox
+### 引入css文件
 
-移动端：
-
-1. safari
-2. chrome
-
-## markdown分块
-
-编辑器的主要思想就是将markdown文本分隔成不同的块，然后根据不同的块提供不同的编辑器，这样首先要解决的任务就是markdown文本的分块，比如存在如下markdown文本：
-``` markdown
-# 123
-123123
-1. 123
+``` javascript
+<link rel="stylesheet"  href="highlight/styles/github.css" media="all">
+<link rel="stylesheet"  href="css/markdown.css" media="all">
+<link rel="stylesheet"  href="fontawesome-free/css/all.min.css" media="screen">
+<link rel="stylesheet"  href="css/wysiwyg.css" media="screen">
 ```
 
-它将被分割成三块，分别为#123,123123和1. 123。
+### 引入js文件
 
-分块的主要好处是可以提供针对性强而且相对简单的块编辑器，而不是笼统的将整个markdown文本放到一个`<div contenteditable="true"></div>`之类的可编辑div中(这将会把你陷入到富文本编辑器的神坑之中，愿你的生涯远离这个东西https://ckeditor.com/blog/ContentEditable-The-Good-the-Bad-and-the-Ugly/)
+``` javascript
+<script src="jquery/jquery.min.js"></script>
+<script src="js/htmlparser.js"></script>
+<script src="js/morphdom-umd.min.js"></script>
+<script src="sweet2alert/dist/sweetalert2.all.min.js"></script>
+<script src="js/turndown.js"></script>
+<script src="js/turndown-plugin-gfm.js"></script>
+<script src="highlight/highlight.pack.js"></script>
+<script src="js/jquery.touchwipe.min.js"></script>
+<script src="js/md.js"></script>
+<script src="js/heather_wysiwyg.js"></script>
+```
 
-我做了个简单的分块页面，用于测试markdown的分块，具体可以到 https://md.qyh.me/markdown_to_block_test.html 这里查看效果
+### 创建编辑器
 
-## 块编辑器
+``` javascript
+var config = {
+    upload_url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
+    upload_finish:function(resp){
+    	swal('仅供测试上传所用，固定返回同一地址')
+    	return {
+    		type : 'video',
+    		url : 'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov',
+    		poster:'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov/960'
+    	};
+    }
+};
 
-当完成了markdown的分块后，需要为不同的块提供不同的不同的块编辑器，块编辑器应该始终是针对单个元素的，比如可以为`<p></p>`提供一个块编辑器，而`<p></p><p></p>`则应该直接提供源码(markdown)编辑器
+var editor = Wysiwyg.create(document.getElementById("editor"),config);
+```
 
-### HeadingEditor
+### 指令
 
-标题编辑器主要用于快速的编辑标题，例如
+指令是用于编辑器操作的无参方法，主要用于快捷键的绑定。
 
-[![heading_editor.gif](https://www.qyh.me/image/article/web/heading_editor.gif/600)](https://www.qyh.me/image/article/web/heading_editor.gif/900)
+#### 系统默认指令
 
-### PreEditor
+|指令名称|  说明|快捷键(pc)|
+| -- | -- | -- |
+|`factories`|打开用于选择一个新建元素的面板|<kbd>Alt-/</kbd>|
+|`contextmenu`|打开当前编辑器提供的菜单面板|<kbd>Alt-O</kbd>|
+|`bold`|用于选择内容加粗|<kbd>Ctrl-B</kbd>|
+|`italic`|用于选择内容倾斜|<kbd>Ctrl-I</kbd>|
+|`link`|用于将选择内容变成超链接|<kbd>Ctrl-L</kbd>|
+|`strikethrough`|用于为选择内容添加删除线|  |
+|`removeFormat`|用于清除选择内容的样式(**超链接不会被清空**)|<kbd>Ctrl-R</kbd>|
+|`code`|用于为选择内容加上code标签，如果没有选择任何内容，增加一个空的code标签，如果当前处于标签内，再次执行这个命令会跳出当前标签|<kbd>Ctrl-D</kbd>|
+|`insertBefore`|在当前正在编辑的元素前面插入一个新的元素|  |
+|`insertAfter`|在当前正在编辑的元素后面插入一个新的元素|  |
+|`table`|在当前正在编辑的元素的后面插入table并编辑它|  |
+|`heading`|在当前正在编辑的元素后面插入H1并编辑它|  |
+|`quote`|在当前正在编辑的元素后面插入blockquote并编辑它|  |
+|`codeBlock`|在当前正在编辑的元素后面插入代码块并编辑它|  |
+|`tasklist`|在当前正在编辑的元素后面插入任务列表并编辑它|  |
+|`paragraph`|在当前正在编辑的元素后面插入段落并编辑它|  |
+|`list`|在当前正在编辑的元素后面插入列表并编辑它|  |
+|`hr`|在当前正在编辑的元素后面插入分割线并编辑它|  |
+|`math`|在当前正在编辑的元素后面插入数学公式块并编辑它|  |
+|`mermaid`|在当前正在编辑的元素后面插入`mermaid`图表并编辑它|  |
 
-代码编辑器旨在提供一个所见即所得的编辑器，例如：
+#### 新增指令
 
-[![pre_editor.gif](https://www.qyh.me/image/article/web/pre_editor.gif/600)](https://www.qyh.me/image/article/web/pre_editor.gif/900)
+通过`EditorWrapper.Wysiwyg.commands['commandName'] = function`可以注册一个指令，例如：
 
-### ListEditor
+``` javascript
+var Wysiwyg = EditorWrapper.Wysiwyg;
+var documentCommandHelper = Wysiwyg.DocumentCommandHelper;
+var commands = Wysiwyg.commands;
+commands['kbd'] = function(){
+    Wysiwyg.runInlineCommand(this,function(range,sel){
+        documentCommandHelper.inlineTagHandler('KBD',range,sel);
+    });
+}
+```
 
-列表编辑器主要用于任务列表状态的快速变更以及有序列表和无序列表的快速转化，例如：
+将会注册一个插入kbd标签的指令。在指令方法内部，通过this即可获取Wysiwyg的实例
 
-[![list_editor.gif](https://www.qyh.me/image/article/web/list_editor.gif/600)](https://www.qyh.me/image/article/web/list_editor.gif/900)
+### 方法
 
-### TableEditor
+#### `bindKey(keyMap)`
 
-markdown的表格一直是一个头痛的问题，尤其是表格行列比较多的时候，这个时候往其中插入某一行和某一列能看花眼，而且一旦修改之后发现表格垮掉了，也往往要费好大的眼神才能看出来。TableEditor旨在解决这一系列的问题，例如：
+用于绑定快捷键，keyMap为一个对象，key为快捷键的名称，如果有多个键，通过-分隔，快捷键的名称为`event.key`请见：[https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key)&nbsp; value为指令名称或者一个方法
 
-[![table_editor.gif](https://www.qyh.me/image/article/web/table_editor.gif/600)](https://www.qyh.me/image/article/web/table_editor.gif/900)
+``` javascript
+var keyMap = {};
+keyMap["Alt-/"] = function(e){
+    alert("Alt - /");
+}
+keyMap["Alt-T"] = "table";
+wrapper.nearWysiwyg
+```
 
-### markdown编辑器
+<kbd>Alt-/</kbd>绑定了一个方法，参数为按钮点击事件，而<kbd>Alt-T</kbd>绑定了一个`command`命令，此时点击<kbd>Alt-T</kbd>按钮将会执行`table`命令。  
+**注意，如果又绑定了一个**<kbd>Alt-Shift-T</kbd>**按钮，那么这个按钮的优先级将高于**<kbd>Alt-T</kbd>**按钮**
 
-对于一些无法提供块编辑器的(最多的就是markdown文本中包含html元素的)，则应该提供一个markdown编辑器，直接撰写markdown，例如：
+#### unbindkey(keys)
 
-[![markdown_editor.gif](https://www.qyh.me/image/article/web/markdown_editor.gif/600)](https://www.qyh.me/image/article/web/markdown_editor.gif/900)
+用于解除快捷键的绑定，keys为一个数组，例如\['Alt-/'\]
 
-同时，各个块编辑器应该可以直接转化为markdown编辑器，例如：
+#### execCommand(commandName)
 
-[![to_markdown_editor.gif](https://www.qyh.me/image/article/web/to_markdown_editor.gif/600)](https://www.qyh.me/image/article/web/to_markdown_editor.gif/900)
+用于执行一个指令
 
-## 预计开发时间
+#### stopEdit(embed)
 
-应该在9月底上线第一个版本。
+用于停止当前编辑器并将编辑器内容保存到markdown文本，embed为一个布尔值，如果为true的话，只会停止最内层编辑器，否则停止最外层编辑器
 
----
+#### insertFile(fileInfo)
+
+在当前编辑器中插入一个文件，fileInfo是用于描述文件的对象，通过type属性来确定一个文件的类型，目前支持`image`&nbsp;`file`&nbsp;`video`三个文件类型。例如，插入一张图片：
+
+``` 
+{
+    type:'image',
+    name:'图片名称',
+    url:'图片地址'
+}
+```
+
+插入一个普通文件(将会以超链接的形式插入)
+
+``` 
+{
+    type:'file',
+    name:'文件名称' 
+    url:'文件地址'    
+}
+```
+
+插入一段视频(将会以html的方式插入)
+
+``` 
+{
+    type:'video',
+    poster:'视频封面地址',
+    src:'视频地址'
+}
+```
+
+上述文件对象将会产生如下html
+
+``` xml
+<video controls poster="" src="">
+
+</video>
+```
+
+如果需要插入多个视频地址(souce节点)，文件描述如下
+
+``` 
+{
+    type:'video',
+    poster:'',
+    sources:[{
+        src:'地址',
+        type:'类型'
+       }
+    ]
+}
+```
+
+产生的html如下：
+
+``` xml
+<video controls poster="">
+    <source src="" type=""/>
+</video>
+```
+
+**并非所有的编辑器都支持这个方法，只有段落和表格编辑器才能插入一个文件**
+
+#### editNext(embed)
+
+结束当前编辑，开启下一个元素的编辑，embed为一个布尔值，如果为true，那么则结束最内层编辑器，否则结束最外层编辑器
+
+#### editPrev(embed)
+
+同`editNext(embed)`
+
+#### delete
+
+删除选中的元素(**这个方法不能用于删除mermaid图表，数学公式**)
+
+#### undo
+
+撤销上一次操作  
+**如果当前没有进行任何编辑，那么将会进行块级别的撤销操作，否则进行编辑器级别的撤销操作**
+
+#### redo
+
+同undo
+
+#### loadMarkdown
+
+加载markdown文本，**会覆盖现有的文档**
+
+#### getMarkdown
+
+获取当前markdown
+
+#### fileUploadEnable
+
+是否开启了文件上传
+
+#### enable
+
+启用编辑器
+
+#### disable
+
+禁用编辑器
+
+## 其他
+
+### 自动链接
+
+在markdown(gfm)中，如果有如下文本&nbsp; `https://www.google.com`那么将会被解析为`<a href="https://www.google.com">https://www.google.com</a>`，这意味着，转化为html后，将无法区分到底是&nbsp;`[](https://www.google.com)`还是`https://www.google.com`，因此在将html转化为markdown的时候，将无法还原，所以自动链接默认禁用
 
 # heather 1.6
 
 ## 说明
 
 markdown编辑器，特性如下：
+
 1. 支持mermaid图表、katex
 2. 自定义工具条|辅助工具条
 3. 支持拖曳html|md文件，自动将html转化为markdown
@@ -104,7 +267,7 @@ https://github.com/mhlx/heather
 
 ### 引入css
 
-```html
+``` html
 <link rel="stylesheet"  href="codemirror/lib/codemirror.css" media="screen">
 <link rel="stylesheet" 
    href="codemirror/addon/scroll/simplescrollbars.css" media="screen">
@@ -116,7 +279,7 @@ https://github.com/mhlx/heather
 
 ### 引入js
 
-```html
+``` html
 <script src="jquery/jquery.min.js"></script>
 <script src="js/htmlparser.js"></script>
 <script src="js/morphdom-umd.min.js"></script>
@@ -143,14 +306,14 @@ https://github.com/mhlx/heather
 
 ### 创建编辑器
 
-```javascript
+``` javascript
 var config = {};
 var wrapper = EditorWrapper.create(config);
 ```
 
 ### 完整代码
 
-```html
+``` html
 <!DOCTYPE html>
 <html lang="zh-CN">
    <head>
@@ -213,7 +376,7 @@ var wrapper = EditorWrapper.create(config);
 4. 编辑器不会替代任何你页面的html元素，它只会额外创建一些html元素，它始终是全屏的，并且**无法改变**
 5. `EditorWrapper`依赖以下html元素(初始化实例时自动创建)，请保证ID的唯一性
 
-```html
+``` html
 <div id="editor_wrapper">
   <div id="editor_toc"></div>
   <div id="editor_in">
@@ -228,29 +391,29 @@ var wrapper = EditorWrapper.create(config);
 
 ## 配置
 
-|  配置项  |  说明  | 默认值   |    
-|  -  |  -  |  -  |
-|  `toolbar_icons`  | 配置顶部工具条图标   | [ 'toc','innerBar','backup','new','search','config' ]   |
-|  `backupEnable`  | 是否开启备份   |    |
-|  `backup_autoSaveMs`  | **当配置backupEnable为true时生效**，当编辑器内容发生变更时，多少毫秒后自动保存编辑器内容   |  500  | 
-|  `innerBar_icons`  | 配置辅助工具条的图标  |['heading','bold','italic','quote','strikethrough','link','code','code-block','uncheck','check','table','undo','redo','close'] | 
-|  `render_allowHtml`  | 是否允许html标签  | false |
-|  `render_plugins`  | 配置markdown渲染支持的插件  | ['footnote','katex','mermaid','anchor','task-lists','sup','sub','abbr'] |
-|  `render_beforeRender`  | 配置在渲染前元素处理器  |  |
-|  `render_ms`  | 当编辑器内容发生变更时，多少毫秒后开始渲染  | 500 |
-|  `stat_enable`  | 是否启用状态条  | true |
-|  `stat_formatter`  | 当启用状态条时，用于获取状态条渲染内容的方法  |  |
-|  `sync_animateMs`  | 配置同步滚动时滚动动画时间  | 0 |
-|  `sync_enable`  | 是否启用同步滚动  |  |
-|  `swipe_animateMs`  | 预览、编辑、toc切换时动画时间  | 500 |
-|  `res_mermaid_js`  | 指定mermaid文件的加载路径  | js/mermaid.min.js ||
-|  `res_katex_css`  | 指定katex css文件的加载路径  | katex/katex.min.css |
-|  `res_katex_js`  | 指定katex js文件的加载路径  | katex/katex.min.js |
-|  `res_hljsTheme`  | 获取highlightjs主题的路径  | function(theme){return themeCssUrl} |
-|  `res_editorTheme`  | 获取CodeMirror主题的路径  | function(theme){return themeCssUrl} |
-|  `res_colorpickerCss`  | 指定colorpicker css文件路径  | colorpicker/dist/css/bootstrap-colorpicker.min.css |
-|  `res_colorpickerJs`  | 指定colorpicker js文件路径  | colorpicker/dist/js/bootstrap-colorpicker.min.js |
-|  `renderAllDocEnable`  | 代码高亮的同步预览中，由于codemirror只渲染当前视窗，因此会出现不同步的现象，开启这个选项在载入文档时可以消除这个现象，但是在文本量比较大的时候，加载非常缓慢，可以选择关闭  | true |
+|配置项|  说明|默认值|
+| -- | -- | -- |
+|`toolbar_icons`|配置顶部工具条图标|\[ 'toc','innerBar','backup','new','search','config' \]|
+|`backupEnable`|是否开启备份|  |
+|`backup_autoSaveMs`|**当配置backupEnable为true时生效**，当编辑器内容发生变更时，多少毫秒后自动保存编辑器内容|500|
+|`innerBar_icons`|配置辅助工具条的图标|\['heading','bold','italic','quote','strikethrough','link','code','code-block','uncheck','check','table','undo','redo','close'\]|
+|`render_allowHtml`|是否允许html标签|false|
+|`render_plugins`|配置markdown渲染支持的插件|\['footnote','katex','mermaid','anchor','task-lists','sup','sub','abbr'\]|
+|`render_beforeRender`|配置在渲染前元素处理器|  |
+|`render_ms`|当编辑器内容发生变更时，多少毫秒后开始渲染|500|
+|`stat_enable`|是否启用状态条|true|
+|`stat_formatter`|当启用状态条时，用于获取状态条渲染内容的方法|  |
+|`sync_animateMs`|配置同步滚动时滚动动画时间|  0|
+|`sync_enable`|是否启用同步滚动|  |
+|`swipe_animateMs`|预览、编辑、toc切换时动画时间|500|
+|`res_mermaid_js`|指定mermaid文件的加载路径|js/mermaid.min.js|
+|`res_katex_css`|指定katex css文件的加载路径|katex/katex.min.css|
+|`res_katex_js`|指定katex js文件的加载路径|katex/katex.min.js|
+|`res_hljsTheme`|获取highlightjs主题的路径|function(theme){return themeCssUrl}|
+|`res_editorTheme`|获取CodeMirror主题的路径|function(theme){return themeCssUrl}|
+|`res_colorpickerCss`|指定colorpicker css文件路径|colorpicker/dist/css/bootstrap-colorpicker.min.css|
+|`res_colorpickerJs`|指定colorpicker js文件路径|colorpicker/dist/js/bootstrap-colorpicker.min.js|
+|`renderAllDocEnable`|代码高亮的同步预览中，由于codemirror只渲染当前视窗，因此会出现不同步的现象，开启这个选项在载入文档时可以消除这个现象，但是在文本量比较大的时候，加载非常缓慢，可以选择关闭|true|
 
 ## 方法
 
@@ -310,7 +473,7 @@ var wrapper = EditorWrapper.create(config);
 
 clazz为fontawesome图标的样式，例如`fa fa-file icon`，handler为图标被点击时触发的方法，callback则为图标元素的回调，例如为添加的图标加上id属性：
 
-```javascript
+``` javascript
 wrapper.toolbar.addIcon(clazz,hander,function(icon){
   icon.setAttribute(id,'icon-id');
 })
@@ -337,7 +500,7 @@ wrapper.toolbar.addIcon(clazz,hander,function(icon){
 
 #### 保持隐藏状态
 
-```javascript
+``` javascript
 wrapper.toolbar.keepHidden = true;
 wrapper.toolbar.hide();
 ```
@@ -354,7 +517,7 @@ wrapper.toolbar.hide();
 
 #### 配置编辑器主题
 
-```javascript
+``` javascript
 var theme = wrapper.theme;
 theme.setEditorTheme(wrapper.editor,'abcdef',function(){
 	theme.render();
@@ -363,7 +526,7 @@ theme.setEditorTheme(wrapper.editor,'abcdef',function(){
 
 #### 配置代码高亮主题
 
-```javascript
+``` javascript
 var theme = wrapper.theme;
 theme.hljs.theme = 'a11y-light'
 theme.render();
@@ -371,7 +534,7 @@ theme.render();
 
 #### 配置顶部工具条颜色
 
-```javascript
+``` javascript
 var theme = wrapper.theme;
 theme.toolbar.color = '#fff'
 theme.render();
@@ -379,7 +542,7 @@ theme.render();
 
 #### 配置辅助工具条颜色
 
-```javascript
+``` javascript
 var theme = wrapper.theme;
 theme.bar.color = '#fff'
 theme.render();
@@ -387,7 +550,7 @@ theme.render();
 
 #### 配置状态条字体颜色
 
-```javascript
+``` javascript
 var theme = wrapper.theme;
 theme.stat.color = '#fff'
 theme.render();
@@ -395,7 +558,7 @@ theme.render();
 
 #### 自定义css
 
-```javascript
+``` javascript
 var css = '';
 wrapper.theme.customCss = css;
 wrapper.theme.render();
@@ -406,6 +569,7 @@ wrapper.theme.render();
 ``` javascript
 wrapper.saveTheme();
 ```
+
 #### 重置主题
 
 ``` javascript
@@ -418,32 +582,31 @@ wrapper.resetTheme();
 
 系统内置指令
 
-| 名称   | 说明   |   快捷键_mac| 快捷键_pc| 
-|  -  |  -  | - | - |
-|  search  |  开启\|关闭一个搜索框  | <kbd>Ctrl</kbd> <kbd>S</kbd> |<kbd>Alt</kbd> <kbd>S</kbd>|
-|  emoji  |  打开emoji选择框  |     
-|  heading  |  打开heading选择框  |<kbd>Ctrl</kbd> <kbd>H</kbd> |<kbd>Ctrl</kbd> <kbd>H</kbd>  |  
-|  bold  |  加粗文本  | <kbd>Ctrl</kbd> <kbd>B</kbd> |<kbd>Ctrl</kbd> <kbd>B</kbd> |
-|  italic  |  倾斜文本  |<kbd>Ctrl</kbd> <kbd>I</kbd> |<kbd>Ctrl</kbd> <kbd>I</kbd>|
-|  quote  |  引用文本  | <kbd>Ctrl</kbd> <kbd>Q</kbd> |<kbd>Ctrl</kbd> <kbd>Q</kbd> | 
-|  strikethrough  |  为文本添加删除线  | 
-|  link  |  插入超链接  | <kbd>Ctrl</kbd> <kbd>L</kbd>  |<kbd>Ctrl</kbd> <kbd>L</kbd> |
-|  codeBlock  |  插入代码块  |<kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>B</kbd> |<kbd>Alt</kbd> <kbd>B</kbd>| 
-|  code  |  插入行内代码  | 
-|  uncheck  |  插入待办事项  |<kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>U</kbd> |<kbd>Alt</kbd> <kbd>U</kbd>|
-|  check  |  插入已完成待办事项  |<kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>I</kbd>|<kbd>Alt</kbd> <kbd>I</kbd>|
-|  undo  |  撤回  |<kbd>Cmd</kbd> <kbd>Z</kbd> | <kbd>Ctrl</kbd> <kbd>Z</kbd>|
-|  redo  |  取消撤回  |<kbd>Cmd</kbd> <kbd>Y</kbd>|<kbd>Ctrl</kbd> <kbd>Y</kbd>|
-|  table  |  插入表格  | <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>T</kbd> |<kbd>Alt</kbd> <kbd>T</kbd>|
+|  名称|  说明|快捷键\_mac|快捷键\_pc|
+| -- | -- | -- | -- |
+|search|开启\|关闭一个搜索框|<kbd>Ctrl</kbd> <kbd>S</kbd>|<kbd>Alt</kbd> <kbd>S</kbd>|
+|emoji|打开emoji选择框|  |  |
+|heading|打开heading选择框|<kbd>Ctrl</kbd> <kbd>H</kbd>|<kbd>Ctrl</kbd> <kbd>H</kbd>|
+|bold|加粗文本|<kbd>Ctrl</kbd> <kbd>B</kbd>|<kbd>Ctrl</kbd> <kbd>B</kbd>|
+|italic|倾斜文本|<kbd>Ctrl</kbd> <kbd>I</kbd>|<kbd>Ctrl</kbd> <kbd>I</kbd>|
+|quote|引用文本|<kbd>Ctrl</kbd> <kbd>Q</kbd>|<kbd>Ctrl</kbd> <kbd>Q</kbd>|
+|strikethrough|为文本添加删除线|  |  |
+|link|插入超链接|<kbd>Ctrl</kbd> <kbd>L</kbd>|<kbd>Ctrl</kbd> <kbd>L</kbd>|
+|codeBlock|插入代码块|<kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>B</kbd>|<kbd>Alt</kbd> <kbd>B</kbd>|
+|code|插入行内代码|  |  |
+|uncheck|插入待办事项|<kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>U</kbd>|<kbd>Alt</kbd> <kbd>U</kbd>|
+|check|插入已完成待办事项|<kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>I</kbd>|<kbd>Alt</kbd> <kbd>I</kbd>|
+|undo|  撤回|<kbd>Cmd</kbd> <kbd>Z</kbd>|<kbd>Ctrl</kbd> <kbd>Z</kbd>|
+|redo|取消撤回|<kbd>Cmd</kbd> <kbd>Y</kbd>|<kbd>Ctrl</kbd> <kbd>Y</kbd>|
+|table|插入表格|<kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>T</kbd>|<kbd>Alt</kbd> <kbd>T</kbd>|
 
 ### 新增指令
 
-`EditorWrapper.commands[commandName] = commandHandler`
-commandHandler接受一个参数`wrapper`，例如：
+`EditorWrapper.commands[commandName] = commandHandler` commandHandler接受一个参数`wrapper`，例如：
 
 新增一个插入图片的指令，并且为该指令绑定`Ctrl+G`的快捷键：
 
-```javascript
+``` javascript
 EditorWrapper.commands['image'] = function(wrapper){
   var editor = wrapper.editor;
   var text = editor.getSelection();
@@ -478,7 +641,7 @@ wrapper.bindKey({'Ctrl-G':'image'});
 
 ### 退出全屏
 
-`wrapper.exitFullScreen()`  **只在PC端有效**
+`wrapper.exitFullScreen()` **只在PC端有效**
 
 ### 销毁实例
 
@@ -511,8 +674,8 @@ var config = {
 };
 var wrapper = EditorWrapper.create(config);
 ```
-其中`upload_url`为上传的地址，`upload_finish`为上传成功后的回调函数，接受一个参数，该参数内容为服务器响应的内容
-，同时返回地址信息，地址信息分为三种：图片|视频|一般文件。
+
+其中`upload_url`为上传的地址，`upload_finish`为上传成功后的回调函数，接受一个参数，该参数内容为服务器响应的内容 ，同时返回地址信息，地址信息分为三种：图片|视频|一般文件。
 
 1. 图片地址，固定格式为`{type:'image',url:'图片地址'}`
 2. 视频地址，一般格式为`{type:'video',url:'视频地址'}`，同时可以通过设置poster属性设定一个封面，例如：`{type:'video',url:'视频地址','poster':'封面图片地址'}`，如果需要设置多个source，可以设置sources属性，source属性应该为一个数组，单个数组元素内容格式为`{'type':'video/mp4|video/ogg等','src':'视频地址'}`
@@ -521,6 +684,7 @@ var wrapper = EditorWrapper.create(config);
 ### 设定上传前参数
 
 通过配置`upload_before`可以在上传前增加额外的参数，例如
+
 ``` javascript
 config.upload_before = function(formData,file){
   formData.append("key", file.name);
@@ -531,12 +695,12 @@ config.upload_before = function(formData,file){
 
 通过配置`upload_fileName`可以设定文件上传名称，默认为`file`
 
-
 ### 七牛云文件上传
 
 一个简单的七牛云文件上传的例子：
 
 前端：
+
 ``` javascript
 var config = {
   upload_url:'http://upload.qiniu.com/',
@@ -565,6 +729,7 @@ var config = {
 ```
 
 后端：
+
 ``` java
 package test;
 
@@ -593,14 +758,13 @@ public class TestServlet extends HttpServlet{
 
 ```
 
-
 ## 导出PDF
 
 没有直接导出PDF的方法，但是可以通过以下步骤，让chrome浏览器的打印功能来实现
 
 ### 设置打印样式
 
-```html
+``` html
 <link rel="stylesheet"  href="codemirror/lib/codemirror.css" media="screen">
 <link rel="stylesheet" 
  href="codemirror/addon/scroll/simplescrollbars.css" media="screen">
@@ -610,13 +774,13 @@ public class TestServlet extends HttpServlet{
 <link rel="stylesheet" href="css/print.css" media="print">
 ```
 
-上述html中，`media="print"`的只会在打印时使用，`media="screen"`的则只会在页面渲染时使用，而`media="all"` 则在所有情况下都会使用，请参考 https://www.w3schools.com/tags/att_link_media.asp
+上述html中，`media="print"`的只会在打印时使用，`media="screen"`的则只会在页面渲染时使用，而`media="all"` 则在所有情况下都会使用，请参考 https://www.w3schools.com/tags/att\_link\_media.asp
 
 ### 打印前渲染
 
 mermaid渲染出来的元素大小会根据视窗大小自动调整，由于左右预览的原因，打印出来的大小会跟预期的大小不一致，此时可以通过监听打印事件使得在打印前再次渲染。
 
-```javascript
+``` javascript
 var wrapper = EditorWrapper.create({});
 var beforePrintHandler = function(mql) {
     if (mql.matches) {
@@ -636,7 +800,7 @@ wrapper.onRemove(function(){
 
 通过添加以下代码可以让pdf文件强制分页
 
-```html
+``` html
 <div style="page-break-after: always;"></div>
 ```
 

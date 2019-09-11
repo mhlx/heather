@@ -174,47 +174,8 @@ function loadJS(callback) {
 		//EditorWrapper.lazyRes to config lazy load res url
 		//EditorWrapper.commands default commands here
 		
-		var Wysiwyg = EditorWrapper.Wysiwyg;
-		var documentCommandHelper = Wysiwyg.DocumentCommandHelper;
-		var commands = Wysiwyg.commands;
-		commands['kbd'] = function(){
-			Wysiwyg.runInlineCommand(this,function(range,sel){
-				documentCommandHelper.inlineTagHandler('KBD',range,sel);
-			});
-		}
-		
-		
-		var htmlPasteHelper = Wysiwyg.HtmlPasteHelper;
-		htmlPasteHelper.nodeHandler['g-emoji'] = {
-			remove : function(node){
-				node.after(document.createTextNode(node.textContent));
-				return true;
-			}
-		}
-		
 		var wrapper = EditorWrapper.create(config);
 		
-			
-		wrapper.editor.on('change',function(editor){
-			//console.log(editor.getValue())
-		})
-		wrapper.on('wysiwyg.enable',function(wysiwyg){
-			wysiwyg.bindKey({'Ctrl-K':'kbd'});
-		})
-		
-		
-		//add contenteditable bar element
-		var barElements = Wysiwyg.ContenteditableBar.defaultBarElements;
-		barElements.push({
-			createElement : function(){
-				var eraser = document.createElement('i');
-				eraser.setAttribute('class','fas fa-times middle-icon');
-				return eraser;
-			},
-			handler : function(ele,range,sel){
-				wysiwyg.execCommand('kbd');
-			}
-		})
 		wrapper.requestFullScreen();
 		
 		//https://www.qyh.me/space/web/article/598
