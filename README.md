@@ -2,13 +2,13 @@
 
 ## write markdown without markdown!
 
-2.0提供了一个**独立的**wysiwyg的编辑器，**它不支持直接书写markdown文本**(例如mark text，虽然那可能是更好的做法)，编辑完成之后，它可以将内容直接转化为markdown文本
+2.0提供了一个**独立的**wysiwyg的编辑器，**它不支持直接书写markdown文本(例如mark text，虽然那可能是更好的做法)**，编辑完成之后，它可以将内容直接转化为markdown文本
 
 ## 安装
 
 ### 引入css文件
 
-``` javascript
+``` xml
 <link rel="stylesheet"  href="highlight/styles/github.css" media="all">
 <link rel="stylesheet"  href="css/markdown.css" media="all">
 <link rel="stylesheet"  href="fontawesome-free/css/all.min.css" media="screen">
@@ -17,7 +17,7 @@
 
 ### 引入js文件
 
-``` javascript
+``` xml
 <script src="jquery/jquery.min.js"></script>
 <script src="js/htmlparser.js"></script>
 <script src="js/morphdom-umd.min.js"></script>
