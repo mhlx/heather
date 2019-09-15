@@ -434,212 +434,264 @@ var EditorWrapper = (function() {
         }
     }
 
-    var turndown = (function() {
+    var turndownService = (function() {
+	
+		var alignMap = {
+			'': ' -- ',
+			'left': ' :-- ',
+			'center': ' :--: ',
+			'right': ' --: '
+		}
 
-        var alignMap = {
-            '': ' -- ',
-            'left': ' :-- ',
-            'center': ' :--: ',
-            'right': ' --: '
-        }
+		var turndownService = new window.TurndownService({
+			'headingStyle': 'atx',
+			'codeBlockStyle': 'fenced',
+			'emDelimiter': '*',
+			'bulletListMarker': '-',
+			defaultReplacement: function(innerHTML, node) {
+				return node.blockDefault() ? '\n\n' + node.outerHTML + '\n\n' : node.outerHTML
+			}
+		});
+		turndownService.use(window.turndownPluginGfm.gfm);
+		turndownService.addRule('paragraph', {
+			filter: ['p'],
+			replacement: function(content) {
+				var lines = content.replaceAll('\r', '').split('\n');
+				var rst = '';
+				for (var i = 0; i < lines.length; i++) {
+					var line = lines[i];
+					if (line == '  ') {
+						rst += '<br>';
+					} else {
+						rst += line;
+					}
+					if (i < lines.length - 1)
+						rst += '\n'
+				}
+				return '\n\n' + rst + '\n\n';
+			}
+		});
+		
+		turndownService.addRule('html-block', {
+			filter: function(node){
+				return node.nodeType == 1  && node.tagName == 'DIV' && node.hasAttribute('data-html');
+			},
+			replacement: function(content,node) {
+				return '\n\n' + node.innerHTML + '\n\n';
+			}
+		});
 
-        var createTurndownservice = function() {
-            var turndownService = new window.TurndownService({
-                'headingStyle': 'atx',
-                'codeBlockStyle': 'fenced',
-                'emDelimiter': '*',
-                'bulletListMarker': '-',
-                defaultReplacement: function(innerHTML, node) {
-                    return node.blockDefault() ? '\n\n' + node.outerHTML + '\n\n' : node.outerHTML
-                }
-            });
-            turndownService.use(window.turndownPluginGfm.gfm);
-            turndownService.addRule('paragraph', {
-                filter: ['p'],
-                replacement: function(content) {
-                    var lines = content.replaceAll('\r', '').split('\n');
-                    var rst = '';
-                    for (var i = 0; i < lines.length; i++) {
-                        var line = lines[i];
-                        if (line == '  ') {
-                            rst += '<br>';
-                        } else {
-                            rst += line;
-                        }
-                        if (i < lines.length - 1)
-                            rst += '\n'
-                    }
-                    return '\n\n' + rst + '\n\n';
-                }
-            });
+		turndownService.addRule('fenceblock', {
+			filter: function(node, options) {
+				return (
+					options.codeBlockStyle === 'fenced' &&
+					node.nodeName === 'PRE' &&
+					node.firstChild &&
+					node.firstChild.nodeName === 'CODE'
+				)
+			},
 
-            turndownService.addRule('fenceblock', {
-                filter: function(node, options) {
-                    return (
-                        options.codeBlockStyle === 'fenced' &&
-                        node.nodeName === 'PRE' &&
-                        node.firstChild &&
-                        node.firstChild.nodeName === 'CODE'
-                    )
-                },
+			replacement: function(content, node, options) {
+				var className = node.firstChild.className || '';
+				var language = (className.match(/language-(\S+)/) || [null, ''])[1];
 
-                replacement: function(content, node, options) {
-                    var className = node.firstChild.className || '';
-                    var language = (className.match(/language-(\S+)/) || [null, ''])[1];
+				var textContent = node.firstChild.textContent;
+				var lines = textContent.split('\n');
+				var lastLine = lines[lines.length - 1];
+				var lineBreaker = lastLine.replaceAll('\n', '') == '' ? '' : '\n';
+				return '\n\n' + options.fence + " " + language + '\n' + textContent + lineBreaker + options.fence + '\n\n';
+			}
+		});
 
-                    var textContent = node.firstChild.textContent;
-                    var lines = textContent.split('\n');
-                    var lastLine = lines[lines.length - 1];
-                    var lineBreaker = lastLine.replaceAll('\n', '') == '' ? '' : '\n';
-                    return '\n\n' + options.fence + " " + language + '\n' + textContent + lineBreaker + options.fence + '\n\n';
-                }
-            });
+		turndownService.addRule('table', {
+			filter: function(node) {
+				return node.nodeName === 'TABLE'
+			},
+			replacement: function(content, node, options) {
+				return '\n\n' + tableToMarkdown($(node)) + '\n\n';
+			}
+		});
 
-            turndownService.addRule('table', {
-                filter: function(node) {
-                    return node.nodeName === 'TABLE'
-                },
-                replacement: function(content, node, options) {
-                    return '\n\n' + tableToMarkdown($(node)) + '\n\n';
-                }
-            });
+		turndownService.addRule('list', {
+			filter: ['ul', 'ol'],
+			replacement: function(content, node, options) {
+				node.innerHTML = cleanHtml(node.innerHTML);
+				return '\n\n' + listToMarkdown(node, options, 0) + '\n\n';
+			}
+		});
+		
+		
+		turndownService.addRule('mermaid', {
+			filter: function(node) {
+				return node.tagName == 'DIV' && node.classList.contains('mermaid-block');
+			},
+			replacement: function(content, node, options) {
+				var expression = getMermaidExpression(node);
+				var lines = expression.split('\n');
+				var lastLine = lines[lines.length - 1];
+				var lineBreaker = lastLine.replaceAll('\n', '') == '' ? '' : '\n';
+				return '\n\n' + options.fence + " mermaid" + '\n' + expression + lineBreaker + options.fence + '\n\n';
+			}
+		});
 
-            turndownService.addRule('list', {
-                filter: ['ul', 'ol'],
-                replacement: function(content, node, options) {
-                    node.innerHTML = cleanHtml(node.innerHTML);
-                    return '\n\n' + listToMarkdown(node, options, 0) + '\n\n';
-                }
-            });
+	   turndownService.addRule('katex-inline', {
+			filter: function(node) {
+				return node.hasAttribute('data-inline-katex');
+			},
 
-            function listToMarkdown(node, options, indent) {
-                var ol = node.tagName == 'OL';
-                var index = 1;
-                var markdown = '';
-                for (const li of node.children) {
-                    var liMarkdowns = [];
-                    var checkbox = getCheckbox(li);
-                    wrapToParagraph(li, checkbox);
-                    var taskList = checkbox != null;
-                    var prefix = '';
-                    if (taskList) {
-                        if (checkbox.checked) {
-                            prefix = options.bulletListMarker + ' [x]';
-                        } else {
-                            prefix = options.bulletListMarker + ' [ ]';
-                        }
-                    } else {
-                        prefix = ol ? index + '.' : options.bulletListMarker;
-                    }
-                    var spaces = taskList ? getSpaces(2) : getSpaces(prefix.length + 1);
-                    var j = 0;
-                    for (const child of li.children) {
-                        if (child === checkbox) continue;
-                        if (child.tagName == 'OL' || child.tagName == 'UL') {
-                            liMarkdowns.push(listToMarkdown(child, options, taskList ? 2 : prefix.length + 1));
-                        } else {
-                            var str = turndownService.turndown(child.outerHTML);
-                            var strs = [];
-                            for (const line of str.split('\n')) {
-                                strs.push(spaces + line);
-                            }
-                            liMarkdowns.push(strs.join('\n'));
-                        }
-                        j++;
-                    }
-                    var liMarkdown = liMarkdowns.join('\n\n');
-                    liMarkdown = liMarkdown.substring(taskList ? ' ' : prefix.length);
-                    markdown += prefix + liMarkdown + '\n';
-                    index++;
-                }
-                var indentMarkdown = [];
-                for (const line of markdown.split('\n')) {
-                    indentMarkdown.push(getSpaces(indent) + line);
-                }
-                return indentMarkdown.join('\n');
-            }
+			replacement: function(content, node) {
+				return '$' + getKatexExpression(node) + '$';
+			}
+		});
+		
+		turndownService.addRule('katex-block', {
+			filter: function(node) {
+				return node.hasAttribute('data-block-katex');
+			},
 
-            function getSpaces(indent) {
-                var spaces = '';
-                for (var k = 0; k < indent; k++) {
-                    spaces += ' ';
-                }
-                return spaces;
-            }
+			replacement: function(content, node) {
+				var expression = getKatexExpression(node);
+				if (!expression.startsWith('\n')) {
+					expression = '\n' + expression;
+				}
+				if (!expression.endsWith('\n')) {
+					expression += '\n';
+				}
+				return '\n\n$$' + expression + '$$\n\n';
+			}
+		});
+		turndownService.addRule('html-inline', {
+			filter: function(node) {
+				return node.hasAttribute('data-inline-html');
+			},
 
-            function tableToMarkdown(table) {
+			replacement: function(content, node) {
+				node.removeAttribute('data-inline-html');
+				return node.outerHTML;
+			}
+		});
 
-                //if td|th has colspan | rowspan attribute
-                //can not parsed to markdown
-                //return raw html
-                if (table.find('[colspan][rowspan]').length > 0) {
-                    return table.outerHTML;
-                }
+		function listToMarkdown(node, options, indent) {
+			var ol = node.tagName == 'OL';
+			var index = 1;
+			var markdown = '';
+			for (const li of node.children) {
+				var liMarkdowns = [];
+				var checkbox = getCheckbox(li);
+				wrapToParagraph(li, checkbox);
+				var taskList = checkbox != null;
+				var prefix = '';
+				if (taskList) {
+					if (checkbox.checked) {
+						prefix = options.bulletListMarker + ' [x]';
+					} else {
+						prefix = options.bulletListMarker + ' [ ]';
+					}
+				} else {
+					prefix = ol ? index + '.' : options.bulletListMarker;
+				}
+				var spaces = taskList ? getSpaces(2) : getSpaces(prefix.length + 1);
+				var j = 0;
+				for (const child of li.children) {
+					if (child === checkbox) continue;
+					if (child.tagName == 'OL' || child.tagName == 'UL') {
+						liMarkdowns.push(listToMarkdown(child, options, taskList ? 2 : prefix.length + 1));
+					} else {
+						var str = turndownService.turndown(child.outerHTML);
+						var strs = [];
+						for (const line of str.split('\n')) {
+							strs.push(spaces + line);
+						}
+						liMarkdowns.push(strs.join('\n'));
+					}
+					j++;
+				}
+				var liMarkdown = liMarkdowns.join('\n\n');
+				liMarkdown = liMarkdown.substring(taskList ? ' ' : prefix.length);
+				markdown += prefix + liMarkdown + '\n';
+				index++;
+			}
+			var indentMarkdown = [];
+			for (const line of markdown.split('\n')) {
+				indentMarkdown.push(getSpaces(indent) + line);
+			}
+			return indentMarkdown.join('\n');
+		}
 
-                var markdown = '';
-                var trs = table.find('tr');
+		function getSpaces(indent) {
+			var spaces = '';
+			for (var k = 0; k < indent; k++) {
+				spaces += ' ';
+			}
+			return spaces;
+		}
 
-                for (var i = 0; i < trs.length; i++) {
-                    var tr = trs.eq(i);
-                    var headingRow = i == 0;
-                    if (headingRow) {
+		function tableToMarkdown(table) {
 
-                        var ths = tr.find('th');
-                        if (ths.length == 0) {
-                            ths = tr.find('td');
-                        }
-                        markdown += getRowMarkdown(ths);
-                        markdown += '\n';
-                        for (var j = 0; j < ths.length; j++) {
-                            var align = ths[j].style['text-align'];
-                            markdown += "|" + alignMap[align];
-                        }
-                        markdown += "|";
-                    } else {
-                        markdown += getRowMarkdown(tr.find('td'));
-                    }
-                    if (i < trs.length - 1) {
-                        markdown += '\n';
-                    }
-                }
-                return markdown;
-            }
+			//if td|th has colspan | rowspan attribute
+			//can not parsed to markdown
+			//return raw html
+			if (table.find('[colspan][rowspan]').length > 0) {
+				return table.outerHTML;
+			}
 
-            function getRowMarkdown(tds) {
-                var markdown = '';
-                for (var j = 0; j < tds.length; j++) {
-                    var td = tds.eq(j);
-                    markdown += "|";
-                    var md = turndownService.turndown(td.html());
-                    // need to convert all '|' to '\|';
-                    var newMd = '';
-                    for (var i = 0; i < md.length; i++) {
-                        var ch = md.charAt(i);
-                        if (ch == '|') {
-                            var prevCh = i == 0 ? '' : md.charAt(i - 1);
-                            if (prevCh == '\\') {
-                                newMd += ch;
-                            } else {
-                                newMd += '\\' + ch;
-                            }
-                        } else {
-                            newMd += ch;
-                        }
-                    }
-                    newMd = newMd.trim().replace(/\n\r/g, '<br>').replace(/\n/g, "<br>");
-                    markdown += newMd.length < 3 ? "  " + newMd : newMd;
-                }
-                markdown += "|";
-                return markdown;
-            }
-            return turndownService;
-        }
+			var markdown = '';
+			var trs = table.find('tr');
 
-        return {
-            create: function() {
-                return createTurndownservice();
-            }
-        };
+			for (var i = 0; i < trs.length; i++) {
+				var tr = trs.eq(i);
+				var headingRow = i == 0;
+				if (headingRow) {
+
+					var ths = tr.find('th');
+					if (ths.length == 0) {
+						ths = tr.find('td');
+					}
+					markdown += getRowMarkdown(ths);
+					markdown += '\n';
+					for (var j = 0; j < ths.length; j++) {
+						var align = ths[j].style['text-align'];
+						markdown += "|" + alignMap[align];
+					}
+					markdown += "|";
+				} else {
+					markdown += getRowMarkdown(tr.find('td'));
+				}
+				if (i < trs.length - 1) {
+					markdown += '\n';
+				}
+			}
+			return markdown;
+		}
+
+		function getRowMarkdown(tds) {
+			var markdown = '';
+			for (var j = 0; j < tds.length; j++) {
+				var td = tds.eq(j);
+				markdown += "|";
+				var md = turndownService.turndown(td.html());
+				// need to convert all '|' to '\|';
+				var newMd = '';
+				for (var i = 0; i < md.length; i++) {
+					var ch = md.charAt(i);
+					if (ch == '|') {
+						var prevCh = i == 0 ? '' : md.charAt(i - 1);
+						if (prevCh == '\\') {
+							newMd += ch;
+						} else {
+							newMd += '\\' + ch;
+						}
+					} else {
+						newMd += ch;
+					}
+				}
+				newMd = newMd.trim().replace(/\n\r/g, '<br>').replace(/\n/g, "<br>");
+				markdown += newMd.length < 3 ? "  " + newMd : newMd;
+			}
+			markdown += "|";
+			return markdown;
+		}
+		return turndownService;
     })();
 
     var FileUpload = (function() {
@@ -829,34 +881,12 @@ var EditorWrapper = (function() {
                 var div = document.createElement('div');
                 cloneAttributes(div, element)
                 div.innerHTML = innerHTML;
-                morphdom(element, div, {
-                    onBeforeElUpdated: function(f, t) {
-                        if (f.isEqualNode(t)) {
-                            return false;
-                        }
-                        if (f.classList.contains('mermaid-block') &&
-                            t.classList.contains('mermaid-block')) {
-                            var oldEle = f.getElementsByClassName('mermaid-source')[0];
-                            var nowEle = t.getElementsByClassName('mermaid-source')[0];
-                            if (isUndefined(oldEle) || isUndefined(nowEle)) {
-                                return true;
-                            }
-                            var old = oldEle.value;
-                            var now = nowEle.value;
-                            if (old == now) {
-                                //更新属性
-                                cloneAttributes(f, t);
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
-                });
+				morphdomUpdate(element,div);
             } else {
                 element.innerHTML = innerHTML;
+				renderKatexAndMermaid(element);
             }
 
-            renderKatexAndMermaid(element);
         }
 
         return MarkdownRender;
@@ -2042,7 +2072,6 @@ var EditorWrapper = (function() {
                 scrollLeft: $("#heather_toc").outerWidth()
             }, 0);
             this.eventHandlers = [];
-            this.turndownService = turndown.create();
             this.themeHandler = new ThemeHandler(config);
             var theme = this.themeHandler.getTheme();
             theme.render();
@@ -2367,7 +2396,7 @@ var EditorWrapper = (function() {
                                 } else {
                                     this.hide();
                                     var rootNode = this.widget.firstChild;
-                                    morphdom(rootNode, node);
+                                    morphdomUpdate(rootNode, node);
                                     this.show();
                                 }
                             }
@@ -2977,7 +3006,7 @@ var EditorWrapper = (function() {
 
         EditorWrapper.prototype.enableSync = function() {
             if (!this.syncEnable) {
-                editor.on('scroll', this.scrollHandler)
+                this.editor.on('scroll', this.scrollHandler)
                 this.syncEnable = true;
             }
         }
@@ -3047,8 +3076,7 @@ var EditorWrapper = (function() {
             var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
             $("#heather_wrapper").animate({
                 scrollLeft: 0
-            }, ms, function() {
-
+            }, ms, function() {		
                 if (callback) callback();
             });
         }
@@ -3624,6 +3652,7 @@ var EditorWrapper = (function() {
 
         return EditorWrapper;
     })();
+	
 	var HtmlPasteHelper = (function() {
 
 		var attributeRule = {
@@ -3631,7 +3660,7 @@ var EditorWrapper = (function() {
 			'a': ['href', 'title']
 		}
 
-		var unwrapSet = new Set(['DIV', 'ARTICLE']);
+		var unwrapSet = new Set(['DIV', 'ARTICLE','SECTION']);
 		var nodeHandler = {
 			'p': {
 				remove: function(node) {
@@ -3713,8 +3742,36 @@ var EditorWrapper = (function() {
 			}
 		}
 
+		var getNodesFromPasteHTML = function(html) {
+			var root = parseHTML(html).body;
+			unwrapNode(unwrapSet, root);
+			var childNodes = root.childNodes;
+			var nodes = [];
+			var textWrap = false;
+			for (const childNode of childNodes) {
+				var _nodes = [];
+				var node = childNode;
+				var nodeType = node.nodeType;
+				if (nodeType != 1 && nodeType != 3) continue;
+				_nodes.push(node);
+				for (const _node of _nodes) {
+					var n = _node;
+					if(n.nodeType == 3){
+						var p = document.createElement('p');
+						p.appendChild(n);
+						nodes.push(p);
+						continue;
+					}
+					cleanNode(root, n);
+					if (!root.contains(n)) continue;
+					cleanAttribute(n);
+					nodes.push(n);
+				}
+			}
+			return nodes;
+		}
 
-		var getMarkdownFromPasteHtml = function(html, wrapper) {
+		var getMarkdownFromPasteHtml = function(html) {
 			var nodes = getNodesFromPasteHTML(html);
 			if (nodes.length > 0) {
 				var markdown = '';
@@ -3724,7 +3781,7 @@ var EditorWrapper = (function() {
 						node.removeAttribute('data-html');
 						markdown += node.outerHTML;
 					} else {
-						markdown += wrapper.turndownService.turndown(node.outerHTML);
+						markdown += turndownService.turndown(node.outerHTML);
 					}
 					if (i < nodes.length - 1) {
 						markdown += '\n\n';
@@ -3736,50 +3793,7 @@ var EditorWrapper = (function() {
 
 			return null;
 		}
-
-
-		function getNodesFromPasteHTML(html) {
-			var root = parseHTML(html).body;
-			unwrapNode(unwrapSet, root);
-			var childNodes = root.childNodes;
-			var nodes = [];
-			for (const childNode of childNodes) {
-				var _nodes = [];
-				var node = childNode;
-				var nodeType = node.nodeType;
-				if (nodeType != 1 && nodeType != 3) continue;
-				if (nodeType == 3) {
-					var nodeValue = node.nodeValue;
-					if (isEmptyText(nodeValue)) {
-						continue;
-					}
-					var p = document.createElement('p');
-					p.innerHTML = nodeValue;
-					_nodes.push(p);
-				} else {
-					_nodes.push(node);
-				}
-				for (const _node of _nodes) {
-					var n = _node;
-					var factory = getEditorFactoryByElement(n);
-					if (factory != null && hasMethod(factory, 'processPasteNode')) {
-						n = factory.processPasteNode(n);
-						cleanAttribute(n);
-					} else {
-						cleanNode(root, n);
-						if (!root.contains(n)) continue;
-						cleanAttribute(n);
-						if (factory == null) {
-							n.setAttribute('data-html', '')
-						}
-					}
-					nodes.push(n);
-				}
-
-			}
-			return nodes;
-		}
-
+		
 		function unwrapNode(tagNames, node) {
 			if (tagNames.has(node.tagName)) {
 				node.normalize();
@@ -3852,12 +3866,13 @@ var EditorWrapper = (function() {
 		return {
 			getMarkdownFromPasteHtml: getMarkdownFromPasteHtml,
 			attributeRule: attributeRule,
-			nodeHandler: nodeHandler
+			nodeHandler: nodeHandler,
+			unwrapSet : unwrapSet
 		}
 
 	})();
-
-
+	
+		
     var registerSelectionChangeListener = function(selectionChangeListener) {
         selectionChangeListeners.push(selectionChangeListener);
     }
@@ -4186,65 +4201,85 @@ var EditorWrapper = (function() {
     function hasMethod(o, pro) {
         return typeof o[pro] === 'function';
     }
+	
+	function morphdomUpdate(target,source){
+		var elem = morphdom(target, source, {
+			onBeforeElUpdated: function(f, t) {
+				if (f.isEqualNode(t)) {
+					return false;
+				}
+				if (f.classList.contains('mermaid-block') &&
+					t.classList.contains('mermaid-block')) {
+					var oldEle = f.getElementsByClassName('mermaid-source')[0];
+					var nowEle = t.getElementsByClassName('mermaid-source')[0];
+					if (isUndefined(oldEle) || isUndefined(nowEle)) {
+						return true;
+					}
+					var old = oldEle.value;
+					var now = nowEle.value;
+					if (old == now) {
+						//更新属性
+						cloneAttributes(f, t);
+						return false;
+					}
+				}
+				return true;
+			}
+		});
+		renderKatexAndMermaid(elem);
+		$(elem).find('img').one('error',function(){
+			this.classList.add('heather_img_error');
+		})
+		return elem;
+	}
 
     function renderKatexAndMermaid(element) {
-        var hasKatex = (element.querySelector(".katex-inline") != null ||
-            element.querySelector(".katex-block") != null);
-        if (hasKatex) {
-            loadKatex(function() {
-                var inlines = element.querySelectorAll(".katex-inline");
-                for (var i = 0; i < inlines.length; i++) {
-                    var inline = inlines[i];
-                    var expression = inline.textContent;
-                    var result = parseKatex(expression, false);
-                    var div = document.createElement('div');
-                    div.innerHTML = result;
-                    var child = div.firstChild;
-                    child.setAttribute('data-inline-katex', '');
-                    inline.outerHTML = child.outerHTML;
-                }
-                var blocks = element.querySelectorAll(".katex-block");
-                for (var i = 0; i < blocks.length; i++) {
-                    var block = blocks[i];
-                    var expression = block.textContent;
-                    var result = parseKatex(expression, true);
-                    var div = document.createElement('div');
-                    div.innerHTML = result;
-                    var child = div.firstChild;
-                    child.setAttribute('data-block-katex', '');
-                    if (block.classList.contains('line')) {
-                        child.classList.add('line');
-                        child.setAttribute('data-line', block.getAttribute('data-line'))
-                        child.setAttribute('data-end-line', block.getAttribute('data-end-line'))
-                    }
-                    block.outerHTML = child.outerHTML;
-                }
-            })
-        }
-        $(element).find('.mermaid').each(function() {
-            if (!this.hasAttribute("data-processed")) {
-                try {
-                    mermaid.parse(this.textContent);
-                    mermaid.init({}, $(this));
-                } catch (e) {
-                    if (window.mermaid)
-                        this.innerHTML = '<pre>' + e.str + '</pre>'
-                }
-            }
-        });
-    }
+		
+        loadKatex(function() {
+			var inlines = element.querySelectorAll(".katex-inline");
+			for (var i = 0; i < inlines.length; i++) {
+				var inline = inlines[i];
+				var expression = inline.textContent;
+				var result = parseKatex(expression, false);
+				var div = document.createElement('div');
+				div.innerHTML = result;
+				var child = div.firstChild;
+				child.setAttribute('data-inline-katex', '');
+				inline.outerHTML = child.outerHTML;
+			}
+			var blocks = [];
 
-
-    function deleteStartWhiteSpace(str, count) {
-        var rst = str;
-        for (var i = 0; i < count; i++) {
-            if (rst.startsWith(" ")) {
-                rst = rst.substring(1);
-            } else {
-                return rst;
-            }
-        }
-        return rst;
+			if(element.hasAttribute('data-block-katex')){
+				blocks.push(element);
+			} else {
+				for(const elem of element.querySelectorAll(".katex-block")){
+					blocks.push(elem);
+				}
+			}
+			
+			for (var i = 0; i < blocks.length; i++) {
+				var block = blocks[i];
+				var expression = block.textContent;
+				var result = parseKatex(expression, true);
+				var div = document.createElement('div');
+				div.innerHTML = result;
+				var child = div.firstChild;
+				child.setAttribute('data-block-katex', '');
+				block.outerHTML = child.outerHTML;
+			}
+		})
+		loadMermaid(function() {
+			$(element).find('.mermaid').each(function() {
+				if (!this.hasAttribute("data-processed")) {
+					try {
+						mermaid.parse(this.textContent);
+						mermaid.init({}, $(this));
+					} catch (e) {
+						this.innerHTML = '<pre>' + e.str + '</pre>'
+					}
+				}
+			});
+		});
     }
 
     return {

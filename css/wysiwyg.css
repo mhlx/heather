@@ -106,7 +106,6 @@ ul li[data-task-list][data-unchecked]:before
 	border:none;
 	min-height:100px;
 	resize: none;
-	background-color: #f6f8fa;
     border-radius: 3px;
     font-size: 85%;
     line-height: 1.45;
@@ -162,7 +161,7 @@ ul li[data-task-list][data-unchecked]:before
 
 .heather_wysiwyg [data-edit]{
 	min-height:60px;
-	background-color: #D3D3D3;
+	background-color: #f9f9f7;
 }
 
 .heather_img_error:before{
@@ -185,4 +184,9 @@ ul li[data-task-list][data-unchecked]:before
 	.heather_middle_icon {
 		font-size: 24px
 	}
+}
+
+.heather_wysiwyg [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
 }
