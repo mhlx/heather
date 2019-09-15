@@ -814,8 +814,9 @@ var Wysiwyg = (function() {
             this.on('editor.embed.stop', function(edt) {
                 markOnEdit(me, edt.parent);
 				edt.getElement().removeAttribute('data-history-id');
-				var editor = me.currentEditor;
-				if(isNeedUpdate(editor)){
+				
+				if(isNeedUpdate(me)){
+					var editor = me.currentEditor;
 					//only update markdown source
 					update(editor.getElement(),me,true);
 				}
@@ -826,7 +827,7 @@ var Wysiwyg = (function() {
                 me.currentEditor = undefined;
                 markOnEdit(me);
 				editor.getElement().removeAttribute('data-history-id');
-				if(isNeedUpdate(editor)){
+				if(isNeedUpdate(me)){
 					update(editor.getElement(),me);
 				}
 				this.rootElem.focus();
@@ -1266,13 +1267,19 @@ var Wysiwyg = (function() {
             return !isUndefined(this.config.upload_url) && !isUndefined(this.config.upload_finish);
         }
 		
-		function isNeedUpdate(editor){
-			if(editor){
-				if(editor.needUpdate === true){
-					return true;
-				} else {
-					var child = editor.child;
-					return isNeedUpdate(child);
+		function isNeedUpdate(wysiwyg){
+			var depthestChild = getDepthestChild(wysiwyg);
+			if(depthestChild == null){
+				if(wysiwyg.currentEditor){
+					return wysiwyg.currentEditor.needUpdate === true;
+				}
+			} else {
+				var editor = depthestChild;
+				while(editor){
+					if(editor.needUpdate === true){
+						return true;
+					}
+					editor = editor.parent;
 				}
 			}
 			return false;
@@ -2430,7 +2437,7 @@ var Wysiwyg = (function() {
 					var timer;
 					var me = this;
 					this.observer = new MutationObserver(function(records){
-						me.needUpdate = true;
+						markNeedUpdate(me);
 						if(timer){
 							clearTimeout(timer);
 						}
@@ -2592,7 +2599,7 @@ var Wysiwyg = (function() {
                             'text-align': align
                         })
                     });
-					editor.needUpdate = true;
+					markNeedUpdate(editor);
 					saveHistory(editor.wysiwyg);
                 }
 
@@ -2614,7 +2621,7 @@ var Wysiwyg = (function() {
 							}
                         }
                     });
-					editor.needUpdate = true;
+					markNeedUpdate(editor);
 					saveHistory(editor.wysiwyg);
                 }
 
@@ -2639,7 +2646,7 @@ var Wysiwyg = (function() {
 							tr.before(html);
 						}
                     }
-					editor.needUpdate = true;
+					markNeedUpdate(editor);
 					saveHistory(editor.wysiwyg);
                 }
 
@@ -2650,7 +2657,7 @@ var Wysiwyg = (function() {
                     }
                     var tr = td.parent();
                     tr.remove();
-					editor.needUpdate = true;
+					markNeedUpdate(editor);
 					saveHistory(editor.wysiwyg);
                 }
 
@@ -2669,7 +2676,7 @@ var Wysiwyg = (function() {
                             th.remove();
                         }
                     });
-					editor.needUpdate = true;
+					markNeedUpdate(editor);
 					saveHistory(editor.wysiwyg);
                 }
 
@@ -2806,7 +2813,7 @@ var Wysiwyg = (function() {
                     this.child.stop();
                 }
 				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
                 triggerEditorEvent('stop', this);
             }
@@ -2891,7 +2898,7 @@ var Wysiwyg = (function() {
                 me.element.focus();
 				var timer;
 				this.observer = new MutationObserver(function(records){
-					me.needUpdate = true;
+					markNeedUpdate(me);
 					if(timer){
 						clearTimeout(timer);
 					}
@@ -2921,7 +2928,7 @@ var Wysiwyg = (function() {
 				}
 				//deleted from dom;
 				if(!this.wysiwyg.rootElem.contains(this.element)){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
 				this.observer.disconnect();
 				triggerEditorEvent('stop', this);
@@ -2962,7 +2969,7 @@ var Wysiwyg = (function() {
                                 h.innerHTML = heading.innerHTML;
                                 $(heading).after(h).remove();
                                 editor.element = h;
-                                editor.needUpdate = true;
+								markNeedUpdate(editor);
                                 editor.stop();
 
                                 startEdit(editor.wysiwyg, editor.element);
@@ -3043,7 +3050,7 @@ var Wysiwyg = (function() {
                 }
                 this.stoped = true;
 				if(!this.wysiwyg.rootElem.contains(this.element)){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
 				triggerEditorEvent('stop', this);
             }
@@ -3099,7 +3106,7 @@ var Wysiwyg = (function() {
 				this.element.focus();
 				var timer;
 				this.observer = new MutationObserver(function(records){
-					me.needUpdate = true;
+					markNeedUpdate(me);
 					if(timer){
 						clearTimeout(timer);
 					}
@@ -3131,7 +3138,7 @@ var Wysiwyg = (function() {
                     divToBr($(p));
                 }
 				if(!this.wysiwyg.rootElem.contains(this.element)){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
 				this.observer.disconnect();
                 this.inlineMath.stop();
@@ -3336,7 +3343,7 @@ var Wysiwyg = (function() {
                             'visibility': 'visible'
                         });
                     });
-					me.needUpdate = true;
+					markNeedUpdate(me);
 					if(timer){
 						clearTimeout(timer);
 					}
@@ -3379,7 +3386,7 @@ var Wysiwyg = (function() {
 					this.element = katexNode;
                 }
 				if(!this.wysiwyg.rootElem.contains(this.element)){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
 				triggerEditorEvent('stop', this);
             }
@@ -3485,7 +3492,7 @@ var Wysiwyg = (function() {
                             preview.innerHTML = '<pre>' + e.str + '</pre>'
                         }
                     });
-					me.needUpdate = true;
+					markNeedUpdate(me);
 					if(timer){
 						clearTimeout(timer);
 					}
@@ -3540,7 +3547,7 @@ var Wysiwyg = (function() {
                     });
                 }
 				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
                 triggerEditorEvent('stop', me);
             }
@@ -3608,7 +3615,7 @@ var Wysiwyg = (function() {
 				pre.setAttribute('contenteditable','true');
 				var timer;
 				var change = function(){
-					me.needUpdate = true;
+					markNeedUpdate(me);
 					if(timer){
 						clearTimeout(timer);
 					}
@@ -3644,7 +3651,7 @@ var Wysiwyg = (function() {
 				}
 				
 				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
 				
                 triggerEditorEvent('stop', this);
@@ -3709,7 +3716,7 @@ var Wysiwyg = (function() {
                 }
                 this.stoped = true;
 				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
                 triggerEditorEvent('stop', this);
             }
@@ -3792,7 +3799,7 @@ var Wysiwyg = (function() {
                         html: '<i class="fas fa-arrow-up"></i>向上添加',
                         handler: function() {
                             var li = me.append(false);
-							me.needUpdate = true;
+							markNeedUpdate(me);
 							saveHistory(me.wysiwyg);
 							me.stop();
                             editLi(me.listEditor, li, li.querySelector('p'));
@@ -3801,7 +3808,7 @@ var Wysiwyg = (function() {
                         html: '<i class="fas fa-arrow-down"></i>向下添加',
                         handler: function() {
                             var li = me.append(true);
-							me.needUpdate = true;
+							markNeedUpdate(me);
 							saveHistory(me.wysiwyg);
                             me.stop();
                             editLi(me.listEditor, li, li.querySelector('p'));
@@ -3866,7 +3873,7 @@ var Wysiwyg = (function() {
                     this.compositeEditorHelper.stop();
 					
 					if(!this.wysiwyg.rootElem.contains(this.getElement())){
-						this.needUpdate = true;
+						markNeedUpdate(this);
 					}
 					
                     triggerEditorEvent('stop', this);
@@ -4001,7 +4008,7 @@ var Wysiwyg = (function() {
                         cloneAttributes(replace, me.element);
                         $(me.element).after(replace).remove();
                         me.element = replace;
-                        me.needUpdate = true;
+                        markNeedUpdate(me);
                         me.stop();
                     }
                 }, {
@@ -4041,7 +4048,7 @@ var Wysiwyg = (function() {
                 this.stoped = true;
                 _stop(this);
 				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
                 triggerEditorEvent('stop', this);
             }
@@ -4190,13 +4197,15 @@ var Wysiwyg = (function() {
                 triggerEditorEvent('create', this);
             }
 			
-			PreEditor.prototype.continueEdit = function(element){
+			PreEditor.prototype.continueEdit = function(element,extra){
 				element.replaceWith(this.copy);
 				this.wysiwyg.edit(this.copy);
 				var depthestChild = getDepthestChild(this.wysiwyg);
 				if(depthestChild != null){
+					depthestChild.language = extra.lang || '';
 					depthestChild.element.innerHTML = element.innerHTML;
 				} else {
+					this.wysiwyg.currentEditor.language = extra.lang || '';
 					this.wysiwyg.currentEditor.element.innerHTML = element.innerHTML;
 				}
 			}
@@ -4213,7 +4222,6 @@ var Wysiwyg = (function() {
                 var timer;
 				var historyTimer;
                 this.inputHandler = function() {
-					me.needUpdate = true;
                     if (timer) {
                         clearTimeout(timer);
                     }
@@ -4226,8 +4234,11 @@ var Wysiwyg = (function() {
 					if(historyTimer){
 						clearTimeout(historyTimer);
 					}
+					markNeedUpdate(me);
 					historyTimer = setTimeout(function(){
-						saveHistory(me.wysiwyg);
+						saveHistory(me.wysiwyg,{
+							lang : me.language
+						});
 					},300)
                 }
 
@@ -4252,8 +4263,11 @@ var Wysiwyg = (function() {
 					if(historyTimer){
 						clearTimeout(historyTimer);
 					}
+					markNeedUpdate(me);
 					historyTimer = setTimeout(function(){
-						saveHistory(me.wysiwyg);
+						saveHistory(me.wysiwyg,{
+							lang : me.language
+						});
 					},300)
 				}
 
@@ -4300,6 +4314,10 @@ var Wysiwyg = (function() {
                                 var lang = result.value;
                                 me.language = lang;
                                 highlight(me.element, me.language);
+								markNeedUpdate(me);
+								saveHistory(me.wysiwyg,{
+									lang : me.language
+								});
                                 me.element.focus();
                             }
                         })
@@ -4336,7 +4354,7 @@ var Wysiwyg = (function() {
                 pre.innerHTML = code.outerHTML;
 				
 				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
 				
                 triggerEditorEvent('stop', this);
@@ -4547,7 +4565,7 @@ var Wysiwyg = (function() {
                 this.stoped = true;
                 this.compositeEditorHelper.stop();
 				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					this.needUpdate = true;
+					markNeedUpdate(this);
 				}
                 triggerEditorEvent('stop', this);
             }
@@ -5255,7 +5273,9 @@ var Wysiwyg = (function() {
             return PreHelper;
         })();
 		
-		
+		function markNeedUpdate(editor){
+			editor.wysiwyg.currentEditor.needUpdate = true;
+		}
 
         function triggerEditorEvent(name, editor, element) {
             var wysiwyg = editor.wysiwyg;
