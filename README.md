@@ -66,16 +66,6 @@ var editor = Wysiwyg.create(document.getElementById("editor"),config);
 |`code`|用于为选择内容加上code标签，如果没有选择任何内容，增加一个空的code标签，如果当前处于标签内，再次执行这个命令会跳出当前标签|<kbd>Ctrl-D</kbd>|
 |`insertBefore`|在当前正在编辑的元素前面插入一个新的元素|  |
 |`insertAfter`|在当前正在编辑的元素后面插入一个新的元素|  |
-|`table`|在当前正在编辑的元素的后面插入table并编辑它|  |
-|`heading`|在当前正在编辑的元素后面插入H1并编辑它|  |
-|`quote`|在当前正在编辑的元素后面插入blockquote并编辑它|  |
-|`codeBlock`|在当前正在编辑的元素后面插入代码块并编辑它|  |
-|`tasklist`|在当前正在编辑的元素后面插入任务列表并编辑它|  |
-|`paragraph`|在当前正在编辑的元素后面插入段落并编辑它|  |
-|`list`|在当前正在编辑的元素后面插入列表并编辑它|  |
-|`hr`|在当前正在编辑的元素后面插入分割线并编辑它|  |
-|`math`|在当前正在编辑的元素后面插入数学公式块并编辑它|  |
-|`mermaid`|在当前正在编辑的元素后面插入`mermaid`图表并编辑它|  |
 
 #### 新增指令
 
@@ -209,13 +199,19 @@ wrapper.nearWysiwyg
 
 同undo
 
-#### loadMarkdown
+#### setMarkdown
 
-加载markdown文本，**会覆盖现有的文档**
+设置markdown文本，自动转化为html，**会覆盖现有的文档**
 
-#### getMarkdown
+#### setHtml
 
-获取当前markdown
+直接设置html内容， **通过`setHtml('')`可以清空编辑器**
+
+#### getResult
+
+获取编辑器内容  
+获取markdown:`wysiwyg.getResult().markdown`  
+获取html:`wysiwyg.getResult().getHtml()`
 
 #### fileUploadEnable
 
@@ -228,6 +224,21 @@ wrapper.nearWysiwyg
 #### disable
 
 禁用编辑器
+
+#### selectAll
+
+选中编辑器内所有的元素
+
+#### edit(element)
+
+编辑一个元素，元素必须是编辑器元素的子元素，例如：
+
+``` javascript
+var blockquote = document.createElement('blockquote');
+blockquote.innerHTML = '<ul><li><p>123</p></li></ul>';
+elem.append(blockquote);
+editor.edit(blockquote.querySelector('p'));
+```
 
 ## 其他
 
