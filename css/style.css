@@ -644,51 +644,9 @@ h6 {
 	  height: 25px;
 }
 
-.heather_opacity-5 {
-	opacity:0.5
-}
-.heather_p{
-	height:50px;
-	background-color: #70B7FD;
-	z-index:1000;
-	line-height:50px;
-	text-align:center;
-}
-
-ul li[data-task-list][data-checked]:before
-{
-    content: "☑️";
-    margin-left:-30px;
-}
-ul li[data-task-list][data-unchecked]:before
-{
-    content: "☐";
-    margin-left:-30px;
-}
 
 #heather_wrapper blockquote{
 	min-height:20px;
-}
-#heather_wrapper [contenteditable]:focus,
-.heather_textarea_editor:focus{
-	outline:none;
-}
-.heather_textarea_editor{
-	width:100%;
-	border:none;
-	min-height:100px;
-	resize: none;
-	background-color: #f6f8fa;
-    border-radius: 3px;
-    font-size: 85%;
-    line-height: 1.45;
-    overflow: auto;
-    padding: 16px;
-}
-
-.heather_sticky{
-	position:sticky;
-	top:0px;
 }
 
 .heather-menu-dialog{
@@ -735,8 +693,3 @@ ul li[data-task-list][data-unchecked]:before
 }
 
 
-
-#heather_out [data-edit]{
-	min-height:60px;
-	background-color: #D3D3D3;
-}

@@ -162,7 +162,7 @@ function loadJS(callback) {
 			///upload for testing
 			upload_url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
 			upload_finish:function(resp){
-				swal('仅供测试上传所用，固定返回同一地址')
+				Swal.fire('仅供测试上传所用，固定返回同一地址')
 				return {
 					type : 'video',
 					url : 'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov',
@@ -215,9 +215,6 @@ function loadJS(callback) {
 		}
 		
 		if(!CodeMirror.browser.mobile){
-		$(window).on('resize',function(){
-				wrapper.toEditor(undefined,0);
-		});
 		$("#heather_out").on('contextmenu',function(e){
 			var style = 'width:200px;margin-bottom:0.5rem;border: 0;border-radius: .25em;background: initial;background-color: #3085d6;color: #fff;font-size: 1.0625em;margin: .3125em;padding: .625em 2em;font-weight: 500;box-shadow: none;';
 			var html = '';

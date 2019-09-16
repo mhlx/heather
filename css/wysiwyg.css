@@ -79,12 +79,14 @@
 
 ul li[data-task-list][data-checked]:before
 {
-    content: "☑️";
+    content: "☑";
+	float:left;
     margin-left:-30px;
 }
 ul li[data-task-list][data-unchecked]:before
 {
     content: "☐";
+	float:left;
     margin-left:-30px;
 }
 
@@ -189,4 +191,7 @@ ul li[data-task-list][data-unchecked]:before
 .heather_wysiwyg [contenteditable] {
     -webkit-user-select: text;
     user-select: text;
+}
+.heather_wysiwyg [data-tr-selected] {
+	background-color: #70B7FD !important;
 }

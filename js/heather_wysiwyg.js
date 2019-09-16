@@ -56,7 +56,7 @@ var Wysiwyg = (function() {
                     selectionChangeListeners[i].call()
                 } catch (e) {
                     console.log(e)
-                };
+                }
             }
         }, selectionChangeTimerMill)
     }
@@ -71,6 +71,9 @@ var Wysiwyg = (function() {
 	var markdownParser = createMarkdownParser({
 		html: true,
 		linkify:false,
+		'task-lists':{
+			enabled : true
+		},
 		plugins: ['footnote', 'katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'],
 		lineNumber: true,
 		highlight: function(str, lang) {
@@ -810,17 +813,18 @@ var Wysiwyg = (function() {
                 me.currentEditNextElement = getNextEditElement(editor.getElement(), me);
                 me.currentEditPrevElement = getPrevEditElement(editor.getElement(), me);
                 me.currentEditor = editor;
-                markOnEdit(me, editor);
+				markOnEdit(me,editor);
 				editor.getElement().setAttribute('data-history-id',createUniqueId());
             });
             this.on('editor.embed.start', function(editor) {
-                markOnEdit(me, editor);
+				markOnEdit(me,editor);
 				editor.getElement().setAttribute('data-history-id',createUniqueId());
             });
 
             this.on('editor.embed.stop', function(edt) {
-                markOnEdit(me, edt.parent);
-				edt.getElement().removeAttribute('data-history-id');
+				var elem = edt.getElement();
+				markOnEdit(me,edt.parent);
+				elem.removeAttribute('data-history-id');
 				
 				if(me.currentEditor.needUpdate === true){
 					var editor = me.currentEditor;
@@ -832,7 +836,7 @@ var Wysiwyg = (function() {
 			
             this.on('editor.stop', function(editor) {
                 me.currentEditor = undefined;
-                markOnEdit(me);
+				markOnEdit(me);
 				editor.getElement().removeAttribute('data-history-id');
 				if(editor.needUpdate === true){
 					update(editor.getElement(),me);
@@ -921,14 +925,13 @@ var Wysiwyg = (function() {
 		}
 		
 		Wysiwyg.prototype.edit = function(element){
-			if (this.isEnable !== true) return;
-			if(element.nodeType != 1) return ;
-			if(!this.rootElem.contains(element)) return ;
-			if(element === this.rootElem) return ;
+			if (this.isEnable !== true) return null;
+			if(element.nodeType != 1) return null;
+			if(!this.rootElem.contains(element)) return null;
+			if(element === this.rootElem) return null;
 			if(element.parentElement === this.rootElem){
 				this.stopEdit();
-				startEdit(this, element);
-				return ;
+				return startEdit(this, element);
 			}
 			var elem = element;
 			while(elem != null){
@@ -939,12 +942,14 @@ var Wysiwyg = (function() {
 			}
 			if(elem != null){
 				this.stopEdit();
-				startEdit(this, elem,element);
+				return startEdit(this, elem,element);
 			}
+			return null;
 		}
 		
 		Wysiwyg.prototype.setMarkdown = function(markdown) {
 			if (this.isEnable !== true) return;
+			this.currentEditor = undefined;
             var html = markdownParser.render(markdown);
 			this.rootElem.innerHTML = html;
 			$(this.rootElem).find('img').one('error',function(){
@@ -957,11 +962,12 @@ var Wysiwyg = (function() {
         }
 		
 		Wysiwyg.prototype.setHtml = function(html) {
-			 if (this.isEnable !== true) return;
+			if (this.isEnable !== true) return;
+			this.currentEditor = undefined;
 			if(html == ''){
 				this.rootElem.innerHTML = '';
 				this.markdownCache = {};
-				return null;
+				return ;
 			}
 			var nodes = HtmlPasteHelper.getNodesFromPasteHTML(html);
 			this.rootElem.innerHTML = '';
@@ -1494,6 +1500,7 @@ var Wysiwyg = (function() {
             }
             var editor = editorFactory.create(elem, wysiwyg);
             editor.start(target);
+			return editor;
         }
 
         var DocumentCommandHelper = (function() {
@@ -1767,7 +1774,7 @@ var Wysiwyg = (function() {
                                 ele['onSelectionChange'].call(this, ele.element, range, sel)
                             } catch (e) {
                                 console.log(e)
-                            };
+                            }
                         }
                     }
                 }
@@ -2393,13 +2400,8 @@ var Wysiwyg = (function() {
 				
 				TdEditor.prototype.continueEdit = function(element){
 					element.replaceWith(this.copy);
-					this.wysiwyg.edit(this.copy);
-					var depthestChild = getDepthestChild(this.wysiwyg);
-					if(depthestChild != null){
-						depthestChild.td.innerHTML = element.innerHTML;
-					} else {
-						this.wysiwyg.currentEditor.td.innerHTML = element.innerHTML;
-					}
+					var editor = this.wysiwyg.edit(this.copy);
+					editor.getElement().innerHTML = element.innerHTML;
 				}
 
                 TdEditor.prototype.start = function() {
@@ -2673,13 +2675,8 @@ var Wysiwyg = (function() {
 			
 			TableEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var depthestChild = getDepthestChild(this.wysiwyg);
-				if(depthestChild != null){
-					depthestChild.element.innerHTML = element.innerHTML;
-				} else {
-					this.wysiwyg.currentEditor.element.innerHTML = element.innerHTML;
-				}
+				var editor = this.wysiwyg.edit(this.copy);
+				editor.getElement().innerHTML = element.innerHTML;
 			}
 			
             TableEditor.prototype.insertFile = function(info) {
@@ -2708,13 +2705,62 @@ var Wysiwyg = (function() {
                     }
                 }
                 var tdHandler = function(e) {
+					
+					if(window.event.ctrlKey || window.event.metaKey){
+						
+						var trLength = me.element.querySelectorAll('tr').length;
+						
+						if(trLength < 3){
+							return ;
+						}
+						
+						var tr = getTR(e.target, me.element);
+						if(tr == null) return ;
+						
+						if(tr === me.element.querySelector('tr')) return ;
+						
+						var selectedLength =  me.element.querySelectorAll('[data-tr-selected]').length;
+						if(trLength - selectedLength < 3) return ;
+						
+						
+						e.preventDefault();
+						e.stopPropagation();
+						
+						//ctrl|cmd and click
+						if (me.child) {
+							me.child.stop();
+						}
+						
+						if(tr.hasAttribute('data-tr-selected')){
+							tr.removeAttribute('data-tr-selected')
+						} else {
+							tr.setAttribute('data-tr-selected','')
+						}
+						me.element.focus();
+						return ;
+					}
+					
                     var td = getTd(e.target, me.element);
+					if(td == null ) return ;
+					
+					var tr = td.parentElement;
+					
+					if(tr.hasAttribute('data-tr-selected')){
+						tr.removeAttribute('data-tr-selected');
+					}
+					
                     editTd(td);
                 }
                 var table = $(this.element);
                 table.on('click', 'th,td', tdHandler);
 
                 var keyDownHandler = function(e) {
+					if(e.key == 'Backspace'){
+						e.preventDefault();
+						e.stopPropagation();
+						
+						return ;
+					}
                     if (e.key == 'Tab') {
                         if (me.child) {
                             //find next td|th
@@ -2748,7 +2794,18 @@ var Wysiwyg = (function() {
                 }
 
                 table.on('keydown', keyDownHandler);
-
+				
+				this.deleteListener = function(e){
+					if(e.key === 'Backspace'){
+						deleteSelectedTR(me);
+						e.preventDefault();
+						e.stopPropagation();
+						return ;
+					}
+				}
+				
+				document.addEventListener('keydown',this.deleteListener);
+				
                 this.tdHandler = tdHandler;
                 this.keyDownHandler = keyDownHandler;
                 triggerEditorEvent('start', this);
@@ -2768,6 +2825,11 @@ var Wysiwyg = (function() {
             TableEditor.prototype.getContextMenus = function() {
                 var editor = this;
                 var menus = [{
+                    html: '<i class="fas fa-trash"></i>删除选中行',
+                    handler: function() {
+						deleteSelectedTR(editor);
+                    }
+                },{
                     html: '<i class="fas fa-check"></i>完成',
                     handler: function() {
                         editor.stop();
@@ -2788,6 +2850,7 @@ var Wysiwyg = (function() {
                 this.stoped = true;
                 var ele = $(this.element);
                 ele.off('click', 'th,td', this.tdHandler);
+				document.removeEventListener('keydown',this.deleteListener);
                 ele.off('keydown', this.keyDownHandler);
                 if (this.child) {
                     this.child.stop();
@@ -2802,6 +2865,17 @@ var Wysiwyg = (function() {
                 return this.element;
             }
 			
+			function deleteSelectedTR(editor){
+				saveHistory(editor.wysiwyg);
+				var trs = editor.element.querySelectorAll('[data-tr-selected]');
+				if(trs.length == 0){
+					return ;
+				}
+				for(const element of trs){
+					element.remove();
+				}
+			}
+			
             function getTd(_target, root) {
                 var target = _target;
                 while (target != null) {
@@ -2815,7 +2889,19 @@ var Wysiwyg = (function() {
                 }
                 return null;
             }
-
+			function getTR(_target, root) {
+                var target = _target;
+                while (target != null) {
+                    if (target.tagName == 'TR') {
+                        return target;
+                    }
+                    target = target.parentElement;
+                    if (!root.contains(target)) {
+                        return null;
+                    }
+                }
+                return null;
+            }
             return {
                 processPasteNode: function(node) {
                     return node;
@@ -2845,13 +2931,8 @@ var Wysiwyg = (function() {
 			
 			HeadingEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var depthestChild = getDepthestChild(this.wysiwyg);
-				if(depthestChild != null){
-					depthestChild.element.innerHTML = element.innerHTML;
-				} else {
-					this.wysiwyg.currentEditor.element.innerHTML = element.innerHTML;
-				}
+				var editor = this.wysiwyg.edit(this.copy);
+				editor.getElement().innerHTML = element.innerHTML;
 			}
 
             HeadingEditor.prototype.start = function() {
@@ -3065,13 +3146,8 @@ var Wysiwyg = (function() {
 			
 			ParagraphEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var depthestChild = getDepthestChild(this.wysiwyg);
-				if(depthestChild != null){
-					depthestChild.element.innerHTML = element.innerHTML;
-				} else {
-					this.wysiwyg.currentEditor.element.innerHTML = element.innerHTML;
-				}
+				var editor = this.wysiwyg.edit(this.copy);
+				editor.getElement().innerHTML = element.innerHTML;
 			}
 
             ParagraphEditor.prototype.start = function() {
@@ -3274,15 +3350,9 @@ var Wysiwyg = (function() {
 			
 			KatexBlockEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var depthestChild = getDepthestChild(this.wysiwyg);
-				if(depthestChild != null){
-					depthestChild.pre.innerHTML = element.querySelector('pre').innerHTML;
-					depthestChild.preview.innerHTML = element.querySelector('.katex-preview').innerHTML;
-				} else {
-					this.wysiwyg.currentEditor.pre.innerHTML = element.querySelector('pre').innerHTML;
-					this.wysiwyg.currentEditor.preview.innerHTML = element.querySelector('.katex-preview').innerHTML;
-				}
+				var editor = this.wysiwyg.edit(this.copy);
+				editor.pre.innerHTML = element.querySelector('pre').innerHTML;
+				editor.preview.innerHTML = element.querySelector('.katex-preview').innerHTML;
 			}
             KatexBlockEditor.prototype.start = function() {
                 var me = this;
@@ -3430,15 +3500,9 @@ var Wysiwyg = (function() {
 			
 			MermaidEditor.prototype.continueEdit = function(element,extra){
 				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var depthestChild = getDepthestChild(this.wysiwyg);
-				if(depthestChild != null){
-					depthestChild.textarea.value = extra.value || '';
-					depthestChild.preview.innerHTML = element.querySelector('.mermaid-preview').innerHTML;
-				} else {
-					this.wysiwyg.currentEditor.textarea.value = extra.value || '';
-					this.wysiwyg.currentEditor.preview.innerHTML = element.querySelector('.mermaid-preview').innerHTML;
-				}
+				var editor = this.wysiwyg.edit(this.copy);
+				editor.textarea.value = extra.value || '';
+				editor.preview.innerHTML = element.querySelector('.mermaid-preview').innerHTML;
 			}
 
             MermaidEditor.prototype.start = function() {
@@ -3580,13 +3644,8 @@ var Wysiwyg = (function() {
             }
 			HtmlBlockEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var depthestChild = getDepthestChild(this.wysiwyg);
-				if(depthestChild != null){
-					depthestChild.element.innerHTML = element.innerHTML;
-				} else {
-					this.wysiwyg.currentEditor.element.innerHTML = element.innerHTML;
-				}
+				var editor = this.wysiwyg.edit(this.copy);
+				editor.getElement().innerHTML = element.innerHTML;
 			}
             HtmlBlockEditor.prototype.start = function() {
 				var me = this;
@@ -3751,13 +3810,8 @@ var Wysiwyg = (function() {
 				
 				LiEditor.prototype.continueEdit = function(element){
 					element.replaceWith(this.copy);
-					this.wysiwyg.edit(this.copy);
-					var depthestChild = getDepthestChild(this.wysiwyg);
-					if(depthestChild != null){
-						depthestChild.li.innerHTML = element.innerHTML;
-					} else {
-						this.wysiwyg.currentEditor.li.innerHTML = element.innerHTML;
-					}
+					var editor = this.wysiwyg.edit(this.copy);
+					editor.getElement().innerHTML = element.innerHTML;
 				}
 
                 LiEditor.prototype.insertBlock = function(block) {
@@ -3817,8 +3871,8 @@ var Wysiwyg = (function() {
 						this.checkbox = checkbox;
 					} else {
 						this.checkbox = getCheckbox(li);
-						wrapToParagraph(li, this.checkbox);
 					}
+					wrapToParagraph(li, this.checkbox);
 					if (this.checkbox != null) {
 						li.setAttribute('data-task-list', '');
 						if (this.checkbox.checked) {
@@ -3840,11 +3894,10 @@ var Wysiwyg = (function() {
 						li.addEventListener('click', this.clickHandler);
 						this.checkbox.remove();
 					}
-                   
-                    triggerEditorEvent('start', this);
-                    //
+					
                     this.compositeEditorHelper = new CompositeEditorHelper(this);
                     this.compositeEditorHelper.start();
+                    triggerEditorEvent('start', this);
                     this.compositeEditorHelper.edit(this.target);
                 }
 
@@ -3928,13 +3981,8 @@ var Wysiwyg = (function() {
 			
 			ListEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var depthestChild = getDepthestChild(this.wysiwyg);
-				if(depthestChild != null){
-					depthestChild.element.innerHTML = element.innerHTML;
-				} else {
-					this.wysiwyg.currentEditor.element.innerHTML = element.innerHTML;
-				}
+				var editor = this.wysiwyg.edit(this.copy);
+				editor.getElement().innerHTML = element.innerHTML;
 			}
 
             ListEditor.prototype.notifyEmbedStopped = function() {
@@ -3942,8 +3990,20 @@ var Wysiwyg = (function() {
             }
 
             ListEditor.prototype.start = function(_target) {
+				if(_target && _target.type == 'checkbox'){
+					triggerEditorEvent('start', this);
+					if (_target.checked) {
+						_target.setAttribute('checked', '')
+					} else {
+						_target.removeAttribute('checked')
+					}
+					markNeedUpdate(this);
+                    triggerEditorEvent('stop', this);
+					return ;
+				}
                 var me = this;
                 var ele = $(this.element);
+				
                 var clickHandler = function(e) {
                     var li = getLi(e.target, me.element);
                     editLi(me, li, e.target);
@@ -4147,7 +4207,29 @@ var Wysiwyg = (function() {
                 var ele = $(editor.element);
                 ele.find('li').each(function() {
                     var checkbox = getCheckbox(this);
-                    wrapToParagraph(this, checkbox);
+					wrapToParagraph(this,checkbox);
+					var first = this.firstChild;
+					if(first != null && first.nodeType == 1){
+						if(first.type == 'checkbox'){
+							//need to put it into paragraph;
+							var next = first.nextSibling;
+							if(next == null){
+								var p = document.createElement('p');
+								p.appendChild(first.cloneNode(true));
+								first.replaceWith(p);
+							} else {
+								next.prepend(first.cloneNode(true));
+								first.remove();
+							}
+						}
+						if(first.tagName == 'P'){
+							//need to unwrap ??
+							//TODO
+							var parent = first.parentNode;
+							while (first.firstChild) parent.insertBefore(first.firstChild, first);
+							first.remove();
+						}
+					}
                 })
                 ele.off('click', 'li', editor.clickHandler);
                 ele.find('[contenteditable]').each(function() {
@@ -4194,15 +4276,9 @@ var Wysiwyg = (function() {
 			
 			PreEditor.prototype.continueEdit = function(element,extra){
 				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var depthestChild = getDepthestChild(this.wysiwyg);
-				if(depthestChild != null){
-					depthestChild.language = extra.lang || '';
-					depthestChild.element.innerHTML = element.innerHTML;
-				} else {
-					this.wysiwyg.currentEditor.language = extra.lang || '';
-					this.wysiwyg.currentEditor.element.innerHTML = element.innerHTML;
-				}
+				var editor = this.wysiwyg.edit(this.copy);
+				editor.language = extra.lang || '';
+				editor.element.innerHTML = element.innerHTML;
 			}
             PreEditor.prototype.start = function() {
                 var me = this;
@@ -4517,13 +4593,8 @@ var Wysiwyg = (function() {
 			
 			BlockquoteEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var depthestChild = getDepthestChild(this.wysiwyg);
-				if(depthestChild != null){
-					depthestChild.element.innerHTML = element.innerHTML;
-				} else {
-					this.wysiwyg.currentEditor.element.innerHTML = element.innerHTML;
-				}
+				var editor = this.wysiwyg.edit(this.copy);
+				editor.getElement().innerHTML = element.innerHTML;
 			}
 			
             BlockquoteEditor.prototype.start = function(_target) {
@@ -5878,7 +5949,7 @@ var Wysiwyg = (function() {
     }
 	
 	var LazyLoader = (function(){
-		 var katexLoading = false;
+		var katexLoading = false;
 		var katexLoaded = false;
 
 		function loadKatex(callback) {
@@ -5915,6 +5986,17 @@ var Wysiwyg = (function() {
 				 mermaidLoaded = true;
 				 if (callback) callback();
 			})
+		}
+		
+		function loadScript(src, callback, relative){
+			var script = document.createElement('script');
+			script.src = src; 
+			if(callback !== null){
+				script.onload = function() { // Other browsers
+					callback();
+				};
+			}
+			document.body.appendChild(script);
 		}
 		
 		return {
@@ -6093,17 +6175,6 @@ var Wysiwyg = (function() {
     function hasMethod(o, pro) {
         return typeof o[pro] === 'function';
     }
-	
-	function loadScript(src, callback, relative){
-		var script = document.createElement('script');
-		script.src = src; 
-		if(callback !== null){
-			script.onload = function() { // Other browsers
-				callback();
-			};
-		}
-		document.body.appendChild(script);
-	}
 
     function renderKatexAndMermaid(element) {
 		
