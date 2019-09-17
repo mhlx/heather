@@ -74,7 +74,7 @@ var Wysiwyg = (function() {
 		'task-lists':{
 			enabled : true
 		},
-		plugins: ['footnote', 'katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'],
+		plugins: ['katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'],
 		lineNumber: true,
 		highlight: function(str, lang) {
 			if (lang == 'mermaid') {
@@ -698,16 +698,12 @@ var Wysiwyg = (function() {
 			var allowEmptyTagNames = new Set(['IMG','AREA','BASE','BR','COL','HR','INPUT','LINK','META','PARAM','VIDEO','IFRAME','TD','TH']);
 			
 			var clean = function(element){
-				doClean(element,element);
+				for(const child of element.children){
+					doClean(child,element);
+				}
 			}
 			
 			function doClean(element,root){
-				if(element === root){
-					for(const child of element.children){
-						clean(child,root);
-					}
-					return ;
-				}
 				//if element is from user's raw html
 				if(element.hasAttribute('data-html') || element.hasAttribute('data-inline-html')) return ;
 				if(!allowEmptyTagNames.has(element.tagName)){
@@ -718,14 +714,14 @@ var Wysiwyg = (function() {
 						//when remove child 
 						//should clean parent element again
 						//like <p><a></a></p>
-						if(root.contains(parent)){
-							clean(parent,root);
+						if(root.contains(parent) && parent !== root){
+							doClean(parent,root);
 						}
 					}
 				}
 				if(!root.contains(element)) return ;
 				for(const child of element.children){
-					clean(child,root);
+					doClean(child,root);
 				}
 			}
 			
@@ -931,7 +927,7 @@ var Wysiwyg = (function() {
 			if(element === this.rootElem) return null;
 			if(element.parentElement === this.rootElem){
 				this.stopEdit();
-				return startEdit(this, element);
+				startEdit(this, element);
 			}
 			var elem = element;
 			while(elem != null){
@@ -942,9 +938,8 @@ var Wysiwyg = (function() {
 			}
 			if(elem != null){
 				this.stopEdit();
-				return startEdit(this, elem,element);
+				startEdit(this, elem,element);
 			}
-			return null;
 		}
 		
 		Wysiwyg.prototype.setMarkdown = function(markdown) {
@@ -1033,6 +1028,7 @@ var Wysiwyg = (function() {
             this.rootElem.removeEventListener('click', this.clickHandler);
             this.rootElem.removeEventListener('keydown', this.keydownHandler);
             this.rootElem.removeEventListener('keyup', this.keyupHandler);
+			unregisterSelectionChangeListener(this.selectionChangeListener)
             this.isEnable = false;
         }
 
@@ -1045,7 +1041,9 @@ var Wysiwyg = (function() {
                 var rangeInfo = getRangeInfo(me.rootElem);
                 var range = rangeInfo.range;
                 var sel = rangeInfo.sel;
-                if (range != null && sel.type == 'Range') return;
+                if (range != null && sel.type == 'Range') {
+					return ;
+				}
                 var elem = e.target;
                 while (elem != null) {
                     if (elem.parentElement === me.rootElem) {
@@ -1106,7 +1104,20 @@ var Wysiwyg = (function() {
             var keyupHandler = function(e) {
                 delete catchMap[e.key.toLowerCase()];
             }
-
+			
+			this.selectionChangeListener = function() {
+				var rangeInfo = getRangeInfo(me.rootElem);
+				var range = rangeInfo.range;
+				var sel = rangeInfo.sel;
+				if (range == null) {
+					return;
+				}
+				if (sel.type == 'Range') {
+					me.rootElem.focus();
+				}
+			}
+			registerSelectionChangeListener(this.selectionChangeListener);
+			
             this.rootElem.addEventListener('keydown', keydownHandler);
             this.rootElem.addEventListener('keyup', keyupHandler);
 			this.rootElem.setAttribute('tabindex','0');
@@ -1117,6 +1128,8 @@ var Wysiwyg = (function() {
             this.clickHandler = clickHandler;
             this.isEnable = true;
         }
+		
+		
 		
 		 Wysiwyg.prototype.delete = function() {
             if (this.isEnable !== true) return;
@@ -1405,6 +1418,8 @@ var Wysiwyg = (function() {
             if (editor)
                 editor.getElement().setAttribute('data-edit', '');
         }
+		
+		
 
         function getDepthestChild(wysiwyg) {
             if (!wysiwyg.currentEditor) return null;
@@ -1427,6 +1442,19 @@ var Wysiwyg = (function() {
             }
             return null;
         }
+		
+		function getContinueEditor(wysiwyg,element){
+			var editor = getDepthestChild(wysiwyg);
+			if(editor == null) return wysiwyg.currentEditor;
+			while(!isUndefined(editor)){
+				if(editor.getElement() === element){
+					break;
+				}
+				editor.stop();
+				editor = editor.parent;
+			}	
+			return editor;
+		}
 
         //TODO need more test
         function initDefaultKey(wysiwyg) {
@@ -1500,7 +1528,6 @@ var Wysiwyg = (function() {
             }
             var editor = editorFactory.create(elem, wysiwyg);
             editor.start(target);
-			return editor;
         }
 
         var DocumentCommandHelper = (function() {
@@ -2400,8 +2427,8 @@ var Wysiwyg = (function() {
 				
 				TdEditor.prototype.continueEdit = function(element){
 					element.replaceWith(this.copy);
-					var editor = this.wysiwyg.edit(this.copy);
-					editor.getElement().innerHTML = element.innerHTML;
+					this.wysiwyg.edit(this.copy);
+					getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
 				}
 
                 TdEditor.prototype.start = function() {
@@ -2675,8 +2702,8 @@ var Wysiwyg = (function() {
 			
 			TableEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				var editor = this.wysiwyg.edit(this.copy);
-				editor.getElement().innerHTML = element.innerHTML;
+				this.wysiwyg.edit(this.copy);
+				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
 			}
 			
             TableEditor.prototype.insertFile = function(info) {
@@ -2755,12 +2782,6 @@ var Wysiwyg = (function() {
                 table.on('click', 'th,td', tdHandler);
 
                 var keyDownHandler = function(e) {
-					if(e.key == 'Backspace'){
-						e.preventDefault();
-						e.stopPropagation();
-						
-						return ;
-					}
                     if (e.key == 'Tab') {
                         if (me.child) {
                             //find next td|th
@@ -2796,15 +2817,15 @@ var Wysiwyg = (function() {
                 table.on('keydown', keyDownHandler);
 				
 				this.deleteListener = function(e){
-					if(e.key === 'Backspace'){
-						deleteSelectedTR(me);
-						e.preventDefault();
-						e.stopPropagation();
-						return ;
+					if(e.key == 'Backspace'){
+						if(deleteSelectedTR(me)){
+							e.preventDefault();
+							e.stopPropagation();
+						}
 					}
 				}
 				
-				document.addEventListener('keydown',this.deleteListener);
+				this.wysiwyg.rootElem.addEventListener('keydown',this.deleteListener);
 				
                 this.tdHandler = tdHandler;
                 this.keyDownHandler = keyDownHandler;
@@ -2850,11 +2871,17 @@ var Wysiwyg = (function() {
                 this.stoped = true;
                 var ele = $(this.element);
                 ele.off('click', 'th,td', this.tdHandler);
-				document.removeEventListener('keydown',this.deleteListener);
+				this.wysiwyg.rootElem.removeEventListener('keydown',this.deleteListener);
                 ele.off('keydown', this.keyDownHandler);
                 if (this.child) {
                     this.child.stop();
                 }
+				
+				var trs = this.element.querySelectorAll('[data-tr-selected]');
+				for(const tr of trs){
+					tr.removeAttribute('data-tr-selected');
+				}
+				
 				if(!this.wysiwyg.rootElem.contains(this.getElement())){
 					markNeedUpdate(this);
 				}
@@ -2866,14 +2893,18 @@ var Wysiwyg = (function() {
             }
 			
 			function deleteSelectedTR(editor){
-				saveHistory(editor.wysiwyg);
 				var trs = editor.element.querySelectorAll('[data-tr-selected]');
 				if(trs.length == 0){
-					return ;
+					return false;
 				}
+				
+				saveHistory(editor.wysiwyg);
+				
 				for(const element of trs){
 					element.remove();
 				}
+				
+				return true;
 			}
 			
             function getTd(_target, root) {
@@ -2931,8 +2962,8 @@ var Wysiwyg = (function() {
 			
 			HeadingEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				var editor = this.wysiwyg.edit(this.copy);
-				editor.getElement().innerHTML = element.innerHTML;
+				this.wysiwyg.edit(this.copy);
+				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
 			}
 
             HeadingEditor.prototype.start = function() {
@@ -3146,8 +3177,8 @@ var Wysiwyg = (function() {
 			
 			ParagraphEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				var editor = this.wysiwyg.edit(this.copy);
-				editor.getElement().innerHTML = element.innerHTML;
+				this.wysiwyg.edit(this.copy);
+				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
 			}
 
             ParagraphEditor.prototype.start = function() {
@@ -3350,7 +3381,8 @@ var Wysiwyg = (function() {
 			
 			KatexBlockEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				var editor = this.wysiwyg.edit(this.copy);
+				this.wysiwyg.edit(this.copy);
+				var editor = getContinueEditor(this.wysiwyg,this.copy);
 				editor.pre.innerHTML = element.querySelector('pre').innerHTML;
 				editor.preview.innerHTML = element.querySelector('.katex-preview').innerHTML;
 			}
@@ -3500,7 +3532,8 @@ var Wysiwyg = (function() {
 			
 			MermaidEditor.prototype.continueEdit = function(element,extra){
 				element.replaceWith(this.copy);
-				var editor = this.wysiwyg.edit(this.copy);
+				this.wysiwyg.edit(this.copy);
+				var editor = getContinueEditor(this.wysiwyg,this.copy);
 				editor.textarea.value = extra.value || '';
 				editor.preview.innerHTML = element.querySelector('.mermaid-preview').innerHTML;
 			}
@@ -3644,8 +3677,8 @@ var Wysiwyg = (function() {
             }
 			HtmlBlockEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				var editor = this.wysiwyg.edit(this.copy);
-				editor.getElement().innerHTML = element.innerHTML;
+				this.wysiwyg.edit(this.copy);
+				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
 			}
             HtmlBlockEditor.prototype.start = function() {
 				var me = this;
@@ -3810,8 +3843,8 @@ var Wysiwyg = (function() {
 				
 				LiEditor.prototype.continueEdit = function(element){
 					element.replaceWith(this.copy);
-					var editor = this.wysiwyg.edit(this.copy);
-					editor.getElement().innerHTML = element.innerHTML;
+					this.wysiwyg.edit(this.copy);
+					getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
 				}
 
                 LiEditor.prototype.insertBlock = function(block) {
@@ -3827,7 +3860,7 @@ var Wysiwyg = (function() {
                     var menus = [{
                         html: '<i class="fas fa-check"></i>完成',
                         handler: function() {
-                            editor.stop();
+                            me.stop();
                         }
                     }, {
                         html: '<i class="fas fa-arrow-up"></i>向上添加',
@@ -3981,8 +4014,8 @@ var Wysiwyg = (function() {
 			
 			ListEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				var editor = this.wysiwyg.edit(this.copy);
-				editor.getElement().innerHTML = element.innerHTML;
+				this.wysiwyg.edit(this.copy);
+				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
 			}
 
             ListEditor.prototype.notifyEmbedStopped = function() {
@@ -4276,7 +4309,8 @@ var Wysiwyg = (function() {
 			
 			PreEditor.prototype.continueEdit = function(element,extra){
 				element.replaceWith(this.copy);
-				var editor = this.wysiwyg.edit(this.copy);
+				this.wysiwyg.edit(this.copy);
+				var editor = getContinueEditor(this.wysiwyg,this.copy);
 				editor.language = extra.lang || '';
 				editor.element.innerHTML = element.innerHTML;
 			}
@@ -4593,8 +4627,8 @@ var Wysiwyg = (function() {
 			
 			BlockquoteEditor.prototype.continueEdit = function(element){
 				element.replaceWith(this.copy);
-				var editor = this.wysiwyg.edit(this.copy);
-				editor.getElement().innerHTML = element.innerHTML;
+				this.wysiwyg.edit(this.copy);
+				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
 			}
 			
             BlockquoteEditor.prototype.start = function(_target) {
@@ -6257,6 +6291,7 @@ var Wysiwyg = (function() {
 	function getMermaidExpression(elem) {
 		return elem.querySelector('.mermaid-source').value;
 	}
+	
 	function morphdomUpdate(target,source){
 		var elem = morphdom(target, source, {
 			onBeforeElUpdated: function(f, t) {
