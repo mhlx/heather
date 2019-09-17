@@ -79,15 +79,27 @@
 
 ul li[data-task-list][data-checked]:before
 {
-    content: "☑";
-	float:left;
-    margin-left:-30px;
+    float: left;
+    margin-left: -30px;
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    font-family: "Font Awesome 5 Free";
+    content: "\f14a";
 }
 ul li[data-task-list][data-unchecked]:before
 {
-    content: "☐";
-	float:left;
-    margin-left:-30px;
+     float: left;
+    margin-left: -30px;
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    -webkit-font-smoothing: antialiased;
+    font-family: "Font Awesome 5 Free";
+    content: "\f0c8";
 }
 
 .heather_wysiwyg blockquote{

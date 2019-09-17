@@ -6,7 +6,7 @@ var Wysiwyg = (function() {
         return this.replace(new RegExp(search, 'g'), replacement);
     };
 
-  
+
     //from turndown js..
     var blockElements = [
         'address', 'article', 'aside', 'audio', 'blockquote', 'body', 'canvas',
@@ -28,19 +28,19 @@ var Wysiwyg = (function() {
         }
         return false;
     }
-	//from CodeMirror/util/browser.js
-	var platform = navigator.platform;
-	var userAgent = navigator.userAgent;
-	var edge = /Edge\/(\d+)/.exec(userAgent);
-	var ios = !edge && /AppleWebKit/.test(userAgent) && /Mobile\/\w+/.test(userAgent)
-	var android = /Android/.test(userAgent);
+    //from CodeMirror/util/browser.js
+    var platform = navigator.platform;
+    var userAgent = navigator.userAgent;
+    var edge = /Edge\/(\d+)/.exec(userAgent);
+    var ios = !edge && /AppleWebKit/.test(userAgent) && /Mobile\/\w+/.test(userAgent)
+    var android = /Android/.test(userAgent);
     var mac = ios || /Mac/.test(platform);
     var mobile = ios || android || /webOS|BlackBerry|Opera Mini|Opera Mobi|IEMobile/i.test(userAgent);
-	
+
     var veryThinHtml = '&#8203;';
     var veryThinChar = '​';
-	var tabSpace = '	';
-	
+    var tabSpace = '	';
+
 
     var selectionChangeListeners = [];
     var selectionChangeTimer;
@@ -60,294 +60,294 @@ var Wysiwyg = (function() {
             }
         }, selectionChangeTimerMill)
     }
-	
-	
+
+
     var lazyRes = {
         mermaid_js: "js/mermaid.min.js",
         katex_css: "katex/katex.min.css",
         katex_js: "katex/katex.min.js"
     }
-	
-	var markdownParser = createMarkdownParser({
-		html: true,
-		linkify:false,
-		'task-lists':{
-			enabled : true
-		},
-		plugins: ['katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'],
-		lineNumber: true,
-		highlight: function(str, lang) {
-			if (lang == 'mermaid') {
-				return createUnparsedMermaidElement(str).outerHTML;
-			}
-			if (lang && hljs.getLanguage(lang)) {
-				try {
-					return '<pre class="hljs"><code class="language-' + lang + '">' +
-						hljs.highlight(lang, str, true).value +
-						'</code></pre>';
-				} catch (__) {}
-			}
-		}
-	});
-	
+
+    var markdownParser = createMarkdownParser({
+        html: true,
+        linkify: false,
+        'task-lists': {
+            enabled: true
+        },
+        plugins: ['katex', 'mermaid', 'anchor', 'task-lists', 'sup', 'sub', 'abbr'],
+        lineNumber: true,
+        highlight: function(str, lang) {
+            if (lang == 'mermaid') {
+                return createUnparsedMermaidElement(str).outerHTML;
+            }
+            if (lang && hljs.getLanguage(lang)) {
+                try {
+                    return '<pre class="hljs"><code class="language-' + lang + '">' +
+                        hljs.highlight(lang, str, true).value +
+                        '</code></pre>';
+                } catch (__) {}
+            }
+        }
+    });
+
     var turndownService = (function() {
-	
-		var alignMap = {
-			'': ' -- ',
-			'left': ' :-- ',
-			'center': ' :--: ',
-			'right': ' --: '
-		}
 
-		var turndownService = new window.TurndownService({
-			'headingStyle': 'atx',
-			'codeBlockStyle': 'fenced',
-			'emDelimiter': '*',
-			'bulletListMarker': '-',
-			defaultReplacement: function(innerHTML, node) {
-				return node.blockDefault() ? '\n\n' + node.outerHTML + '\n\n' : node.outerHTML
-			}
-		});
-		turndownService.use(window.turndownPluginGfm.gfm);
-		turndownService.addRule('paragraph', {
-			filter: ['p'],
-			replacement: function(content) {
-				var lines = content.replaceAll('\r', '').split('\n');
-				var rst = '';
-				for (var i = 0; i < lines.length; i++) {
-					var line = lines[i];
-					if (line == '  ') {
-						rst += '<br>';
-					} else {
-						rst += line;
-					}
-					if (i < lines.length - 1)
-						rst += '\n'
-				}
-				return '\n\n' + rst + '\n\n';
-			}
-		});
-		
-		turndownService.addRule('html-block', {
-			filter: function(node){
-				return node.nodeType == 1  && node.tagName == 'DIV' && node.hasAttribute('data-html');
-			},
-			replacement: function(content,node) {
-				return '\n\n' + node.innerHTML + '\n\n';
-			}
-		});
+        var alignMap = {
+            '': ' -- ',
+            'left': ' :-- ',
+            'center': ' :--: ',
+            'right': ' --: '
+        }
 
-		turndownService.addRule('fenceblock', {
-			filter: function(node, options) {
-				return (
-					options.codeBlockStyle === 'fenced' &&
-					node.nodeName === 'PRE' &&
-					node.firstChild &&
-					node.firstChild.nodeName === 'CODE'
-				)
-			},
+        var turndownService = new window.TurndownService({
+            'headingStyle': 'atx',
+            'codeBlockStyle': 'fenced',
+            'emDelimiter': '*',
+            'bulletListMarker': '-',
+            defaultReplacement: function(innerHTML, node) {
+                return node.blockDefault() ? '\n\n' + node.outerHTML + '\n\n' : node.outerHTML
+            }
+        });
+        turndownService.use(window.turndownPluginGfm.gfm);
+        turndownService.addRule('paragraph', {
+            filter: ['p'],
+            replacement: function(content) {
+                var lines = content.replaceAll('\r', '').split('\n');
+                var rst = '';
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
+                    if (line == '  ') {
+                        rst += '<br>';
+                    } else {
+                        rst += line;
+                    }
+                    if (i < lines.length - 1)
+                        rst += '\n'
+                }
+                return '\n\n' + rst + '\n\n';
+            }
+        });
 
-			replacement: function(content, node, options) {
-				var className = node.firstChild.className || '';
-				var language = (className.match(/language-(\S+)/) || [null, ''])[1];
+        turndownService.addRule('html-block', {
+            filter: function(node) {
+                return node.nodeType == 1 && node.tagName == 'DIV' && node.hasAttribute('data-html');
+            },
+            replacement: function(content, node) {
+                return '\n\n' + node.innerHTML + '\n\n';
+            }
+        });
 
-				var textContent = node.firstChild.textContent;
-				var lines = textContent.split('\n');
-				var lastLine = lines[lines.length - 1];
-				var lineBreaker = lastLine.replaceAll('\n', '') == '' ? '' : '\n';
-				return '\n\n' + options.fence + " " + language + '\n' + textContent + lineBreaker + options.fence + '\n\n';
-			}
-		});
+        turndownService.addRule('fenceblock', {
+            filter: function(node, options) {
+                return (
+                    options.codeBlockStyle === 'fenced' &&
+                    node.nodeName === 'PRE' &&
+                    node.firstChild &&
+                    node.firstChild.nodeName === 'CODE'
+                )
+            },
 
-		turndownService.addRule('table', {
-			filter: function(node) {
-				return node.nodeName === 'TABLE'
-			},
-			replacement: function(content, node, options) {
-				return '\n\n' + tableToMarkdown($(node)) + '\n\n';
-			}
-		});
+            replacement: function(content, node, options) {
+                var className = node.firstChild.className || '';
+                var language = (className.match(/language-(\S+)/) || [null, ''])[1];
 
-		turndownService.addRule('list', {
-			filter: ['ul', 'ol'],
-			replacement: function(content, node, options) {
-				node.innerHTML = cleanHtml(node.innerHTML);
-				return '\n\n' + listToMarkdown(node, options, 0) + '\n\n';
-			}
-		});
-		
-		
-		turndownService.addRule('mermaid', {
-			filter: function(node) {
-				return node.tagName == 'DIV' && node.classList.contains('mermaid-block');
-			},
-			replacement: function(content, node, options) {
-				var expression = getMermaidExpression(node);
-				var lines = expression.split('\n');
-				var lastLine = lines[lines.length - 1];
-				var lineBreaker = lastLine.replaceAll('\n', '') == '' ? '' : '\n';
-				return '\n\n' + options.fence + " mermaid" + '\n' + expression + lineBreaker + options.fence + '\n\n';
-			}
-		});
+                var textContent = node.firstChild.textContent;
+                var lines = textContent.split('\n');
+                var lastLine = lines[lines.length - 1];
+                var lineBreaker = lastLine.replaceAll('\n', '') == '' ? '' : '\n';
+                return '\n\n' + options.fence + " " + language + '\n' + textContent + lineBreaker + options.fence + '\n\n';
+            }
+        });
 
-	   turndownService.addRule('katex-inline', {
-			filter: function(node) {
-				return node.hasAttribute('data-inline-katex');
-			},
+        turndownService.addRule('table', {
+            filter: function(node) {
+                return node.nodeName === 'TABLE'
+            },
+            replacement: function(content, node, options) {
+                return '\n\n' + tableToMarkdown($(node)) + '\n\n';
+            }
+        });
 
-			replacement: function(content, node) {
-				return '$' + getKatexExpression(node) + '$';
-			}
-		});
-		
-		turndownService.addRule('katex-block', {
-			filter: function(node) {
-				return node.hasAttribute('data-block-katex');
-			},
+        turndownService.addRule('list', {
+            filter: ['ul', 'ol'],
+            replacement: function(content, node, options) {
+                node.innerHTML = cleanHtml(node.innerHTML);
+                return '\n\n' + listToMarkdown(node, options, 0) + '\n\n';
+            }
+        });
 
-			replacement: function(content, node) {
-				var expression = getKatexExpression(node);
-				if (!expression.startsWith('\n')) {
-					expression = '\n' + expression;
-				}
-				if (!expression.endsWith('\n')) {
-					expression += '\n';
-				}
-				return '\n\n$$' + expression + '$$\n\n';
-			}
-		});
-		turndownService.addRule('html-inline', {
-			filter: function(node) {
-				return node.hasAttribute('data-inline-html');
-			},
 
-			replacement: function(content, node) {
-				node.removeAttribute('data-inline-html');
-				return node.outerHTML;
-			}
-		});
+        turndownService.addRule('mermaid', {
+            filter: function(node) {
+                return node.tagName == 'DIV' && node.classList.contains('mermaid-block');
+            },
+            replacement: function(content, node, options) {
+                var expression = getMermaidExpression(node);
+                var lines = expression.split('\n');
+                var lastLine = lines[lines.length - 1];
+                var lineBreaker = lastLine.replaceAll('\n', '') == '' ? '' : '\n';
+                return '\n\n' + options.fence + " mermaid" + '\n' + expression + lineBreaker + options.fence + '\n\n';
+            }
+        });
 
-		function listToMarkdown(node, options, indent) {
-			var ol = node.tagName == 'OL';
-			var index = 1;
-			var markdown = '';
-			for (const li of node.children) {
-				var liMarkdowns = [];
-				var checkbox = getCheckbox(li);
-				wrapToParagraph(li, checkbox);
-				var taskList = checkbox != null;
-				var prefix = '';
-				if (taskList) {
-					if (checkbox.checked) {
-						prefix = options.bulletListMarker + ' [x]';
-					} else {
-						prefix = options.bulletListMarker + ' [ ]';
-					}
-				} else {
-					prefix = ol ? index + '.' : options.bulletListMarker;
-				}
-				var spaces = taskList ? getSpaces(2) : getSpaces(prefix.length + 1);
-				var j = 0;
-				for (const child of li.children) {
-					if (child === checkbox) continue;
-					if (child.tagName == 'OL' || child.tagName == 'UL') {
-						liMarkdowns.push(listToMarkdown(child, options, taskList ? 2 : prefix.length + 1));
-					} else {
-						var str = turndownService.turndown(child.outerHTML);
-						var strs = [];
-						for (const line of str.split('\n')) {
-							strs.push(spaces + line);
-						}
-						liMarkdowns.push(strs.join('\n'));
-					}
-					j++;
-				}
-				var liMarkdown = liMarkdowns.join('\n\n');
-				liMarkdown = liMarkdown.substring(taskList ? ' ' : prefix.length);
-				markdown += prefix + liMarkdown + '\n';
-				index++;
-			}
-			var indentMarkdown = [];
-			for (const line of markdown.split('\n')) {
-				indentMarkdown.push(getSpaces(indent) + line);
-			}
-			return indentMarkdown.join('\n');
-		}
+        turndownService.addRule('katex-inline', {
+            filter: function(node) {
+                return node.hasAttribute('data-inline-katex');
+            },
 
-		function getSpaces(indent) {
-			var spaces = '';
-			for (var k = 0; k < indent; k++) {
-				spaces += ' ';
-			}
-			return spaces;
-		}
+            replacement: function(content, node) {
+                return '$' + getKatexExpression(node) + '$';
+            }
+        });
 
-		function tableToMarkdown(table) {
+        turndownService.addRule('katex-block', {
+            filter: function(node) {
+                return node.hasAttribute('data-block-katex');
+            },
 
-			//if td|th has colspan | rowspan attribute
-			//can not parsed to markdown
-			//return raw html
-			if (table.find('[colspan][rowspan]').length > 0) {
-				return table.outerHTML;
-			}
+            replacement: function(content, node) {
+                var expression = getKatexExpression(node);
+                if (!expression.startsWith('\n')) {
+                    expression = '\n' + expression;
+                }
+                if (!expression.endsWith('\n')) {
+                    expression += '\n';
+                }
+                return '\n\n$$' + expression + '$$\n\n';
+            }
+        });
+        turndownService.addRule('html-inline', {
+            filter: function(node) {
+                return node.hasAttribute('data-inline-html');
+            },
 
-			var markdown = '';
-			var trs = table.find('tr');
+            replacement: function(content, node) {
+                node.removeAttribute('data-inline-html');
+                return node.outerHTML;
+            }
+        });
 
-			for (var i = 0; i < trs.length; i++) {
-				var tr = trs.eq(i);
-				var headingRow = i == 0;
-				if (headingRow) {
+        function listToMarkdown(node, options, indent) {
+            var ol = node.tagName == 'OL';
+            var index = 1;
+            var markdown = '';
+            for (const li of node.children) {
+                var liMarkdowns = [];
+                var checkbox = getCheckbox(li);
+                wrapToParagraph(li, checkbox);
+                var taskList = checkbox != null;
+                var prefix = '';
+                if (taskList) {
+                    if (checkbox.checked) {
+                        prefix = options.bulletListMarker + ' [x]';
+                    } else {
+                        prefix = options.bulletListMarker + ' [ ]';
+                    }
+                } else {
+                    prefix = ol ? index + '.' : options.bulletListMarker;
+                }
+                var spaces = taskList ? getSpaces(2) : getSpaces(prefix.length + 1);
+                var j = 0;
+                for (const child of li.children) {
+                    if (child === checkbox) continue;
+                    if (child.tagName == 'OL' || child.tagName == 'UL') {
+                        liMarkdowns.push(listToMarkdown(child, options, taskList ? 2 : prefix.length + 1));
+                    } else {
+                        var str = turndownService.turndown(child.outerHTML);
+                        var strs = [];
+                        for (const line of str.split('\n')) {
+                            strs.push(spaces + line);
+                        }
+                        liMarkdowns.push(strs.join('\n'));
+                    }
+                    j++;
+                }
+                var liMarkdown = liMarkdowns.join('\n\n');
+                liMarkdown = liMarkdown.substring(taskList ? ' ' : prefix.length);
+                markdown += prefix + liMarkdown + '\n';
+                index++;
+            }
+            var indentMarkdown = [];
+            for (const line of markdown.split('\n')) {
+                indentMarkdown.push(getSpaces(indent) + line);
+            }
+            return indentMarkdown.join('\n');
+        }
 
-					var ths = tr.find('th');
-					if (ths.length == 0) {
-						ths = tr.find('td');
-					}
-					markdown += getRowMarkdown(ths);
-					markdown += '\n';
-					for (var j = 0; j < ths.length; j++) {
-						var align = ths[j].style['text-align'];
-						markdown += "|" + alignMap[align];
-					}
-					markdown += "|";
-				} else {
-					markdown += getRowMarkdown(tr.find('td'));
-				}
-				if (i < trs.length - 1) {
-					markdown += '\n';
-				}
-			}
-			return markdown;
-		}
+        function getSpaces(indent) {
+            var spaces = '';
+            for (var k = 0; k < indent; k++) {
+                spaces += ' ';
+            }
+            return spaces;
+        }
 
-		function getRowMarkdown(tds) {
-			var markdown = '';
-			for (var j = 0; j < tds.length; j++) {
-				var td = tds.eq(j);
-				markdown += "|";
-				var md = turndownService.turndown(td.html());
-				// need to convert all '|' to '\|';
-				var newMd = '';
-				for (var i = 0; i < md.length; i++) {
-					var ch = md.charAt(i);
-					if (ch == '|') {
-						var prevCh = i == 0 ? '' : md.charAt(i - 1);
-						if (prevCh == '\\') {
-							newMd += ch;
-						} else {
-							newMd += '\\' + ch;
-						}
-					} else {
-						newMd += ch;
-					}
-				}
-				newMd = newMd.trim().replace(/\n\r/g, '<br>').replace(/\n/g, "<br>");
-				markdown += newMd.length < 3 ? "  " + newMd : newMd;
-			}
-			markdown += "|";
-			return markdown;
-		}
-		return turndownService;
+        function tableToMarkdown(table) {
+
+            //if td|th has colspan | rowspan attribute
+            //can not parsed to markdown
+            //return raw html
+            if (table.find('[colspan][rowspan]').length > 0) {
+                return table.outerHTML;
+            }
+
+            var markdown = '';
+            var trs = table.find('tr');
+
+            for (var i = 0; i < trs.length; i++) {
+                var tr = trs.eq(i);
+                var headingRow = i == 0;
+                if (headingRow) {
+
+                    var ths = tr.find('th');
+                    if (ths.length == 0) {
+                        ths = tr.find('td');
+                    }
+                    markdown += getRowMarkdown(ths);
+                    markdown += '\n';
+                    for (var j = 0; j < ths.length; j++) {
+                        var align = ths[j].style['text-align'];
+                        markdown += "|" + alignMap[align];
+                    }
+                    markdown += "|";
+                } else {
+                    markdown += getRowMarkdown(tr.find('td'));
+                }
+                if (i < trs.length - 1) {
+                    markdown += '\n';
+                }
+            }
+            return markdown;
+        }
+
+        function getRowMarkdown(tds) {
+            var markdown = '';
+            for (var j = 0; j < tds.length; j++) {
+                var td = tds.eq(j);
+                markdown += "|";
+                var md = turndownService.turndown(td.html());
+                // need to convert all '|' to '\|';
+                var newMd = '';
+                for (var i = 0; i < md.length; i++) {
+                    var ch = md.charAt(i);
+                    if (ch == '|') {
+                        var prevCh = i == 0 ? '' : md.charAt(i - 1);
+                        if (prevCh == '\\') {
+                            newMd += ch;
+                        } else {
+                            newMd += '\\' + ch;
+                        }
+                    } else {
+                        newMd += ch;
+                    }
+                }
+                newMd = newMd.trim().replace(/\n\r/g, '<br>').replace(/\n/g, "<br>");
+                markdown += newMd.length < 3 ? "  " + newMd : newMd;
+            }
+            markdown += "|";
+            return markdown;
+        }
+        return turndownService;
     })();
 
     var Bar = (function() {
@@ -489,7 +489,7 @@ var Wysiwyg = (function() {
                 'a': ['href', 'title']
             }
 
-            var unwrapSet = new Set(['DIV', 'ARTICLE','SECTION']);
+            var unwrapSet = new Set(['DIV', 'ARTICLE', 'SECTION']);
             var nodeHandler = {
                 'p': {
                     remove: function(node) {
@@ -576,7 +576,7 @@ var Wysiwyg = (function() {
                 unwrapNode(unwrapSet, root);
                 var childNodes = root.childNodes;
                 var nodes = [];
-				var textWrap = false;
+                var textWrap = false;
                 for (const childNode of childNodes) {
                     var _nodes = [];
                     var node = childNode;
@@ -585,17 +585,17 @@ var Wysiwyg = (function() {
                     _nodes.push(node);
                     for (const _node of _nodes) {
                         var n = _node;
-						if(n.nodeType == 3){
-							if(textWrap){
-								var p = document.createElement('p');
-								p.appendChild(n);
-								nodes.push(p);
-							} else {
-								nodes.push(n);
-							}
-							continue;
-						}
-						textWrap = true;
+                        if (n.nodeType == 3) {
+                            if (textWrap) {
+                                var p = document.createElement('p');
+                                p.appendChild(n);
+                                nodes.push(p);
+                            } else {
+                                nodes.push(n);
+                            }
+                            continue;
+                        }
+                        textWrap = true;
                         var factory = getEditorFactoryByElement(n);
                         if (factory != null && hasMethod(factory, 'processPasteNode')) {
                             n = factory.processPasteNode(n);
@@ -687,60 +687,60 @@ var Wysiwyg = (function() {
                 getNodesFromPasteHTML: getNodesFromPasteHTML,
                 attributeRule: attributeRule,
                 nodeHandler: nodeHandler,
-				unwrapSet : unwrapSet
+                unwrapSet: unwrapSet
             }
 
         })();
-		
-		//used to remove empty element
-		var HtmlClean = (function(){
-			//allow tag that has no childNodes
-			var allowEmptyTagNames = new Set(['IMG','AREA','BASE','BR','COL','HR','INPUT','LINK','META','PARAM','VIDEO','IFRAME','TD','TH']);
-			
-			var clean = function(element){
-				for(const child of element.children){
-					doClean(child,element);
-				}
-			}
-			
-			function doClean(element,root){
-				//if element is from user's raw html
-				if(element.hasAttribute('data-html') || element.hasAttribute('data-inline-html')) return ;
-				if(!allowEmptyTagNames.has(element.tagName)){
-					var innerHTML = element.innerHTML;
-					if(innerHTML.replaceAll(veryThinChar,'').replaceAll('&nbsp;','').trim() == ''){
-						var parent = element.parentElement;
-						element.remove();
-						//when remove child 
-						//should clean parent element again
-						//like <p><a></a></p>
-						if(root.contains(parent) && parent !== root){
-							doClean(parent,root);
-						}
-					}
-				}
-				if(!root.contains(element)) return ;
-				for(const child of element.children){
-					doClean(child,root);
-				}
-			}
-			
-			return {
-				clean : clean
-			}
-			
-		})();
 
-        var htmlPasteEventListener = function(e,fileHandler) {
-			var data = (e.originalEvent || e).clipboardData;
-			if(data.files.length > 0){
-				e.preventDefault();
-				e.stopPropagation();
-				var file = data.files[0];
-				file.paste = true;
-				if(fileHandler) fileHandler(file);
-				return ;
-			}
+        //used to remove empty element
+        var HtmlClean = (function() {
+            //allow tag that has no childNodes
+            var allowEmptyTagNames = new Set(['IMG', 'AREA', 'BASE', 'BR', 'COL', 'HR', 'INPUT', 'LINK', 'META', 'PARAM', 'VIDEO', 'IFRAME', 'TD', 'TH']);
+
+            var clean = function(element) {
+                for (const child of element.children) {
+                    doClean(child, element);
+                }
+            }
+
+            function doClean(element, root) {
+                //if element is from user's raw html
+                if (element.hasAttribute('data-html') || element.hasAttribute('data-inline-html')) return;
+                if (!allowEmptyTagNames.has(element.tagName)) {
+                    var innerHTML = element.innerHTML;
+                    if (innerHTML.replaceAll(veryThinChar, '').replaceAll('&nbsp;', '').trim() == '') {
+                        var parent = element.parentElement;
+                        element.remove();
+                        //when remove child 
+                        //should clean parent element again
+                        //like <p><a></a></p>
+                        if (root.contains(parent) && parent !== root) {
+                            doClean(parent, root);
+                        }
+                    }
+                }
+                if (!root.contains(element)) return;
+                for (const child of element.children) {
+                    doClean(child, root);
+                }
+            }
+
+            return {
+                clean: clean
+            }
+
+        })();
+
+        var htmlPasteEventListener = function(e, fileHandler) {
+            var data = (e.originalEvent || e).clipboardData;
+            if (data.files.length > 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                var file = data.files[0];
+                file.paste = true;
+                if (fileHandler) fileHandler(file);
+                return;
+            }
             var editor = this;
             var isRoot = isUndefined(editor.parent);
             if (!isRoot) {
@@ -748,241 +748,242 @@ var Wysiwyg = (function() {
                 return;
             }
             var html = data.getData('text/html');
-			if(html == ''){
-				plainPasteHandler(e);
+            if (html == '') {
+                plainPasteHandler(e);
                 return;
-			}
+            }
             e.preventDefault();
             e.stopPropagation();
-			
-			
-			var nodes = HtmlPasteHelper.getNodesFromPasteHTML(html);
-			
-			
-			if(nodes.length > 0){
-				
-				
-				var rangeInfo = getRangeInfo(editor.getElement());
-				for(const node of nodes){
-					if(node.nodeType == 1)
-						break;
-					var range = rangeInfo.range;
-					if(range != null){
-						var text = document.createTextNode(node.wholeText);
-						range.insertNode(text);
-						range.setStartAfter(text);
-					}
-				}
-				
-				nodes = nodes.filter(function(el) {
-					return el.nodeType == 1;
-				});
-				
-				if(nodes.length > 0){
-					var next = editor.getElement().nextElementSibling;
-					editor.stop();
-					if(next == null){
-						editor.wysiwyg.rootElem.appendChild(nodes[0]);
-						next = nodes[0];
-						nodes.shift();
-					}
-					nodes.reverse();
-					for(const node of nodes){
-						$(next).before(node);
-						update(node,this.wysiwyg);
-						next = node;
-					}
-				}
-	
-			}
+
+
+            var nodes = HtmlPasteHelper.getNodesFromPasteHTML(html);
+
+
+            if (nodes.length > 0) {
+
+
+                var rangeInfo = getRangeInfo(editor.getElement());
+                for (const node of nodes) {
+                    if (node.nodeType == 1)
+                        break;
+                    var range = rangeInfo.range;
+                    if (range != null) {
+                        var text = document.createTextNode(node.wholeText);
+                        range.insertNode(text);
+                        range.setStartAfter(text);
+                    }
+                }
+
+                nodes = nodes.filter(function(el) {
+                    return el.nodeType == 1;
+                });
+
+                if (nodes.length > 0) {
+                    var next = editor.getElement().nextElementSibling;
+                    editor.stop();
+                    if (next == null) {
+                        for (const node of nodes) {
+                            this.wysiwyg.rootElem.appendChild(node);
+                        }
+                    } else {
+                        nodes.reverse();
+                        for (const node of nodes) {
+                            $(next).before(node);
+                            update(node, this.wysiwyg);
+                            next = node;
+                        }
+                    }
+                }
+
+            }
         }
 
 
-        function Wysiwyg(rootElem,config) {
+        function Wysiwyg(rootElem, config) {
             this.inlineMath = new InlineMath(rootElem);
             this.keyMap = [];
-			this.eventHandlers = [];
+            this.eventHandlers = [];
             initDefaultKey(this);
             var me = this;
-			
+
             this.on('editor.start', function(editor) {
                 me.currentEditNextElement = getNextEditElement(editor.getElement(), me);
                 me.currentEditPrevElement = getPrevEditElement(editor.getElement(), me);
                 me.currentEditor = editor;
-				markOnEdit(me,editor);
-				editor.getElement().setAttribute('data-history-id',createUniqueId());
+                markOnEdit(me, editor);
+                editor.getElement().setAttribute('data-history-id', createUniqueId());
             });
             this.on('editor.embed.start', function(editor) {
-				markOnEdit(me,editor);
-				editor.getElement().setAttribute('data-history-id',createUniqueId());
+                markOnEdit(me, editor);
+                editor.getElement().setAttribute('data-history-id', createUniqueId());
             });
 
             this.on('editor.embed.stop', function(edt) {
-				var elem = edt.getElement();
-				markOnEdit(me,edt.parent);
-				elem.removeAttribute('data-history-id');
-				
-				if(me.currentEditor.needUpdate === true){
-					var editor = me.currentEditor;
-					//only update markdown source
-					update(editor.getElement(),me,true);
-				}
-				this.rootElem.focus();
+                var elem = edt.getElement();
+                markOnEdit(me, edt.parent);
+
+                if (me.currentEditor.needUpdate === true) {
+                    var editor = me.currentEditor;
+                    //only update markdown source
+                    update(editor.getElement(), me, true);
+                }
+                elem.removeAttribute('data-history-id');
+                this.rootElem.focus();
             });
-			
+
             this.on('editor.stop', function(editor) {
                 me.currentEditor = undefined;
-				markOnEdit(me);
-				editor.getElement().removeAttribute('data-history-id');
-				if(editor.needUpdate === true){
-					update(editor.getElement(),me);
-				}
-				this.rootElem.focus();
+                markOnEdit(me);
+                editor.getElement().removeAttribute('data-history-id');
+                if (editor.needUpdate === true) {
+                    update(editor.getElement(), me);
+                }
+                this.rootElem.focus();
             });
-			this.rootElem = rootElem;
-			this.config = config;
-			this.markdownCache = {};
-			this.history = new History(config.historyLength || 500);
-			saveHistory(this);
-			this.enable();
+            this.rootElem = rootElem;
+            this.config = config;
+            this.markdownCache = {};
+            this.history = new History(config.historyLength || 500);
+            saveHistory(this);
+            this.enable();
         }
-		
-		Wysiwyg.prototype.selectAll = function(){
-			if (this.isEnable !== true) return;
-			this.stopEdit();
-		    var childNodes = this.rootElem.childNodes;
-			var range = document.createRange();
-			range.setStartBefore(childNodes[0]);
-			range.setEndAfter(childNodes[childNodes.length-1]);
-			window.getSelection().removeAllRanges();
-			window.getSelection().addRange(range);
-		}
-		
-		Wysiwyg.prototype.inSourceMode = function(){
-			if (this.isEnable !== true) return;
-			if(this.sourceMode === true) return ;
-			var result = this.getValue();
-			this.disable();
-			var me = this;
-			this.rootElem.innerHTML = '';
-			var textarea = document.createElement('textarea');
-			textarea.classList.add('heather_textarea_editor');
-			textarea.addEventListener('input', function() {
-				this.style.height = this.scrollHeight + 'px';
-			});
-			textarea.value = result.markdown;
-			this.rootElem.appendChild(textarea);
-			textarea.style.height = textarea.scrollHeight + 'px'
-			this.sourceMode = true;
-		}
-		
-		Wysiwyg.prototype.outSourceMode = function(){
-			if(this.sourceMode !== true) return ;
-			var textarea =  this.rootElem.firstChild;
-			var markdown = textarea.value;
-			textarea.remove();
-			this.enable();
-			this.setMarkdown(markdown);
-			this.sourceMode = false;
-		}
-		
-		Wysiwyg.prototype.getValue = function(){
-			if (this.isEnable !== true) return null;
-			this.stopEdit();
+
+        Wysiwyg.prototype.selectAll = function() {
+            if (this.isEnable !== true) return;
+            this.stopEdit();
+            var childNodes = this.rootElem.childNodes;
+            var range = document.createRange();
+            range.setStartBefore(childNodes[0]);
+            range.setEndAfter(childNodes[childNodes.length - 1]);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+        }
+
+        Wysiwyg.prototype.inSourceMode = function() {
+            if (this.isEnable !== true) return;
+            if (this.sourceMode === true) return;
+            var result = this.getValue();
+            this.disable();
+            var me = this;
+            this.rootElem.innerHTML = '';
+            var textarea = document.createElement('textarea');
+            textarea.classList.add('heather_textarea_editor');
+            textarea.addEventListener('input', function() {
+                this.style.height = this.scrollHeight + 'px';
+            });
+            textarea.value = result.markdown;
+            this.rootElem.appendChild(textarea);
+            textarea.style.height = textarea.scrollHeight + 'px'
+            this.sourceMode = true;
+        }
+
+        Wysiwyg.prototype.outSourceMode = function() {
+            if (this.sourceMode !== true) return;
+            var textarea = this.rootElem.firstChild;
+            var markdown = textarea.value;
+            textarea.remove();
+            this.enable();
+            this.setMarkdown(markdown);
+            this.sourceMode = false;
+        }
+
+        Wysiwyg.prototype.getValue = function() {
+            if (this.isEnable !== true) return null;
+            this.stopEdit();
             var markdowns = [];
-		    for(const child of this.rootElem.children){
-				if(child.hasAttribute('data-markdown-id')){
-					var id = child.dataset.markdownId;
-					if(!isUndefined(this.markdownCache[id])){
-						markdowns.push(this.markdownCache[id]);
-					} else {
-						var markdown = turndownService.turndown(cleanHtml(child.outerHTML)).trim();
-						this.markdownCache[id] = markdown;
-						markdowns.push(markdown.trim());
-					}
-				} else {
-					var id = createUniqueId();
-					child.setAttribute('data-markdown-id',id);
-					var markdown = turndownService.turndown(cleanHtml(child.outerHTML)).trim();
-					this.markdownCache[id] = markdown;
-					markdowns.push(markdown);
-				}
-		    }
-			markdowns = markdowns.filter(function(md) {
-				return md != '';
-			});
-			var markdown = markdowns.join('\n\n');
-		    return {
-				markdown : markdown,
-				getHtml : function(){
-					return window.md.render(markdown);
-				}
-			};
-		}
-		
-		Wysiwyg.prototype.edit = function(element){
-			if (this.isEnable !== true) return null;
-			if(element.nodeType != 1) return null;
-			if(!this.rootElem.contains(element)) return null;
-			if(element === this.rootElem) return null;
-			if(element.parentElement === this.rootElem){
-				this.stopEdit();
-				startEdit(this, element);
-			}
-			var elem = element;
-			while(elem != null){
-				if(elem.parentElement === this.rootElem){
-					break;
-				}
-				elem = elem.parentElement;
-			}
-			if(elem != null){
-				this.stopEdit();
-				startEdit(this, elem,element);
-			}
-		}
-		
-		Wysiwyg.prototype.setMarkdown = function(markdown) {
-			if (this.isEnable !== true) return;
-			this.currentEditor = undefined;
-            var html = markdownParser.render(markdown);
-			this.rootElem.innerHTML = html;
-			$(this.rootElem).find('img').one('error',function(){
-				this.classList.add('heather_img_error');
-			})
-			this.markdownCache = {};
-			this.getValue();
-			renderKatexAndMermaid(this.rootElem);
-			saveHistory(this);
+            for (const child of this.rootElem.children) {
+                if (child.hasAttribute('data-markdown-id')) {
+                    var id = child.dataset.markdownId;
+                    if (!isUndefined(this.markdownCache[id])) {
+                        markdowns.push(this.markdownCache[id]);
+                    } else {
+                        var markdown = turndownService.turndown(cleanHtml(child.outerHTML)).trim();
+                        this.markdownCache[id] = markdown;
+                        markdowns.push(markdown.trim());
+                    }
+                } else {
+                    var id = createUniqueId();
+                    child.setAttribute('data-markdown-id', id);
+                    var markdown = turndownService.turndown(cleanHtml(child.outerHTML)).trim();
+                    this.markdownCache[id] = markdown;
+                    markdowns.push(markdown);
+                }
+            }
+            markdowns = markdowns.filter(function(md) {
+                return md != '';
+            });
+            var markdown = markdowns.join('\n\n');
+            return {
+                markdown: markdown,
+                getHtml: function() {
+                    return window.md.render(markdown);
+                }
+            };
         }
-		
-		Wysiwyg.prototype.setHtml = function(html) {
-			if (this.isEnable !== true) return;
-			this.currentEditor = undefined;
-			if(html == ''){
-				this.rootElem.innerHTML = '';
-				this.markdownCache = {};
-				return ;
-			}
-			var nodes = HtmlPasteHelper.getNodesFromPasteHTML(html);
-			this.rootElem.innerHTML = '';
-			for(const node of nodes){
-				if(node.nodeType == 3){
-					var p = document.createElement('p');
-					p.appendChild(node);
-					this.rootElem.appendChild(p);
-				} else {
-					this.rootElem.appendChild(node);
-				}
-			}
-			$(this.rootElem).find('img').one('error',function(){
-				this.classList.add('heather_img_error');
-			})
-			this.markdownCache = {};
-			this.getValue();
-			saveHistory(this);
-        }	
-		
+
+        Wysiwyg.prototype.edit = function(element) {
+            if (this.isEnable !== true) return null;
+            if (element.nodeType != 1) return null;
+            if (!this.rootElem.contains(element)) return null;
+            if (element === this.rootElem) return null;
+            if (element.parentElement === this.rootElem) {
+                this.stopEdit();
+                startEdit(this, element);
+            }
+            var elem = element;
+            while (elem != null) {
+                if (elem.parentElement === this.rootElem) {
+                    break;
+                }
+                elem = elem.parentElement;
+            }
+            if (elem != null) {
+                this.stopEdit();
+                startEdit(this, elem, element);
+            }
+        }
+
+        Wysiwyg.prototype.setMarkdown = function(markdown) {
+            if (this.isEnable !== true) return;
+            this.currentEditor = undefined;
+            var html = markdownParser.render(markdown);
+            this.rootElem.innerHTML = html;
+            $(this.rootElem).find('img').one('error', function() {
+                this.classList.add('heather_img_error');
+            })
+            this.markdownCache = {};
+            this.getValue();
+            renderKatexAndMermaid(this.rootElem);
+            saveHistory(this);
+        }
+
+        Wysiwyg.prototype.setHtml = function(html) {
+            if (this.isEnable !== true) return;
+            this.currentEditor = undefined;
+            if (html == '') {
+                this.rootElem.innerHTML = '';
+                this.markdownCache = {};
+                return;
+            }
+            var nodes = HtmlPasteHelper.getNodesFromPasteHTML(html);
+            this.rootElem.innerHTML = '';
+            for (const node of nodes) {
+                if (node.nodeType == 3) {
+                    var p = document.createElement('p');
+                    p.appendChild(node);
+                    this.rootElem.appendChild(p);
+                } else {
+                    this.rootElem.appendChild(node);
+                }
+            }
+            $(this.rootElem).find('img').one('error', function() {
+                this.classList.add('heather_img_error');
+            })
+            this.markdownCache = {};
+            this.getValue();
+            saveHistory(this);
+        }
+
         Wysiwyg.prototype.on = function(name, handler) {
             this.eventHandlers.push({
                 name: name,
@@ -1001,34 +1002,34 @@ var Wysiwyg = (function() {
         }
 
         Wysiwyg.prototype.undo = function() {
-			if (this.isEnable !== true) return;
-			this.stopEdit();
-			var record = this.history.undo();
-			if(record != null){
-				this.saveHistory = false;
-				recover(this,record);
-			}
+            if (this.isEnable !== true) return;
+            this.stopEdit();
+            var record = this.history.undo();
+            if (record != null) {
+                this.saveHistory = false;
+                recover(this, record);
+            }
         }
 
         Wysiwyg.prototype.redo = function() {
-			if (this.isEnable !== true) return;
-			this.stopEdit();
-			var record = this.history.redo();
-			if(record != null){
-				this.saveHistory = false;
-				recover(this,record);
-			}
+            if (this.isEnable !== true) return;
+            this.stopEdit();
+            var record = this.history.redo();
+            if (record != null) {
+                this.saveHistory = false;
+                recover(this, record);
+            }
         }
 
         Wysiwyg.prototype.disable = function() {
             if (this.isEnable !== true) return;
             this.stopEdit();
-			this.rootElem.removeAttribute('tabindex');
+            this.rootElem.removeAttribute('tabindex');
             this.rootElem.classList.remove('heather_wysiwyg');
             this.rootElem.removeEventListener('click', this.clickHandler);
             this.rootElem.removeEventListener('keydown', this.keydownHandler);
             this.rootElem.removeEventListener('keyup', this.keyupHandler);
-			unregisterSelectionChangeListener(this.selectionChangeListener)
+            unregisterSelectionChangeListener(this.selectionChangeListener)
             this.isEnable = false;
         }
 
@@ -1042,8 +1043,8 @@ var Wysiwyg = (function() {
                 var range = rangeInfo.range;
                 var sel = rangeInfo.sel;
                 if (range != null && sel.type == 'Range') {
-					return ;
-				}
+                    return;
+                }
                 var elem = e.target;
                 while (elem != null) {
                     if (elem.parentElement === me.rootElem) {
@@ -1051,7 +1052,7 @@ var Wysiwyg = (function() {
                     }
                     elem = elem.parentElement;
                 }
-				if(elem == null) return ;
+                if (elem == null) return;
                 if (me.currentEditor) {
                     if (me.currentEditor.getElement() != elem) {
                         me.stopEdit();
@@ -1067,7 +1068,7 @@ var Wysiwyg = (function() {
                 }
             }
             this.rootElem.addEventListener('click', clickHandler);
-          
+
             var catchMap = {};
             var keyMap = this.keyMap;
             var keydownTimer;
@@ -1104,34 +1105,34 @@ var Wysiwyg = (function() {
             var keyupHandler = function(e) {
                 delete catchMap[e.key.toLowerCase()];
             }
-			
-			this.selectionChangeListener = function() {
-				var rangeInfo = getRangeInfo(me.rootElem);
-				var range = rangeInfo.range;
-				var sel = rangeInfo.sel;
-				if (range == null) {
-					return;
-				}
-				if (sel.type == 'Range') {
-					me.rootElem.focus();
-				}
-			}
-			registerSelectionChangeListener(this.selectionChangeListener);
-			
+
+            this.selectionChangeListener = function() {
+                var rangeInfo = getRangeInfo(me.rootElem);
+                var range = rangeInfo.range;
+                var sel = rangeInfo.sel;
+                if (range == null) {
+                    return;
+                }
+                if (sel.type == 'Range') {
+                    me.rootElem.focus();
+                }
+            }
+            registerSelectionChangeListener(this.selectionChangeListener);
+
             this.rootElem.addEventListener('keydown', keydownHandler);
             this.rootElem.addEventListener('keyup', keyupHandler);
-			this.rootElem.setAttribute('tabindex','0');
-			this.rootElem.focus();
-			
+            this.rootElem.setAttribute('tabindex', '0');
+            this.rootElem.focus();
+
             this.keydownHandler = keydownHandler;
             this.keyupHandler = keyupHandler;
             this.clickHandler = clickHandler;
             this.isEnable = true;
         }
-		
-		
-		
-		 Wysiwyg.prototype.delete = function() {
+
+
+
+        Wysiwyg.prototype.delete = function() {
             if (this.isEnable !== true) return;
             if (this.currentEditor) return;
             var rangeInfo = getRangeInfo(this.rootElem);
@@ -1140,11 +1141,11 @@ var Wysiwyg = (function() {
             if (range != null) {
                 if (sel.type != 'Range') return;
                 range.deleteContents();
-				HtmlClean.clean(this.rootElem);
-				this.markdownCache = {};
-				var markdown = this.getValue().markdown;
-				this.rootElem.innerHTML = markdownParser.render(markdown);
-				saveHistory(this);
+                HtmlClean.clean(this.rootElem);
+                this.markdownCache = {};
+                var markdown = this.getValue().markdown;
+                this.rootElem.innerHTML = markdownParser.render(markdown);
+                saveHistory(this);
             }
         }
 
@@ -1206,7 +1207,7 @@ var Wysiwyg = (function() {
         }
 
         Wysiwyg.prototype.stopEdit = function(embed) {
-			if (this.isEnable !== true) return;
+            if (this.isEnable !== true) return;
             if (this.currentEditor) {
                 if (embed === true) {
                     var depthestChild = getDepthestChild(this);
@@ -1220,7 +1221,7 @@ var Wysiwyg = (function() {
         }
 
         Wysiwyg.prototype.insertFile = function(info) {
-			 if (this.isEnable !== true) return;
+            if (this.isEnable !== true) return;
             var depthestChild = getDepthestChild(this);
             if (depthestChild != null) {
                 if (hasMethod(depthestChild, 'insertFile')) {
@@ -1240,7 +1241,7 @@ var Wysiwyg = (function() {
         //if there's no element
         //do nothing
         Wysiwyg.prototype.editNext = function(embed) {
-			 if (this.isEnable !== true) return;
+            if (this.isEnable !== true) return;
             if (this.currentEditor) {
                 if (embed === true &&
                     hasMethod(this.currentEditor, 'editNextEmbed') &&
@@ -1261,7 +1262,7 @@ var Wysiwyg = (function() {
         }
 
         Wysiwyg.prototype.editPrev = function(embed) {
-			 if (this.isEnable !== true) return;
+            if (this.isEnable !== true) return;
             if (this.currentEditor) {
                 if (embed === true &&
                     hasMethod(this.currentEditor, 'editPrevEmbed') &&
@@ -1281,98 +1282,98 @@ var Wysiwyg = (function() {
                 }
             }
         }
-		
-		Wysiwyg.prototype.fileUploadEnable = function() {
+
+        Wysiwyg.prototype.fileUploadEnable = function() {
             return !isUndefined(this.config.upload_url) && !isUndefined(this.config.upload_finish);
         }
-		
-		
-		function recover(wysiwyg,record){
-			var html = record.html;
-			wysiwyg.rootElem.innerHTML = html;
-			renderKatexAndMermaid(wysiwyg.rootElem);
-			$(wysiwyg.rootElem).find('img').one('error',function(){
-				this.classList.add('heather_img_error');
-			})
-			wysiwyg.markdownCache = {};
-			if(record.id){
-				record.editor.continueEdit(wysiwyg.rootElem.querySelector('[data-history-id="'+record.id+'"]'),record.extra);
-			}
-		}
-		
-		function saveHistory(wysiwyg,extra){
-			if(wysiwyg.saveHistory === false){
-				wysiwyg.saveHistory = true;
-				return ;
-			}
-			var depthestChild = getDepthestChild(wysiwyg);
-			if(depthestChild != null){
-				wysiwyg.history.save({
-					editor : depthestChild,
-					id : depthestChild.getElement().dataset.historyId,
-					html : wysiwyg.rootElem.innerHTML,
-					extra : extra
-				});
-			} else {
-				if(wysiwyg.currentEditor){
-					wysiwyg.history.save({
-						id : wysiwyg.currentEditor.getElement().dataset.historyId,
-						editor : wysiwyg.currentEditor,
-						html : wysiwyg.rootElem.innerHTML,
-						extra : extra
-					});
-				} else {
-					wysiwyg.history.save({
-						html : wysiwyg.rootElem.innerHTML
-					});
-				}
-			}
-		}
-		
-		function observeAll(observer,element){
-			observer.observe(element, {
-				childList: true,
-				subtree: true,
-				attribute: true,
-				characterData: true
-			});
-		}
-		
-		function update(elem,wysiwyg,markdownOnly){
-			if(!wysiwyg.rootElem.contains(elem)){
-				if(elem.hasAttribute('data-markdown-id')){
-					delete wysiwyg.markdownCache[elem.dataset.markdownId];
-				}
-				return ;
-			}
-			var markdown = turndownService.turndown(cleanHtml(elem.outerHTML)).trim();
-			
-			var id;
-			if(!elem.hasAttribute('data-markdown-id')){
-				id = createUniqueId();
-				elem.setAttribute('data-markdown-id',id);
-			} else {
-				id = elem.dataset.markdownId;
-			}
-			wysiwyg.markdownCache[id] = markdown;
-			if(markdownOnly === true) return ;
-			var html = markdownParser.render(markdown);
-			var dom = parseHTML(html).body;
-			var child = dom.firstChild;
-			if(child == null){
-				//invalid maybe
-				return ;
-			}
-			if(child.tagName === elem.tagName){
-				cloneAttributes(child,elem);
-				morphdomUpdate(elem, dom.firstChild);
-			} else {
-				var element = document.createElement(elem.tagName);
-				cloneAttributes(element,elem);
-				element.innerHTML = child.outerHTML;
-				morphdomUpdate(elem, element);
-			}
-		}
+
+
+        function recover(wysiwyg, record) {
+            var html = record.html;
+            wysiwyg.rootElem.innerHTML = html;
+            renderKatexAndMermaid(wysiwyg.rootElem);
+            $(wysiwyg.rootElem).find('img').one('error', function() {
+                this.classList.add('heather_img_error');
+            })
+            wysiwyg.markdownCache = {};
+            if (record.id) {
+                record.editor.continueEdit(wysiwyg.rootElem.querySelector('[data-history-id="' + record.id + '"]'), record.extra);
+            }
+        }
+
+        function saveHistory(wysiwyg, extra) {
+            if (wysiwyg.saveHistory === false) {
+                wysiwyg.saveHistory = true;
+                return;
+            }
+            var depthestChild = getDepthestChild(wysiwyg);
+            if (depthestChild != null) {
+                wysiwyg.history.save({
+                    editor: depthestChild,
+                    id: depthestChild.getElement().dataset.historyId,
+                    html: wysiwyg.rootElem.innerHTML,
+                    extra: extra
+                });
+            } else {
+                if (wysiwyg.currentEditor) {
+                    wysiwyg.history.save({
+                        id: wysiwyg.currentEditor.getElement().dataset.historyId,
+                        editor: wysiwyg.currentEditor,
+                        html: wysiwyg.rootElem.innerHTML,
+                        extra: extra
+                    });
+                } else {
+                    wysiwyg.history.save({
+                        html: wysiwyg.rootElem.innerHTML
+                    });
+                }
+            }
+        }
+
+        function observeAll(observer, element) {
+            observer.observe(element, {
+                childList: true,
+                subtree: true,
+                attribute: true,
+                characterData: true
+            });
+        }
+
+        function update(elem, wysiwyg, markdownOnly) {
+            if (!wysiwyg.rootElem.contains(elem)) {
+                if (elem.hasAttribute('data-markdown-id')) {
+                    delete wysiwyg.markdownCache[elem.dataset.markdownId];
+                }
+                return;
+            }
+            var markdown = turndownService.turndown(cleanHtml(elem.outerHTML)).trim();
+
+            var id;
+            if (!elem.hasAttribute('data-markdown-id')) {
+                id = createUniqueId();
+                elem.setAttribute('data-markdown-id', id);
+            } else {
+                id = elem.dataset.markdownId;
+            }
+            wysiwyg.markdownCache[id] = markdown;
+            if (markdownOnly === true) return;
+            var html = markdownParser.render(markdown);
+            var dom = parseHTML(html).body;
+            var child = dom.firstChild;
+            if (child == null) {
+                //invalid maybe
+                return;
+            }
+            if (child.tagName === elem.tagName) {
+                cloneAttributes(child, elem);
+                morphdomUpdate(elem, dom.firstChild);
+            } else {
+                var element = document.createElement(elem.tagName);
+                cloneAttributes(element, elem);
+                element.innerHTML = child.outerHTML;
+                morphdomUpdate(elem, element);
+            }
+        }
 
         function getNextEditElement(element, wysiwyg) {
             var next = element == null ? null : element.nextElementSibling;
@@ -1418,15 +1419,15 @@ var Wysiwyg = (function() {
             if (editor)
                 editor.getElement().setAttribute('data-edit', '');
         }
-		
-		
+
+
 
         function getDepthestChild(wysiwyg) {
             if (!wysiwyg.currentEditor) return null;
             return _getDepthestChild(wysiwyg.currentEditor);
         }
-		
-		function _getDepthestChild(editor) {
+
+        function _getDepthestChild(editor) {
             var child = editor.child;
             if (!isUndefined(child)) {
                 //find nested child
@@ -1442,19 +1443,19 @@ var Wysiwyg = (function() {
             }
             return null;
         }
-		
-		function getContinueEditor(wysiwyg,element){
-			var editor = getDepthestChild(wysiwyg);
-			if(editor == null) return wysiwyg.currentEditor;
-			while(!isUndefined(editor)){
-				if(editor.getElement() === element){
-					break;
-				}
-				editor.stop();
-				editor = editor.parent;
-			}	
-			return editor;
-		}
+
+        function getContinueEditor(wysiwyg, element) {
+            var editor = getDepthestChild(wysiwyg);
+            if (editor == null) return wysiwyg.currentEditor;
+            while (!isUndefined(editor)) {
+                if (editor.getElement() === element) {
+                    break;
+                }
+                editor.stop();
+                editor = editor.parent;
+            }
+            return editor;
+        }
 
         //TODO need more test
         function initDefaultKey(wysiwyg) {
@@ -1833,20 +1834,20 @@ var Wysiwyg = (function() {
                     'top': top < 0 ? coords.top + coords.height + 30 : top + $(window).scrollTop() + "px"
                 });
                 //if (!mobile) {
-					var left = coords.left - bar.width() / 2 + coords.width / 2;
-                    if (bar.width() + left > $(window).width()) {
-                        bar.element.css({
-                            'right': 30 + "px",
-							left : ''
-                        })
-                    } else {
-                        bar.element.css({
-                            'left': Math.max(10,left) + "px",
-							
-                            'right': '',
-                        })
-                    }
-               // }
+                var left = coords.left - bar.width() / 2 + coords.width / 2;
+                if (bar.width() + left > $(window).width()) {
+                    bar.element.css({
+                        'right': 30 + "px",
+                        left: ''
+                    })
+                } else {
+                    bar.element.css({
+                        'left': Math.max(10, left) + "px",
+
+                        'right': '',
+                    })
+                }
+                // }
                 bar.show();
             }
 
@@ -1857,16 +1858,16 @@ var Wysiwyg = (function() {
                 defaultBarElements: defaultBarElements
             };
         })();
-		
+
 
 
         var InlineMath = (function() {
 
             function InlineMath(rootElem) {
-				this.rootElem = rootElem;
+                this.rootElem = rootElem;
                 var katexPreview = document.createElement('div');
                 katexPreview.classList.add('katex-inline-preview');
-				document.body.appendChild(katexPreview);
+                document.body.appendChild(katexPreview);
                 this.katexPreview = katexPreview;
             }
 
@@ -2197,7 +2198,7 @@ var Wysiwyg = (function() {
                     this.uploadUrl = config.upload_url;
                     this.beforeUpload = config.upload_before;
                     this.afterUpload = config.upload_finish;
-					this.fileNameGen = config.upload_fileNameGen; 
+                    this.fileNameGen = config.upload_fileNameGen;
                 }
 
                 FileUpload.prototype.start = function() {
@@ -2215,10 +2216,10 @@ var Wysiwyg = (function() {
                     });
 
                     var formData = new FormData();
-					var fileName = this.file.name;
-					if(this.fileNameGen)
-						fileName = this.fileNameGen(this.file) || this.file.name;
-                    formData.append(this.fileName, this.file,fileName);
+                    var fileName = this.file.name;
+                    if (this.fileNameGen)
+                        fileName = this.fileNameGen(this.file) || this.file.name;
+                    formData.append(this.fileName, this.file, fileName);
                     if (this.beforeUpload) {
                         this.beforeUpload(formData, this.file);
                     }
@@ -2339,22 +2340,22 @@ var Wysiwyg = (function() {
                     range = getRangeInfo(this.element).range;
                 }
                 if (!isUndefined(range) && range != null) {
-					if(file){
-						var upload = new FileUpload(file, range, me.config);
-						this.uploads.push(upload);
-						upload.start();
-					} else {
-						Swal.fire({
-							title: '选择文件',
-							input: 'file'
-						}).then(function(rst) {
-							if (rst.value != null) {
-								var upload = new FileUpload(rst.value, range, me.config);
-								me.uploads.push(upload);
-								upload.start();
-							}
-						});						
-					}
+                    if (file) {
+                        var upload = new FileUpload(file, range, me.config);
+                        this.uploads.push(upload);
+                        upload.start();
+                    } else {
+                        Swal.fire({
+                            title: '选择文件',
+                            input: 'file'
+                        }).then(function(rst) {
+                            if (rst.value != null) {
+                                var upload = new FileUpload(rst.value, range, me.config);
+                                me.uploads.push(upload);
+                                upload.start();
+                            }
+                        });
+                    }
 
                 }
             }
@@ -2371,43 +2372,43 @@ var Wysiwyg = (function() {
             }
 
             return FileUploadMgr;
-			
+
         })();
 
 
         var History = (function() {
-			
-           var History = function(maxLength) {
-				this.stack = [];
-				this.pointer = -1;
-				this.maxLength = maxLength || 5;
-			}
-			
-			History.prototype.save = function(data) {
-				if (this.stack.length === this.maxLength)
-					this.stack.shift();
-				else
-					this.pointer += 1;
-				this.stack.splice(this.pointer);
-				this.stack.push(data);
-			}
-			
-			History.prototype.undo = function() {
-				if (this.pointer <= 0) return;
-				this.pointer -= 1;
-				return this.stack[this.pointer];
-			}
-			
-			History.prototype.redo = function() {
-				if (this.pointer >= this.stack.length - 1) return;
-				this.pointer += 1;
-				return this.stack[this.pointer];
-			}
-			
-			History.prototype.clear = function() {
-				this.pointer = -1;
-				this.stack = [];
-			}
+
+            var History = function(maxLength) {
+                this.stack = [];
+                this.pointer = -1;
+                this.maxLength = maxLength || 5;
+            }
+
+            History.prototype.save = function(data) {
+                if (this.stack.length === this.maxLength)
+                    this.stack.shift();
+                else
+                    this.pointer += 1;
+                this.stack.splice(this.pointer);
+                this.stack.push(data);
+            }
+
+            History.prototype.undo = function() {
+                if (this.pointer <= 0) return;
+                this.pointer -= 1;
+                return this.stack[this.pointer];
+            }
+
+            History.prototype.redo = function() {
+                if (this.pointer >= this.stack.length - 1) return;
+                this.pointer += 1;
+                return this.stack[this.pointer];
+            }
+
+            History.prototype.clear = function() {
+                this.pointer = -1;
+                this.stack = [];
+            }
             return History;
         })();
 
@@ -2419,17 +2420,17 @@ var Wysiwyg = (function() {
                 function TdEditor(table, td, wysiwyg, embed) {
                     this.table = table;
                     this.td = td;
-					this.copy = this.td.cloneNode(true);
+                    this.copy = this.td.cloneNode(true);
                     this.wysiwyg = wysiwyg;
                     this.embed = true;
                     triggerEditorEvent('create', this);
                 }
-				
-				TdEditor.prototype.continueEdit = function(element){
-					element.replaceWith(this.copy);
-					this.wysiwyg.edit(this.copy);
-					getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
-				}
+
+                TdEditor.prototype.continueEdit = function(element) {
+                    element.replaceWith(this.copy);
+                    this.wysiwyg.edit(this.copy);
+                    getContinueEditor(this.wysiwyg, this.copy).getElement().innerHTML = element.innerHTML;
+                }
 
                 TdEditor.prototype.start = function() {
                     this.mediaHelper = new MediaHelper(this.td);
@@ -2437,24 +2438,24 @@ var Wysiwyg = (function() {
                     this.td.addEventListener('paste', plainPasteHandler);
                     this.td.setAttribute('contenteditable', true);
                     this.contenteditableBar = ContenteditableBar.create(this.td);
-					if(this.wysiwyg.fileUploadEnable()){
-						this.fileUploadMgr = new FileUploadMgr(this.td, this.wysiwyg.config);
-					}
+                    if (this.wysiwyg.fileUploadEnable()) {
+                        this.fileUploadMgr = new FileUploadMgr(this.td, this.wysiwyg.config);
+                    }
                     var inlineMath = createInlineMathSession(this.wysiwyg, this.td);
                     inlineMath.start();
                     this.inlineMath = inlineMath;
-					var timer;
-					var me = this;
-					this.observer = new MutationObserver(function(records){
-						markNeedUpdate(me);
-						if(timer){
-							clearTimeout(timer);
-						}
-						timer = setTimeout(function(){
-							saveHistory(me.wysiwyg);
-						},300);
-					})
-					observeAll(this.observer,this.getElement());
+                    var timer;
+                    var me = this;
+                    this.observer = new MutationObserver(function(records) {
+                        markNeedUpdate(me);
+                        if (timer) {
+                            clearTimeout(timer);
+                        }
+                        timer = setTimeout(function() {
+                            saveHistory(me.wysiwyg);
+                        }, 300);
+                    })
+                    observeAll(this.observer, this.getElement());
                     triggerEditorEvent('start', this);
                 }
 
@@ -2463,43 +2464,43 @@ var Wysiwyg = (function() {
                     this.td.removeEventListener('paste', plainPasteHandler);
                     this.td.removeAttribute('contenteditable');
                     this.contenteditableBar.remove();
-					if(this.wysiwyg.fileUploadEnable()){
-						this.fileUploadMgr.remove();
-					}
+                    if (this.wysiwyg.fileUploadEnable()) {
+                        this.fileUploadMgr.remove();
+                    }
                     this.mediaHelper.remove();
                     this.inlineMath.stop();
-					this.observer.disconnect();
+                    this.observer.disconnect();
                     triggerEditorEvent('stop', this);
                 }
-				
+
                 TdEditor.prototype.getContextMenus = function() {
-					var select = '<select id="heather_table_expand_num" style="border: none;outline: none;background:none;text-align-last: center; -webkit-appearance: none; -moz-appearance: none; appearance: none;">';
-					for(var i=1;i<=10;i++){
-						select +='<option value="'+i+'">'+i+'</option>';
-					}
-					select += '</select>';
-					
-					var keydownHandler = function(e){
-						var key = parseInt(e.key);
-						if(+key == +key){
-							if(1<=key && key <= 9){
-								e.preventDefault();
-								e.stopPropagation();
-								this.querySelector('select').value = key;
-							}
-						}
-					}
-					
-					var getSelectValue = function(nodes){
-						var value = 1;
-						for(const node of nodes){
-							if(node.nodeType == 1 && node.tagName == 'SELECT'){
-								value = node.value;
-								break;
-							}
-						}
-						return value;
-					}
+                    var select = '<select id="heather_table_expand_num" style="border: none;outline: none;background:none;text-align-last: center; -webkit-appearance: none; -moz-appearance: none; appearance: none;">';
+                    for (var i = 1; i <= 10; i++) {
+                        select += '<option value="' + i + '">' + i + '</option>';
+                    }
+                    select += '</select>';
+
+                    var keydownHandler = function(e) {
+                        var key = parseInt(e.key);
+                        if (+key == +key) {
+                            if (1 <= key && key <= 9) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                this.querySelector('select').value = key;
+                            }
+                        }
+                    }
+
+                    var getSelectValue = function(nodes) {
+                        var value = 1;
+                        for (const node of nodes) {
+                            if (node.nodeType == 1 && node.tagName == 'SELECT') {
+                                value = node.value;
+                                break;
+                            }
+                        }
+                        return value;
+                    }
                     var me = this;
                     var menus = [{
                         html: '<i class="fas fa-check"></i>完成',
@@ -2520,73 +2521,73 @@ var Wysiwyg = (function() {
                             return me.wysiwyg.fileUploadEnable();
                         }
                     }, {
-                        html: '<i class="fas fa-arrow-right"></i>向右添加'+select+'列',
+                        html: '<i class="fas fa-arrow-right"></i>向右添加' + select + '列',
                         handler: function() {
-                            addCol($(me.table), $(me.td),getSelectValue(this), true,me);
+                            addCol($(me.table), $(me.td), getSelectValue(this), true, me);
                         },
-						onActive:function(li){
-							li.addEventListener('keydown',keydownHandler);
-						},
-						onInActive:function(li){
-							li.removeEventListener('keydown',keydownHandler);
-						}
+                        onActive: function(li) {
+                            li.addEventListener('keydown', keydownHandler);
+                        },
+                        onInActive: function(li) {
+                            li.removeEventListener('keydown', keydownHandler);
+                        }
                     }, {
-                        html: '<i class="fas fa-arrow-left"></i>向左添加'+select+'列',
+                        html: '<i class="fas fa-arrow-left"></i>向左添加' + select + '列',
                         handler: function() {
-                            addCol($(me.table), $(me.td),getSelectValue(this), false,me);
+                            addCol($(me.table), $(me.td), getSelectValue(this), false, me);
                         },
-						onActive:function(li){
-							li.addEventListener('keydown',keydownHandler);
-						},
-						onInActive:function(li){
-							li.removeEventListener('keydown',keydownHandler);
-						}
+                        onActive: function(li) {
+                            li.addEventListener('keydown', keydownHandler);
+                        },
+                        onInActive: function(li) {
+                            li.removeEventListener('keydown', keydownHandler);
+                        }
                     }, {
-                        html: '<i class="fas fa-arrow-up"></i>向上添加'+select+'行',
+                        html: '<i class="fas fa-arrow-up"></i>向上添加' + select + '行',
                         handler: function() {
-                            addRow($(me.table), $(me.td),getSelectValue(this), false,me);
+                            addRow($(me.table), $(me.td), getSelectValue(this), false, me);
                         },
-						onActive:function(li){
-							li.addEventListener('keydown',keydownHandler);
-						},
-						onInActive:function(li){
-							li.removeEventListener('keydown',keydownHandler);
-						}
+                        onActive: function(li) {
+                            li.addEventListener('keydown', keydownHandler);
+                        },
+                        onInActive: function(li) {
+                            li.removeEventListener('keydown', keydownHandler);
+                        }
                     }, {
-                        html: '<i class="fas fa-arrow-down"></i>向下添加'+select+'行',
+                        html: '<i class="fas fa-arrow-down"></i>向下添加' + select + '行',
                         handler: function() {
-                            addRow($(me.table), $(me.td),getSelectValue(this), true,me);
+                            addRow($(me.table), $(me.td), getSelectValue(this), true, me);
                         },
-						onActive:function(li){
-							li.addEventListener('keydown',keydownHandler);
-						},
-						onInActive:function(li){
-							li.removeEventListener('keydown',keydownHandler);
-						}
+                        onActive: function(li) {
+                            li.addEventListener('keydown', keydownHandler);
+                        },
+                        onInActive: function(li) {
+                            li.removeEventListener('keydown', keydownHandler);
+                        }
                     }, {
                         html: '<i class="fas fa-minus"></i>删除列',
                         handler: function() {
-                            deleteCol($(me.table), $(me.td),me);
+                            deleteCol($(me.table), $(me.td), me);
                         }
                     }, {
                         html: '<i class="fas fa-minus"></i>删除行',
                         handler: function() {
-                            deleteRow($(me.table), $(me.td),me);
+                            deleteRow($(me.table), $(me.td), me);
                         }
                     }, {
                         html: '<i class="fas fa-align-left"></i>左对齐',
                         handler: function() {
-                            doAlign($(me.table), $(me.td), 'left',me);
+                            doAlign($(me.table), $(me.td), 'left', me);
                         }
                     }, {
                         html: '<i class="fas fa-align-center"></i>居中对齐',
                         handler: function() {
-                            doAlign($(me.table), $(me.td), 'center',me);
+                            doAlign($(me.table), $(me.td), 'center', me);
                         }
                     }, {
                         html: '<i class="fas fa-align-right"></i>右对齐',
                         handler: function() {
-                            doAlign($(me.table), $(me.td), 'right',me);
+                            doAlign($(me.table), $(me.td), 'right', me);
                         }
                     }];
                     return menus;
@@ -2600,7 +2601,7 @@ var Wysiwyg = (function() {
                     insertFileAtElement(info, this.td);
                 }
 
-                function doAlign(table, td, align,editor) {
+                function doAlign(table, td, align, editor) {
                     var index = td.index();
                     table.find('tr').each(function() {
                         var tr = $(this);
@@ -2608,33 +2609,33 @@ var Wysiwyg = (function() {
                             'text-align': align
                         })
                     });
-					markNeedUpdate(editor);
-					saveHistory(editor.wysiwyg);
+                    markNeedUpdate(editor);
+                    saveHistory(editor.wysiwyg);
                 }
 
-                function addCol(table, td, num,after,editor) {
+                function addCol(table, td, num, after, editor) {
                     var index = td.index();
                     table.find('tr').each(function() {
                         var tr = $(this);
                         var td = tr.find('td').eq(index);
                         var th = tr.find('th').eq(index);
                         if (after) {
-							for(var i=1;i<=num;i++){
-								th.after('<th></th>');
-								td.after('<td></td>');
-							}
+                            for (var i = 1; i <= num; i++) {
+                                th.after('<th></th>');
+                                td.after('<td></td>');
+                            }
                         } else {
-							for(var i=1;i<=num;i++){
-								th.before('<th></th>');
-								td.before('<td></td>');
-							}
+                            for (var i = 1; i <= num; i++) {
+                                th.before('<th></th>');
+                                td.before('<td></td>');
+                            }
                         }
                     });
-					markNeedUpdate(editor);
-					saveHistory(editor.wysiwyg);
+                    markNeedUpdate(editor);
+                    saveHistory(editor.wysiwyg);
                 }
 
-                function addRow(table, td,num, after,editor) {
+                function addRow(table, td, num, after, editor) {
                     if (td[0].tagName == 'TH' && !after) return;
                     var tr = td.parent();
                     var tdSize = tr.find('td').length;
@@ -2647,30 +2648,30 @@ var Wysiwyg = (function() {
                     }
                     html += '</tr>';
                     if (after) {
-						for(var i=1;i<=num;i++){
-							tr.after(html);
-						}
+                        for (var i = 1; i <= num; i++) {
+                            tr.after(html);
+                        }
                     } else {
-                       for(var i=1;i<=num;i++){
-							tr.before(html);
-						}
+                        for (var i = 1; i <= num; i++) {
+                            tr.before(html);
+                        }
                     }
-					markNeedUpdate(editor);
-					saveHistory(editor.wysiwyg);
+                    markNeedUpdate(editor);
+                    saveHistory(editor.wysiwyg);
                 }
 
-                function deleteRow(table, td,editor) {
+                function deleteRow(table, td, editor) {
                     if (td[0].tagName == 'TH') return;
                     if (table.find('tr').length == 2) {
                         return;
                     }
                     var tr = td.parent();
                     tr.remove();
-					markNeedUpdate(editor);
-					saveHistory(editor.wysiwyg);
+                    markNeedUpdate(editor);
+                    saveHistory(editor.wysiwyg);
                 }
 
-                function deleteCol(table, td,editor) {
+                function deleteCol(table, td, editor) {
                     var ths = table.find('tr').eq(0).find('th');
                     if (ths.length == 1) return;
                     var index = td.index();
@@ -2685,8 +2686,8 @@ var Wysiwyg = (function() {
                             th.remove();
                         }
                     });
-					markNeedUpdate(editor);
-					saveHistory(editor.wysiwyg);
+                    markNeedUpdate(editor);
+                    saveHistory(editor.wysiwyg);
                 }
 
                 return TdEditor;
@@ -2696,16 +2697,16 @@ var Wysiwyg = (function() {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 triggerEditorEvent('create', this);
             }
-			
-			TableEditor.prototype.continueEdit = function(element){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
-			}
-			
+
+            TableEditor.prototype.continueEdit = function(element) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+                getContinueEditor(this.wysiwyg, this.copy).getElement().innerHTML = element.innerHTML;
+            }
+
             TableEditor.prototype.insertFile = function(info) {
                 if (this.child) {
                     this.child.insertFile(info);
@@ -2732,50 +2733,50 @@ var Wysiwyg = (function() {
                     }
                 }
                 var tdHandler = function(e) {
-					
-					if(window.event.ctrlKey || window.event.metaKey){
-						
-						var trLength = me.element.querySelectorAll('tr').length;
-						
-						if(trLength < 3){
-							return ;
-						}
-						
-						var tr = getTR(e.target, me.element);
-						if(tr == null) return ;
-						
-						if(tr === me.element.querySelector('tr')) return ;
-						
-						var selectedLength =  me.element.querySelectorAll('[data-tr-selected]').length;
-						if(trLength - selectedLength < 3) return ;
-						
-						
-						e.preventDefault();
-						e.stopPropagation();
-						
-						//ctrl|cmd and click
-						if (me.child) {
-							me.child.stop();
-						}
-						
-						if(tr.hasAttribute('data-tr-selected')){
-							tr.removeAttribute('data-tr-selected')
-						} else {
-							tr.setAttribute('data-tr-selected','')
-						}
-						me.element.focus();
-						return ;
-					}
-					
+
+                    if (window.event.ctrlKey || window.event.metaKey) {
+
+                        var trLength = me.element.querySelectorAll('tr').length;
+
+                        if (trLength < 3) {
+                            return;
+                        }
+
+                        var tr = getTR(e.target, me.element);
+                        if (tr == null) return;
+
+                        if (tr === me.element.querySelector('tr')) return;
+
+                        var selectedLength = me.element.querySelectorAll('[data-tr-selected]').length;
+                        if (trLength - selectedLength < 3) return;
+
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        //ctrl|cmd and click
+                        if (me.child) {
+                            me.child.stop();
+                        }
+
+                        if (tr.hasAttribute('data-tr-selected')) {
+                            tr.removeAttribute('data-tr-selected')
+                        } else {
+                            tr.setAttribute('data-tr-selected', '')
+                        }
+                        me.element.focus();
+                        return;
+                    }
+
                     var td = getTd(e.target, me.element);
-					if(td == null ) return ;
-					
-					var tr = td.parentElement;
-					
-					if(tr.hasAttribute('data-tr-selected')){
-						tr.removeAttribute('data-tr-selected');
-					}
-					
+                    if (td == null) return;
+
+                    var tr = td.parentElement;
+
+                    if (tr.hasAttribute('data-tr-selected')) {
+                        tr.removeAttribute('data-tr-selected');
+                    }
+
                     editTd(td);
                 }
                 var table = $(this.element);
@@ -2815,18 +2816,18 @@ var Wysiwyg = (function() {
                 }
 
                 table.on('keydown', keyDownHandler);
-				
-				this.deleteListener = function(e){
-					if(e.key == 'Backspace'){
-						if(deleteSelectedTR(me)){
-							e.preventDefault();
-							e.stopPropagation();
-						}
-					}
-				}
-				
-				this.wysiwyg.rootElem.addEventListener('keydown',this.deleteListener);
-				
+
+                this.deleteListener = function(e) {
+                    if (e.key == 'Backspace') {
+                        if (deleteSelectedTR(me)) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                    }
+                }
+
+                this.wysiwyg.rootElem.addEventListener('keydown', this.deleteListener);
+
                 this.tdHandler = tdHandler;
                 this.keyDownHandler = keyDownHandler;
                 triggerEditorEvent('start', this);
@@ -2848,9 +2849,9 @@ var Wysiwyg = (function() {
                 var menus = [{
                     html: '<i class="fas fa-trash"></i>删除选中行',
                     handler: function() {
-						deleteSelectedTR(editor);
+                        deleteSelectedTR(editor);
                     }
-                },{
+                }, {
                     html: '<i class="fas fa-check"></i>完成',
                     handler: function() {
                         editor.stop();
@@ -2871,42 +2872,42 @@ var Wysiwyg = (function() {
                 this.stoped = true;
                 var ele = $(this.element);
                 ele.off('click', 'th,td', this.tdHandler);
-				this.wysiwyg.rootElem.removeEventListener('keydown',this.deleteListener);
+                this.wysiwyg.rootElem.removeEventListener('keydown', this.deleteListener);
                 ele.off('keydown', this.keyDownHandler);
                 if (this.child) {
                     this.child.stop();
                 }
-				
-				var trs = this.element.querySelectorAll('[data-tr-selected]');
-				for(const tr of trs){
-					tr.removeAttribute('data-tr-selected');
-				}
-				
-				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					markNeedUpdate(this);
-				}
+
+                var trs = this.element.querySelectorAll('[data-tr-selected]');
+                for (const tr of trs) {
+                    tr.removeAttribute('data-tr-selected');
+                }
+
+                if (!this.wysiwyg.rootElem.contains(this.getElement())) {
+                    markNeedUpdate(this);
+                }
                 triggerEditorEvent('stop', this);
             }
 
             TableEditor.prototype.getElement = function() {
                 return this.element;
             }
-			
-			function deleteSelectedTR(editor){
-				var trs = editor.element.querySelectorAll('[data-tr-selected]');
-				if(trs.length == 0){
-					return false;
-				}
-				
-				saveHistory(editor.wysiwyg);
-				
-				for(const element of trs){
-					element.remove();
-				}
-				
-				return true;
-			}
-			
+
+            function deleteSelectedTR(editor) {
+                var trs = editor.element.querySelectorAll('[data-tr-selected]');
+                if (trs.length == 0) {
+                    return false;
+                }
+
+                saveHistory(editor.wysiwyg);
+
+                for (const element of trs) {
+                    element.remove();
+                }
+
+                return true;
+            }
+
             function getTd(_target, root) {
                 var target = _target;
                 while (target != null) {
@@ -2920,7 +2921,8 @@ var Wysiwyg = (function() {
                 }
                 return null;
             }
-			function getTR(_target, root) {
+
+            function getTR(_target, root) {
                 var target = _target;
                 while (target != null) {
                     if (target.tagName == 'TR') {
@@ -2956,15 +2958,15 @@ var Wysiwyg = (function() {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 triggerEditorEvent('create', this);
             }
-			
-			HeadingEditor.prototype.continueEdit = function(element){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
-			}
+
+            HeadingEditor.prototype.continueEdit = function(element) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+                getContinueEditor(this.wysiwyg, this.copy).getElement().innerHTML = element.innerHTML;
+            }
 
             HeadingEditor.prototype.start = function() {
                 var me = this;
@@ -2988,20 +2990,20 @@ var Wysiwyg = (function() {
                 this.inlineMath = inlineMath;
                 this.contenteditableBar = ContenteditableBar.create(heading);
                 me.element.focus();
-				var timer;
-				this.observer = new MutationObserver(function(records){
-					markNeedUpdate(me);
-					if(timer){
-						clearTimeout(timer);
-					}
-					timer = setTimeout(function(){
-						saveHistory(me.wysiwyg);
-					},300);
-				});
-				
-				observeAll(this.observer,this.element);
-				
-				triggerEditorEvent('start', this);
+                var timer;
+                this.observer = new MutationObserver(function(records) {
+                    markNeedUpdate(me);
+                    if (timer) {
+                        clearTimeout(timer);
+                    }
+                    timer = setTimeout(function() {
+                        saveHistory(me.wysiwyg);
+                    }, 300);
+                });
+
+                observeAll(this.observer, this.element);
+
+                triggerEditorEvent('start', this);
             }
 
             HeadingEditor.prototype.stop = function() {
@@ -3013,17 +3015,17 @@ var Wysiwyg = (function() {
                 this.contenteditableBar.remove();
                 this.element.removeEventListener('paste', plainPasteHandler);
                 this.element.removeEventListener('keydown', this.keyDownHandler);
-				
-				
-				if(isEmptyText(this.element.innerHTML)){
-					this.element.remove();
-				}
-				//deleted from dom;
-				if(!this.wysiwyg.rootElem.contains(this.element)){
-					markNeedUpdate(this);
-				}
-				this.observer.disconnect();
-				triggerEditorEvent('stop', this);
+
+
+                if (isEmptyText(this.element.innerHTML)) {
+                    this.element.remove();
+                }
+                //deleted from dom;
+                if (!this.wysiwyg.rootElem.contains(this.element)) {
+                    markNeedUpdate(this);
+                }
+                this.observer.disconnect();
+                triggerEditorEvent('stop', this);
             }
 
             HeadingEditor.prototype.getElement = function() {
@@ -3034,7 +3036,7 @@ var Wysiwyg = (function() {
                 this.element.remove();
                 this.stop();
             }
-           
+
             HeadingEditor.prototype.getContextMenus = function() {
 
                 var editor = this;
@@ -3061,8 +3063,8 @@ var Wysiwyg = (function() {
                                 h.innerHTML = heading.innerHTML;
                                 $(heading).after(h).remove();
                                 editor.element = h;
-								markNeedUpdate(editor);
-								saveHistory(editor.wysiwyg);
+                                markNeedUpdate(editor);
+                                saveHistory(editor.wysiwyg);
                                 editor.stop();
 
                                 startEdit(editor.wysiwyg, editor.element);
@@ -3103,7 +3105,7 @@ var Wysiwyg = (function() {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 triggerEditorEvent('create', this);
             }
 
@@ -3115,12 +3117,12 @@ var Wysiwyg = (function() {
                 this.element.remove();
                 this.stop();
             }
-			
-			HREditor.prototype.continueEdit = function(element){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-			}
-			
+
+            HREditor.prototype.continueEdit = function(element) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+            }
+
             HREditor.prototype.getContextMenus = function() {
                 var editor = this;
                 var menus = [{
@@ -3142,10 +3144,10 @@ var Wysiwyg = (function() {
                     return;
                 }
                 this.stoped = true;
-				if(!this.wysiwyg.rootElem.contains(this.element)){
-					markNeedUpdate(this);
-				}
-				triggerEditorEvent('stop', this);
+                if (!this.wysiwyg.rootElem.contains(this.element)) {
+                    markNeedUpdate(this);
+                }
+                triggerEditorEvent('stop', this);
             }
 
             HREditor.prototype.getElement = function() {
@@ -3171,39 +3173,39 @@ var Wysiwyg = (function() {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 triggerEditorEvent('create', this);
             }
-			
-			ParagraphEditor.prototype.continueEdit = function(element){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
-			}
+
+            ParagraphEditor.prototype.continueEdit = function(element) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+                getContinueEditor(this.wysiwyg, this.copy).getElement().innerHTML = element.innerHTML;
+            }
 
             ParagraphEditor.prototype.start = function() {
                 var me = this;
                 this.element.setAttribute('contenteditable', 'true');
                 this.pasteHandler = function(e) {
-                    htmlPasteEventListener.call(me, e,function(file){
-						if(me.fileUploadMgr)
-							me.fileUploadMgr.upload(file);
-					});
-					saveHistory(me.wysiwyg);
+                    htmlPasteEventListener.call(me, e, function(file) {
+                        if (me.fileUploadMgr)
+                            me.fileUploadMgr.upload(file);
+                    });
+                    saveHistory(me.wysiwyg);
                 }
-				bindElement(this);
-				this.element.focus();
-				var timer;
-				this.observer = new MutationObserver(function(records){
-					markNeedUpdate(me);
-					if(timer){
-						clearTimeout(timer);
-					}
-					timer = setTimeout(function(){
-						saveHistory(me.wysiwyg);
-					},300);
-				})
-				observeAll(this.observer,this.element);
+                bindElement(this);
+                this.element.focus();
+                var timer;
+                this.observer = new MutationObserver(function(records) {
+                    markNeedUpdate(me);
+                    if (timer) {
+                        clearTimeout(timer);
+                    }
+                    timer = setTimeout(function() {
+                        saveHistory(me.wysiwyg);
+                    }, 300);
+                })
+                observeAll(this.observer, this.element);
                 triggerEditorEvent('start', this);
             }
 
@@ -3212,9 +3214,9 @@ var Wysiwyg = (function() {
                     return;
                 }
                 this.stoped = true;
-				if(this.wysiwyg.fileUploadEnable()){
-					this.fileUploadMgr.remove();
-				}
+                if (this.wysiwyg.fileUploadEnable()) {
+                    this.fileUploadMgr.remove();
+                }
                 this.contenteditableBar.remove();
                 this.mediaHelper.remove();
                 DocumentCommandHelper.unbindInlineBackspaceListener(this.element);
@@ -3226,12 +3228,12 @@ var Wysiwyg = (function() {
                     p.removeEventListener('paste', this.pasteHandler);
                     divToBr($(p));
                 }
-				if(!this.wysiwyg.rootElem.contains(this.element)){
-					markNeedUpdate(this);
-				}
-				this.observer.disconnect();
+                if (!this.wysiwyg.rootElem.contains(this.element)) {
+                    markNeedUpdate(this);
+                }
+                this.observer.disconnect();
                 this.inlineMath.stop();
-				triggerEditorEvent('stop', this);
+                triggerEditorEvent('stop', this);
             }
 
 
@@ -3247,7 +3249,7 @@ var Wysiwyg = (function() {
                 this.element.remove();
                 this.stop();
             }
-			
+
             ParagraphEditor.prototype.getContextMenus = function() {
                 var editor = this;
                 var menus = [{
@@ -3256,11 +3258,11 @@ var Wysiwyg = (function() {
                         editor.stop();
                     }
                 }, {
-					html: '<i class="fas fa-file"></i>插入文件',
-					handler: function(rangeInfo) {
-						createInsertFileDialog(rangeInfo);
-					}
-				},{
+                    html: '<i class="fas fa-file"></i>插入文件',
+                    handler: function(rangeInfo) {
+                        createInsertFileDialog(rangeInfo);
+                    }
+                }, {
                     html: '<i class="fas fa-upload"></i>上传文件',
                     handler: function() {
                         editor.fileUploadMgr.upload();
@@ -3276,21 +3278,21 @@ var Wysiwyg = (function() {
                 }];
                 return menus;
             }
-			
-			function bindElement(editor){
-				var paragraph = editor.getElement();
-				paragraph.addEventListener('paste', editor.pasteHandler);
+
+            function bindElement(editor) {
+                var paragraph = editor.getElement();
+                paragraph.addEventListener('paste', editor.pasteHandler);
                 editor.mediaHelper = new MediaHelper(paragraph);
-				if(editor.wysiwyg.fileUploadEnable()){
-					 var fileUploadMgr = new FileUploadMgr(paragraph, editor.wysiwyg.config);
-					 editor.fileUploadMgr = fileUploadMgr;
-				}
+                if (editor.wysiwyg.fileUploadEnable()) {
+                    var fileUploadMgr = new FileUploadMgr(paragraph, editor.wysiwyg.config);
+                    editor.fileUploadMgr = fileUploadMgr;
+                }
                 editor.contenteditableBar = ContenteditableBar.create(paragraph);
                 var inlineMath = createInlineMathSession(editor.wysiwyg, paragraph);
                 inlineMath.start();
                 editor.inlineMath = inlineMath;
                 DocumentCommandHelper.bindInlineBackspaceListener(paragraph);
-			}
+            }
 
             function divToBr($element) {
                 var divs = $element.find('div');
@@ -3375,32 +3377,32 @@ var Wysiwyg = (function() {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 triggerEditorEvent('create', this);
             }
-			
-			KatexBlockEditor.prototype.continueEdit = function(element){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var editor = getContinueEditor(this.wysiwyg,this.copy);
-				editor.pre.innerHTML = element.querySelector('pre').innerHTML;
-				editor.preview.innerHTML = element.querySelector('.katex-preview').innerHTML;
-			}
+
+            KatexBlockEditor.prototype.continueEdit = function(element) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+                var editor = getContinueEditor(this.wysiwyg, this.copy);
+                editor.pre.innerHTML = element.querySelector('pre').innerHTML;
+                editor.preview.innerHTML = element.querySelector('.katex-preview').innerHTML;
+            }
             KatexBlockEditor.prototype.start = function() {
                 var me = this;
                 var expression = getKatexExpression(this.element);
-				var div = document.createElement('div');
+                var div = document.createElement('div');
                 var pre = document.createElement('pre');
                 pre.innerHTML = expression;
                 var preview = document.createElement('div');
                 preview.classList.add('katex-preview');
 
-				div.appendChild(pre);
-				div.appendChild(preview);
-				var timer;
+                div.appendChild(pre);
+                div.appendChild(preview);
+                var timer;
                 this.updatePreview = function() {
-					var pre = me.pre;
-					var preview = me.preview;
+                    var pre = me.pre;
+                    var preview = me.preview;
                     var expression = pre.textContent.trimEnd();
                     if (isEmptyText(expression)) {
                         $(preview).css({
@@ -3427,14 +3429,14 @@ var Wysiwyg = (function() {
                             'visibility': 'visible'
                         });
                     });
-					markNeedUpdate(me);
-					if(timer){
-						clearTimeout(timer);
-					}
-					timer = setTimeout(function(){
-						saveHistory(me.wysiwyg);
-					},300);
-					
+                    markNeedUpdate(me);
+                    if (timer) {
+                        clearTimeout(timer);
+                    }
+                    timer = setTimeout(function() {
+                        saveHistory(me.wysiwyg);
+                    }, 300);
+
                 };
                 pre.setAttribute('contenteditable', 'true');
                 pre.addEventListener('input', this.updatePreview);
@@ -3445,7 +3447,7 @@ var Wysiwyg = (function() {
                 this.element = div;
 
                 this.preview = preview;
-				this.pre = pre;
+                this.pre = pre;
                 this.updatePreview();
                 this.pre.focus();
                 triggerEditorEvent('start', this);
@@ -3462,25 +3464,25 @@ var Wysiwyg = (function() {
                 if (isEmptyText(expression)) {
                     this.element.remove();
                 } else {
-					var katexNode = createUnparsedKatexBlockElement(expression);
+                    var katexNode = createUnparsedKatexBlockElement(expression);
                     LazyLoader.loadKatex(function() {
                         katexNode.innerHTML = parseHTML(parseKatex(expression, true)).body.firstChild.innerHTML;
                     });
-					$(this.element).after(katexNode).remove();
-					this.element = katexNode;
+                    $(this.element).after(katexNode).remove();
+                    this.element = katexNode;
                 }
-				if(!this.wysiwyg.rootElem.contains(this.element)){
-					markNeedUpdate(this);
-				}
-				triggerEditorEvent('stop', this);
+                if (!this.wysiwyg.rootElem.contains(this.element)) {
+                    markNeedUpdate(this);
+                }
+                triggerEditorEvent('stop', this);
             }
 
             KatexBlockEditor.prototype.delete = function() {
                 this.element.remove();
                 this.stop();
             }
-			
-			
+
+
             KatexBlockEditor.prototype.getContextMenus = function() {
                 var editor = this;
                 var menus = [{
@@ -3526,35 +3528,35 @@ var Wysiwyg = (function() {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 triggerEditorEvent('create', this);
             }
-			
-			MermaidEditor.prototype.continueEdit = function(element,extra){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var editor = getContinueEditor(this.wysiwyg,this.copy);
-				editor.textarea.value = extra.value || '';
-				editor.preview.innerHTML = element.querySelector('.mermaid-preview').innerHTML;
-			}
+
+            MermaidEditor.prototype.continueEdit = function(element, extra) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+                var editor = getContinueEditor(this.wysiwyg, this.copy);
+                editor.textarea.value = extra.value || '';
+                editor.preview.innerHTML = element.querySelector('.mermaid-preview').innerHTML;
+            }
 
             MermaidEditor.prototype.start = function() {
                 var me = this;
                 var expression = getMermaidExpression(this.element);
-				var div = document.createElement('div');
+                var div = document.createElement('div');
                 var textarea = document.createElement('textarea');
                 textarea.classList.add('heather_textarea_editor');
                 textarea.value = expression;
-				div.appendChild(textarea);
+                div.appendChild(textarea);
                 var preview = document.createElement('div');
                 preview.classList.add('mermaid-preview');
                 preview.classList.add('mermaid');
-				div.appendChild(preview);
+                div.appendChild(preview);
 
-				var timer;
+                var timer;
                 this.updatePreview = function() {
-					var textarea = me.textarea;
-					var preview = me.preview;
+                    var textarea = me.textarea;
+                    var preview = me.preview;
                     var expression = me.textarea.value;
                     if (isEmptyText(expression)) {
                         $(preview).hide();
@@ -3571,15 +3573,15 @@ var Wysiwyg = (function() {
                             preview.innerHTML = '<pre>' + e.str + '</pre>'
                         }
                     });
-					markNeedUpdate(me);
-					if(timer){
-						clearTimeout(timer);
-					}
-					timer = setTimeout(function(){
-						saveHistory(me.wysiwyg,{
-							value : textarea.value
-						});
-					},300);
+                    markNeedUpdate(me);
+                    if (timer) {
+                        clearTimeout(timer);
+                    }
+                    timer = setTimeout(function() {
+                        saveHistory(me.wysiwyg, {
+                            value: textarea.value
+                        });
+                    }, 300);
                 };
                 textarea.addEventListener('input', function() {
                     me.updatePreview();
@@ -3591,7 +3593,7 @@ var Wysiwyg = (function() {
                 this.element = div;
 
                 this.preview = preview;
-				this.textarea = textarea;
+                this.textarea = textarea;
 
                 me.updatePreview();
                 this.textarea.focus();
@@ -3609,12 +3611,12 @@ var Wysiwyg = (function() {
                     this.element.remove();
                 } else {
                     var me = this;
-					var div = createUnparsedMermaidElement(expression);
+                    var div = createUnparsedMermaidElement(expression);
                     $(me.element).after(div).remove();
-					me.element = div;
-					//this method is async
+                    me.element = div;
+                    //this method is async
                     LazyLoader.loadMermaid(function() {
-                        
+
                         var mermaidNode = div.querySelector('.mermaid');
                         try {
                             mermaid.parse(mermaidNode.textContent);
@@ -3622,12 +3624,12 @@ var Wysiwyg = (function() {
                         } catch (e) {
                             mermaidNode.innerHTML = '<pre>' + e.str + '</pre>'
                         }
-                       
+
                     });
                 }
-				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					markNeedUpdate(this);
-				}
+                if (!this.wysiwyg.rootElem.contains(this.getElement())) {
+                    markNeedUpdate(this);
+                }
                 triggerEditorEvent('stop', me);
             }
             MermaidEditor.prototype.delete = function() {
@@ -3664,46 +3666,46 @@ var Wysiwyg = (function() {
                 order: 0
             }
         })();
-		
-		
-		 var HtmlBlockEditorFactory = (function() {
+
+
+        var HtmlBlockEditorFactory = (function() {
 
             function HtmlBlockEditor(element, wysiwyg, embed) {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 triggerEditorEvent('create', this);
             }
-			HtmlBlockEditor.prototype.continueEdit = function(element){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
-			}
+            HtmlBlockEditor.prototype.continueEdit = function(element) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+                getContinueEditor(this.wysiwyg, this.copy).getElement().innerHTML = element.innerHTML;
+            }
             HtmlBlockEditor.prototype.start = function() {
-				var me = this;
-				var innerHTML = this.element.innerHTML;
-				var pre = document.createElement('pre');
-				var textNode = document.createTextNode(innerHTML);
-				pre.appendChild(textNode);
-				pre.setAttribute('contenteditable','true');
-				var timer;
-				var change = function(){
-					markNeedUpdate(me);
-					if(timer){
-						clearTimeout(timer);
-					}
-					timer = setTimeout(function(){
-						saveHistory(me.wysiwyg);
-					},300)
-				}
+                var me = this;
+                var innerHTML = this.element.innerHTML;
+                var pre = document.createElement('pre');
+                var textNode = document.createTextNode(innerHTML);
+                pre.appendChild(textNode);
+                pre.setAttribute('contenteditable', 'true');
+                var timer;
+                var change = function() {
+                    markNeedUpdate(me);
+                    if (timer) {
+                        clearTimeout(timer);
+                    }
+                    timer = setTimeout(function() {
+                        saveHistory(me.wysiwyg);
+                    }, 300)
+                }
                 pre.addEventListener('input', change);
                 pre.addEventListener('indent', change);
                 pre.addEventListener('unindent', change);
-				$(this.element).after(pre).remove();
-				this.preHelper = new PreHelper(pre);
-				this.element = pre;
-				
+                $(this.element).after(pre).remove();
+                this.preHelper = new PreHelper(pre);
+                this.element = pre;
+
                 triggerEditorEvent('start', this);
             }
 
@@ -3712,22 +3714,22 @@ var Wysiwyg = (function() {
                     return;
                 }
                 this.stoped = true;
-				this.preHelper.unbind();
-				var textContent = this.element.textContent;
-				if(isEmptyText(textContent)){
-					this.element.remove();
-				} else {
-					var div = document.createElement('div');
-					div.setAttribute('data-html','');
-					div.innerHTML = textContent;
-					$(this.element).after(div).remove();
-					this.element = div;
-				}
-				
-				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					markNeedUpdate(this);
-				}
-				
+                this.preHelper.unbind();
+                var textContent = this.element.textContent;
+                if (isEmptyText(textContent)) {
+                    this.element.remove();
+                } else {
+                    var div = document.createElement('div');
+                    div.setAttribute('data-html', '');
+                    div.innerHTML = textContent;
+                    $(this.element).after(div).remove();
+                    this.element = div;
+                }
+
+                if (!this.wysiwyg.rootElem.contains(this.getElement())) {
+                    markNeedUpdate(this);
+                }
+
                 triggerEditorEvent('stop', this);
             }
 
@@ -3763,22 +3765,22 @@ var Wysiwyg = (function() {
                 order: 0
             }
         })();
-		
-		
-		 var DefaultEditorFactory = (function() {
+
+
+        var DefaultEditorFactory = (function() {
 
             function DefaultEditor(element, wysiwyg, embed) {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 triggerEditorEvent('create', this);
             }
-			
-			DefaultEditor.prototype.continueEdit = function(element){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-			}
+
+            DefaultEditor.prototype.continueEdit = function(element) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+            }
 
             DefaultEditor.prototype.start = function() {
                 triggerEditorEvent('start', this);
@@ -3789,9 +3791,9 @@ var Wysiwyg = (function() {
                     return;
                 }
                 this.stoped = true;
-				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					markNeedUpdate(this);
-				}
+                if (!this.wysiwyg.rootElem.contains(this.getElement())) {
+                    markNeedUpdate(this);
+                }
                 triggerEditorEvent('stop', this);
             }
 
@@ -3834,18 +3836,18 @@ var Wysiwyg = (function() {
                 function LiEditor(listEditor, li, target) {
                     this.listEditor = listEditor;
                     this.li = li;
-					this.copy = this.li.cloneNode(true);
+                    this.copy = this.li.cloneNode(true);
                     this.wysiwyg = listEditor.wysiwyg;
                     this.target = target;
                     this.embed = true; //always true
                     triggerEditorEvent('create', this);
                 }
-				
-				LiEditor.prototype.continueEdit = function(element){
-					element.replaceWith(this.copy);
-					this.wysiwyg.edit(this.copy);
-					getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
-				}
+
+                LiEditor.prototype.continueEdit = function(element) {
+                    element.replaceWith(this.copy);
+                    this.wysiwyg.edit(this.copy);
+                    getContinueEditor(this.wysiwyg, this.copy).getElement().innerHTML = element.innerHTML;
+                }
 
                 LiEditor.prototype.insertBlock = function(block) {
                     this.compositeEditorHelper.insertBlock(block);
@@ -3866,17 +3868,17 @@ var Wysiwyg = (function() {
                         html: '<i class="fas fa-arrow-up"></i>向上添加',
                         handler: function() {
                             var li = me.append(false);
-							markNeedUpdate(me);
-							saveHistory(me.wysiwyg);
-							me.stop();
+                            markNeedUpdate(me);
+                            saveHistory(me.wysiwyg);
+                            me.stop();
                             editLi(me.listEditor, li, li.querySelector('p'));
                         }
                     }, {
                         html: '<i class="fas fa-arrow-down"></i>向下添加',
                         handler: function() {
                             var li = me.append(true);
-							markNeedUpdate(me);
-							saveHistory(me.wysiwyg);
+                            markNeedUpdate(me);
+                            saveHistory(me.wysiwyg);
                             me.stop();
                             editLi(me.listEditor, li, li.querySelector('p'));
                         }
@@ -3893,41 +3895,41 @@ var Wysiwyg = (function() {
 
                 LiEditor.prototype.start = function() {
                     var li = this.li;
-					if(li.hasAttribute('data-task-list') && (li.hasAttribute('data-checked') || li.hasAttribute('data-unchecked'))){
-						//from continue edit
-						//create a new checkbox
-						var checkbox = document.createElement('input');
-						checkbox.setAttribute('disabled','');
-						checkbox.setAttribute('type','checkbox');
-						checkbox.setAttribute('class','task-list-item-checkbox');
-						checkbox.checked = li.hasAttribute('data-checked');
-						this.checkbox = checkbox;
-					} else {
-						this.checkbox = getCheckbox(li);
-					}
-					wrapToParagraph(li, this.checkbox);
-					if (this.checkbox != null) {
-						li.setAttribute('data-task-list', '');
-						if (this.checkbox.checked) {
-							li.setAttribute('data-checked', '');
-						} else {
-							li.setAttribute('data-unchecked', '');
-						}
-						this.clickHandler = function(e) {
-							if (e.offsetX < 0) {
-								if (li.hasAttribute('data-checked')) {
-									li.removeAttribute('data-checked');
-									li.setAttribute('data-unchecked', '');
-								} else {
-									li.removeAttribute('data-unchecked');
-									li.setAttribute('data-checked', '');
-								}
-							}
-						}
-						li.addEventListener('click', this.clickHandler);
-						this.checkbox.remove();
-					}
-					
+                    if (li.hasAttribute('data-task-list') && (li.hasAttribute('data-checked') || li.hasAttribute('data-unchecked'))) {
+                        //from continue edit
+                        //create a new checkbox
+                        var checkbox = document.createElement('input');
+                        checkbox.setAttribute('disabled', '');
+                        checkbox.setAttribute('type', 'checkbox');
+                        checkbox.setAttribute('class', 'task-list-item-checkbox');
+                        checkbox.checked = li.hasAttribute('data-checked');
+                        this.checkbox = checkbox;
+                    } else {
+                        this.checkbox = getCheckbox(li);
+                    }
+                    wrapToParagraph(li, this.checkbox);
+                    if (this.checkbox != null) {
+                        li.setAttribute('data-task-list', '');
+                        if (this.checkbox.checked) {
+                            li.setAttribute('data-checked', '');
+                        } else {
+                            li.setAttribute('data-unchecked', '');
+                        }
+                        this.clickHandler = function(e) {
+                            if (e.offsetX < 0) {
+                                if (li.hasAttribute('data-checked')) {
+                                    li.removeAttribute('data-checked');
+                                    li.setAttribute('data-unchecked', '');
+                                } else {
+                                    li.removeAttribute('data-unchecked');
+                                    li.setAttribute('data-checked', '');
+                                }
+                            }
+                        }
+                        li.addEventListener('click', this.clickHandler);
+                        this.checkbox.remove();
+                    }
+
                     this.compositeEditorHelper = new CompositeEditorHelper(this);
                     this.compositeEditorHelper.start();
                     triggerEditorEvent('start', this);
@@ -3951,11 +3953,11 @@ var Wysiwyg = (function() {
                         li.removeEventListener('click', this.clickHandler);
                     }
                     this.compositeEditorHelper.stop();
-					
-					if(!this.wysiwyg.rootElem.contains(this.getElement())){
-						markNeedUpdate(this);
-					}
-					
+
+                    if (!this.wysiwyg.rootElem.contains(this.getElement())) {
+                        markNeedUpdate(this);
+                    }
+
                     triggerEditorEvent('stop', this);
                 }
 
@@ -3982,7 +3984,7 @@ var Wysiwyg = (function() {
                 LiEditor.prototype.insertAfter = function() {
                     this.compositeEditorHelper.insertAfter();
                 }
-				
+
                 LiEditor.prototype.append = function(after) {
                     if (after) {
                         if (this.isTaskList()) {
@@ -4008,35 +4010,35 @@ var Wysiwyg = (function() {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 triggerEditorEvent('create', this);
             }
-			
-			ListEditor.prototype.continueEdit = function(element){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
-			}
+
+            ListEditor.prototype.continueEdit = function(element) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+                getContinueEditor(this.wysiwyg, this.copy).getElement().innerHTML = element.innerHTML;
+            }
 
             ListEditor.prototype.notifyEmbedStopped = function() {
                 this.child = undefined;
             }
 
             ListEditor.prototype.start = function(_target) {
-				if(_target && _target.type == 'checkbox'){
-					triggerEditorEvent('start', this);
-					if (_target.checked) {
-						_target.setAttribute('checked', '')
-					} else {
-						_target.removeAttribute('checked')
-					}
-					markNeedUpdate(this);
+                if (_target && _target.type == 'checkbox') {
+                    triggerEditorEvent('start', this);
+                    if (_target.checked) {
+                        _target.setAttribute('checked', '')
+                    } else {
+                        _target.removeAttribute('checked')
+                    }
+                    markNeedUpdate(this);
                     triggerEditorEvent('stop', this);
-					return ;
-				}
+                    return;
+                }
                 var me = this;
                 var ele = $(this.element);
-				
+
                 var clickHandler = function(e) {
                     var li = getLi(e.target, me.element);
                     editLi(me, li, e.target);
@@ -4093,10 +4095,10 @@ var Wysiwyg = (function() {
                         var replace = document.createElement(tagName);
                         replace.innerHTML = me.element.innerHTML;
                         cloneAttributes(replace, me.element);
-						me.element.replaceWith(replace);
+                        me.element.replaceWith(replace);
                         me.element = replace;
                         markNeedUpdate(me);
-						saveHistory(me.wysiwyg);
+                        saveHistory(me.wysiwyg);
                         me.stop();
                     }
                 }, {
@@ -4135,9 +4137,9 @@ var Wysiwyg = (function() {
                 }
                 this.stoped = true;
                 _stop(this);
-				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					markNeedUpdate(this);
-				}
+                if (!this.wysiwyg.rootElem.contains(this.getElement())) {
+                    markNeedUpdate(this);
+                }
                 triggerEditorEvent('stop', this);
             }
 
@@ -4240,29 +4242,29 @@ var Wysiwyg = (function() {
                 var ele = $(editor.element);
                 ele.find('li').each(function() {
                     var checkbox = getCheckbox(this);
-					wrapToParagraph(this,checkbox);
-					var first = this.firstChild;
-					if(first != null && first.nodeType == 1){
-						if(first.type == 'checkbox'){
-							//need to put it into paragraph;
-							var next = first.nextSibling;
-							if(next == null){
-								var p = document.createElement('p');
-								p.appendChild(first.cloneNode(true));
-								first.replaceWith(p);
-							} else {
-								next.prepend(first.cloneNode(true));
-								first.remove();
-							}
-						}
-						if(first.tagName == 'P'){
-							//need to unwrap ??
-							//TODO
-							var parent = first.parentNode;
-							while (first.firstChild) parent.insertBefore(first.firstChild, first);
-							first.remove();
-						}
-					}
+                    wrapToParagraph(this, checkbox);
+                    var first = this.firstChild;
+                    if (first != null && first.nodeType == 1) {
+                        if (first.type == 'checkbox') {
+                            //need to put it into paragraph;
+                            var next = first.nextSibling;
+                            if (next == null) {
+                                var p = document.createElement('p');
+                                p.appendChild(first.cloneNode(true));
+                                first.replaceWith(p);
+                            } else {
+                                next.prepend(first.cloneNode(true));
+                                first.remove();
+                            }
+                        }
+                        if (first.tagName == 'P') {
+                            //need to unwrap ??
+                            //TODO
+                            var parent = first.parentNode;
+                            while (first.firstChild) parent.insertBefore(first.firstChild, first);
+                            first.remove();
+                        }
+                    }
                 })
                 ele.off('click', 'li', editor.clickHandler);
                 ele.find('[contenteditable]').each(function() {
@@ -4301,19 +4303,19 @@ var Wysiwyg = (function() {
         var PreEditorFactory = (function() {
             function PreEditor(element, wysiwyg, embed) {
                 this.element = element;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
                 triggerEditorEvent('create', this);
             }
-			
-			PreEditor.prototype.continueEdit = function(element,extra){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				var editor = getContinueEditor(this.wysiwyg,this.copy);
-				editor.language = extra.lang || '';
-				editor.element.innerHTML = element.innerHTML;
-			}
+
+            PreEditor.prototype.continueEdit = function(element, extra) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+                var editor = getContinueEditor(this.wysiwyg, this.copy);
+                editor.language = extra.lang || '';
+                editor.element.innerHTML = element.innerHTML;
+            }
             PreEditor.prototype.start = function() {
                 var me = this;
                 var pre = this.element;
@@ -4325,7 +4327,7 @@ var Wysiwyg = (function() {
                 pre.setAttribute('contenteditable', 'true');
 
                 var timer;
-				var historyTimer;
+                var historyTimer;
                 this.inputHandler = function() {
                     if (timer) {
                         clearTimeout(timer);
@@ -4336,15 +4338,15 @@ var Wysiwyg = (function() {
                             highlight(pre, me.language);
                         });
                     }, 100);
-					if(historyTimer){
-						clearTimeout(historyTimer);
-					}
-					markNeedUpdate(me);
-					historyTimer = setTimeout(function(){
-						saveHistory(me.wysiwyg,{
-							lang : me.language
-						});
-					},300)
+                    if (historyTimer) {
+                        clearTimeout(historyTimer);
+                    }
+                    markNeedUpdate(me);
+                    historyTimer = setTimeout(function() {
+                        saveHistory(me.wysiwyg, {
+                            lang: me.language
+                        });
+                    }, 300)
                 }
 
                 this.startHandler = function(e) {
@@ -4353,35 +4355,35 @@ var Wysiwyg = (function() {
                 this.endHandler = function(e) {
                     me.composing = false;
                 };
-				
-				this.indentHandler = function(e){
-					var text = e.detail.text;
-					var range = e.detail.range;
-					var html = highlightStr(text,me.language);
-					if(html != null){
-						var renderer = document.createElement('template');
-						renderer.innerHTML = html;
-						range.insertNode(renderer.content);
-					} else {
-						range.insertNode(document.createTextNode(text));
-					}
-					if(historyTimer){
-						clearTimeout(historyTimer);
-					}
-					markNeedUpdate(me);
-					historyTimer = setTimeout(function(){
-						saveHistory(me.wysiwyg,{
-							lang : me.language
-						});
-					},300)
-				}
+
+                this.indentHandler = function(e) {
+                    var text = e.detail.text;
+                    var range = e.detail.range;
+                    var html = highlightStr(text, me.language);
+                    if (html != null) {
+                        var renderer = document.createElement('template');
+                        renderer.innerHTML = html;
+                        range.insertNode(renderer.content);
+                    } else {
+                        range.insertNode(document.createTextNode(text));
+                    }
+                    if (historyTimer) {
+                        clearTimeout(historyTimer);
+                    }
+                    markNeedUpdate(me);
+                    historyTimer = setTimeout(function() {
+                        saveHistory(me.wysiwyg, {
+                            lang: me.language
+                        });
+                    }, 300)
+                }
 
                 pre.addEventListener('compositionstart', this.startHandler);
                 pre.addEventListener('compositionend', this.endHandler);
                 pre.addEventListener('input', this.inputHandler);
                 pre.addEventListener('indent', this.indentHandler);
                 pre.addEventListener('unindent', this.indentHandler);
-				
+
                 this.preHelper = new PreHelper(pre);
 
                 if (this.language == 'html') this.language = 'xml';
@@ -4413,16 +4415,16 @@ var Wysiwyg = (function() {
                             animation: false,
                             inputValue: me.language,
                             inputOptions: inputOptions,
-							scrollbarPadding :false
+                            scrollbarPadding: false
                         }).then((result) => {
                             if (result.value) {
                                 var lang = result.value;
                                 me.language = lang;
                                 highlight(me.element, me.language);
-								markNeedUpdate(me);
-								saveHistory(me.wysiwyg,{
-									lang : me.language
-								});
+                                markNeedUpdate(me);
+                                saveHistory(me.wysiwyg, {
+                                    lang: me.language
+                                });
                                 me.element.focus();
                             }
                         })
@@ -4457,11 +4459,11 @@ var Wysiwyg = (function() {
                 }
                 code.innerHTML = pre.innerHTML;
                 pre.innerHTML = code.outerHTML;
-				
-				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					markNeedUpdate(this);
-				}
-				
+
+                if (!this.wysiwyg.rootElem.contains(this.getElement())) {
+                    markNeedUpdate(this);
+                }
+
                 triggerEditorEvent('stop', this);
             }
 
@@ -4495,12 +4497,12 @@ var Wysiwyg = (function() {
                     morphdom(pre, _pre);
                 }
             }
-			
-			function highlightStr(str, language) {
+
+            function highlightStr(str, language) {
                 if (hljs.getLanguage(language)) {
-                   return hljs.highlight(language, str, true).value;
+                    return hljs.highlight(language, str, true).value;
                 }
-				return null;
+                return null;
             }
             //code from https://codepen.io/brianmearns/pen/YVjZWw
             function getTextSegments(element) {
@@ -4545,7 +4547,7 @@ var Wysiwyg = (function() {
                 if (callback) callback();
                 restoreSelection(code, anchorIndex, focusIndex);
             }
-			
+
             function restoreSelection(code, absoluteAnchorIndex, absoluteFocusIndex) {
                 var sel = window.getSelection();
                 var textSegments = getTextSegments(code);
@@ -4620,17 +4622,17 @@ var Wysiwyg = (function() {
                 this.element = element;
                 this.wysiwyg = wysiwyg;
                 this.embed = embed;
-				this.copy = this.element.cloneNode(true);
+                this.copy = this.element.cloneNode(true);
                 this.compositeEditorHelper = new CompositeEditorHelper(this);
                 triggerEditorEvent('create', this);
             }
-			
-			BlockquoteEditor.prototype.continueEdit = function(element){
-				element.replaceWith(this.copy);
-				this.wysiwyg.edit(this.copy);
-				getContinueEditor(this.wysiwyg,this.copy).getElement().innerHTML = element.innerHTML;
-			}
-			
+
+            BlockquoteEditor.prototype.continueEdit = function(element) {
+                element.replaceWith(this.copy);
+                this.wysiwyg.edit(this.copy);
+                getContinueEditor(this.wysiwyg, this.copy).getElement().innerHTML = element.innerHTML;
+            }
+
             BlockquoteEditor.prototype.start = function(_target) {
                 this.compositeEditorHelper.start();
                 triggerEditorEvent('start', this);
@@ -4664,9 +4666,9 @@ var Wysiwyg = (function() {
                 }
                 this.stoped = true;
                 this.compositeEditorHelper.stop();
-				if(!this.wysiwyg.rootElem.contains(this.getElement())){
-					markNeedUpdate(this);
-				}
+                if (!this.wysiwyg.rootElem.contains(this.getElement())) {
+                    markNeedUpdate(this);
+                }
                 triggerEditorEvent('stop', this);
             }
 
@@ -4870,7 +4872,7 @@ var Wysiwyg = (function() {
                     createEditor(block, this);
                 }
             }
-			
+
             function editTarget(helper, _target) {
                 var target = _target;
                 while (target != null) {
@@ -4932,7 +4934,7 @@ var Wysiwyg = (function() {
         editorFactories.push(ParagraphEditorFactory);
         editorFactories.push(HtmlBlockEditorFactory);
         editorFactories.push(DefaultEditorFactory);
-		
+
 
         editorFactories.sort(function(a, b) {
             return a.order > b.order ? -1 : a.order == b.order ? 0 : 1;
@@ -4958,18 +4960,18 @@ var Wysiwyg = (function() {
                 if (hasMethod(editor, 'insertBlock')) {
                     editor.insertBlock(element); //just add block ,let editor do remain work
                 } else {
-					var next = editor.getElement().nextElementSibling;
+                    var next = editor.getElement().nextElementSibling;
                     wysiwyg.stopEdit();
-					if(next == null){
-						 wysiwyg.rootElem.appendChild(element);
-					} else {
-						$(next).before(element)
-					}
-					startEdit(wysiwyg, element);
+                    if (next == null) {
+                        wysiwyg.rootElem.appendChild(element);
+                    } else {
+                        $(next).before(element)
+                    }
+                    startEdit(wysiwyg, element);
                 }
             } else {
                 wysiwyg.rootElem.appendChild(element);
-				startEdit(wysiwyg, element);
+                startEdit(wysiwyg, element);
             }
         }
 
@@ -4988,14 +4990,14 @@ var Wysiwyg = (function() {
                     var me = this;
                     showEditorFactoryDialog(function(element) {
                         var ele = me.currentEditor.getElement();
-						var prev = ele.previousElementSibling;
+                        var prev = ele.previousElementSibling;
                         me.stopEdit();
-						
-						if(prev == null){
-							$(me.rootElem).prepend(element);
-						} else {
-							$(prev).after(element);
-						}
+
+                        if (prev == null) {
+                            $(me.rootElem).prepend(element);
+                        } else {
+                            $(prev).after(element);
+                        }
                         startEdit(me, element);
                     })
                 }
@@ -5009,14 +5011,14 @@ var Wysiwyg = (function() {
                     var me = this;
                     showEditorFactoryDialog(function(element) {
                         var ele = me.currentEditor.getElement();
-						var next = ele.nextElementSibling;
+                        var next = ele.nextElementSibling;
                         me.stopEdit();
-						
-						if(next == null){
-							$(me.rootElem).after(element);
-						} else {
-							$(next).before(element);
-						}
+
+                        if (next == null) {
+                            $(me.rootElem).after(element);
+                        } else {
+                            $(next).before(element);
+                        }
                         startEdit(me, element);
                     })
                 }
@@ -5026,15 +5028,15 @@ var Wysiwyg = (function() {
             if (this.currentEditor) {
                 var menuCards = [];
                 var editor = this.currentEditor;
-				
-				var rangeInfo;
-				var depthestChild = getDepthestChild(this);
-				if(depthestChild == null){
-					rangeInfo = getRangeInfo(editor.getElement());
-				} else {
-					rangeInfo = getRangeInfo(depthestChild.getElement());
-				}
-				
+
+                var rangeInfo;
+                var depthestChild = getDepthestChild(this);
+                if (depthestChild == null) {
+                    rangeInfo = getRangeInfo(editor.getElement());
+                } else {
+                    rangeInfo = getRangeInfo(depthestChild.getElement());
+                }
+
                 var child = editor.child;
                 var menus = editor.getContextMenus();
 
@@ -5065,10 +5067,10 @@ var Wysiwyg = (function() {
                         me.execCommand('insertBefore');
                     }
                 });
-                createMenuDialog(menuCards,rangeInfo);
+                createMenuDialog(menuCards, rangeInfo);
             }
         }
-      
+
         commands['bold'] = function() {
             runInlineCommand(this, function(range, sel) {
                 DocumentCommandHelper.bold();
@@ -5137,7 +5139,7 @@ var Wysiwyg = (function() {
                             '<label>图片alt</label><input id="heather-media-helper-img-alt" class="swal2-input">' +
                             '<label>图片标题</label><input id="heather-media-helper-img-title" class="swal2-input">',
                         focusConfirm: false,
-						scrollbarPadding :false,
+                        scrollbarPadding: false,
                         onBeforeOpen: function() {
                             document.getElementById("heather-media-helper-img-src").value = src;
                             document.getElementById("heather-media-helper-img-alt").value = alt;
@@ -5179,7 +5181,7 @@ var Wysiwyg = (function() {
                 }
 
                 $(element).on('click', 'img', imgClickHandler);
-				
+
                 makeVideoFocusable(element);
 
                 var observer = new MutationObserver(function(mutations, observer) {
@@ -5266,20 +5268,20 @@ var Wysiwyg = (function() {
                 this.pre = pre;
                 this.keyDownHandler = function(e) {
                     if (e.key == 'Enter') {
-						var rangeInfo = getRangeInfo(pre);
-						var range = rangeInfo.range;
+                        var rangeInfo = getRangeInfo(pre);
+                        var range = rangeInfo.range;
                         var sel = rangeInfo.sel;
-						if(range != null){
-							e.preventDefault();
-							e.stopPropagation();
-							var text = document.createTextNode('\n'+veryThinChar);
-							range.insertNode(text);
-							sel.removeAllRanges();
-							range.setStart(text,1);
-							range.setEnd(text,1);
-							sel.addRange(range);
-							pre.dispatchEvent(new Event("input"));
-						}
+                        if (range != null) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            var text = document.createTextNode('\n' + veryThinChar);
+                            range.insertNode(text);
+                            sel.removeAllRanges();
+                            range.setStart(text, 1);
+                            range.setEnd(text, 1);
+                            sel.addRange(range);
+                            pre.dispatchEvent(new Event("input"));
+                        }
                         return false;
                     }
                     if (e.shiftKey && e.key == 'Tab') {
@@ -5302,10 +5304,12 @@ var Wysiwyg = (function() {
                                 }
                             }
                             range.deleteContents();
-							pre.dispatchEvent(new CustomEvent("unindent",{detail:{
-								text : rst,
-								range : range
-							}}));
+                            pre.dispatchEvent(new CustomEvent("unindent", {
+                                detail: {
+                                    text: rst,
+                                    range: range
+                                }
+                            }));
                         }
                         e.preventDefault();
                         e.stopPropagation();
@@ -5330,11 +5334,13 @@ var Wysiwyg = (function() {
                                     }
                                 }
                                 range.deleteContents();
-                             //   range.insertNode(document.createTextNode(rst));
-								pre.dispatchEvent(new CustomEvent("indent",{detail:{
-									text : rst,
-									range : range
-								}}));
+                                //   range.insertNode(document.createTextNode(rst));
+                                pre.dispatchEvent(new CustomEvent("indent", {
+                                    detail: {
+                                        text: rst,
+                                        range: range
+                                    }
+                                }));
                             }
                         }
                         e.preventDefault();
@@ -5353,10 +5359,10 @@ var Wysiwyg = (function() {
                     var range = rangeInfo.range;
                     if (range != null) {
                         range.deleteContents();
-						var node = document.createTextNode(data.replaceAll('<br>', '\n').replaceAll(tabSpace, "    "));
+                        var node = document.createTextNode(data.replaceAll('<br>', '\n').replaceAll(tabSpace, "    "));
                         range.insertNode(node);
-						range.setStartAfter(node);
-						pre.dispatchEvent(new Event("input"));
+                        range.setStartAfter(node);
+                        pre.dispatchEvent(new Event("input"));
                     }
                     return false;
                 }
@@ -5372,10 +5378,10 @@ var Wysiwyg = (function() {
 
             return PreHelper;
         })();
-		
-		function markNeedUpdate(editor){
-			editor.wysiwyg.currentEditor.needUpdate = true;
-		}
+
+        function markNeedUpdate(editor) {
+            editor.wysiwyg.currentEditor.needUpdate = true;
+        }
 
         function triggerEditorEvent(name, editor, element) {
             var wysiwyg = editor.wysiwyg;
@@ -5383,13 +5389,13 @@ var Wysiwyg = (function() {
                 if (editor.parent && name == 'stop') {
                     editor.parent.notifyEmbedStopped(editor);
                 }
-                triggerEvent(wysiwyg,'editor.embed.' + name, editor, element);
+                triggerEvent(wysiwyg, 'editor.embed.' + name, editor, element);
             } else {
-               triggerEvent(wysiwyg,'editor.' + name, editor, element);
+                triggerEvent(wysiwyg, 'editor.' + name, editor, element);
             }
         }
-		
-		function triggerEvent(wysiwyg, name, args) {
+
+        function triggerEvent(wysiwyg, name, args) {
             for (var i = 0; i < wysiwyg.eventHandlers.length; i++) {
                 var evtHandler = wysiwyg.eventHandlers[i];
                 if (evtHandler.name == name) {
@@ -5440,22 +5446,22 @@ var Wysiwyg = (function() {
 
         function insertFileAtElement(info, element) {
             var rangeInfo = getRangeInfo(element);
-            insertFileAtRange(info,rangeInfo);
+            insertFileAtRange(info, rangeInfo);
         }
-		
-		function insertFileAtRange(info, rangeInfo) {
+
+        function insertFileAtRange(info, rangeInfo) {
             var range = rangeInfo.range;
             var sel = rangeInfo.sel;
             if (range != null) {
                 var fileElement = fileToElement(info);
                 if (fileElement != null) {
-					if(fileElement.tagName == 'IMG'){
-						//add on error callback
-						fileElement.onerror = function(){
-							this.onerror = null;
-							fileElement.classList.add('heather_img_error');
-						}
-					}
+                    if (fileElement.tagName == 'IMG') {
+                        //add on error callback
+                        fileElement.onerror = function() {
+                            this.onerror = null;
+                            fileElement.classList.add('heather_img_error');
+                        }
+                    }
                     range.deleteContents();
                     range.insertNode(fileElement);
                     range.setStartAfter(fileElement);
@@ -5464,88 +5470,92 @@ var Wysiwyg = (function() {
                 }
             }
         }
-		
-		function createInsertFileDialog(rangeInfo){
-			if(rangeInfo.range == null){
-				return ;
-			}
-			//TODO add video
-			createMenuDialog([{
-				'title': '',
-				'menus': [{
-					html: '<i class="fas fa-link"></i>超链接',
-					handler: function(rangeInfo) {
-						Swal.fire({
-							html: '<label>超链接地址</label><input  class="swal2-input">' +
-								'<label>超链接内容</label><input  class="swal2-input">',
-							focusConfirm: false,
-							preConfirm: (dom) => {
-								var inputs = Swal.getContent().querySelectorAll('input');
-								return [
-									inputs[0].value,
-									inputs[1].value
-								]
-							},
-							showCancelButton: true,
-							scrollbarPadding :false
-						}).then((formValues) => {
-							formValues = formValues.value;
-							if (!formValues) {
-								return;
-							}
-							var src = formValues[0];
-							var name = formValues[1];
 
-							if (src.trim() != '') {
-								var fileInfo = {type:'file'};
-								fileInfo.url = src.trim();
-								fileInfo.name = name || fileInfo.url;
-								insertFileAtRange(fileInfo,rangeInfo);
-							}
-						});
-					}
-				}, {
-					html: '<i class="fas fa-paragraph"></i>图片',
-					handler: function(rangeInfo) {
-						Swal.fire({
-							html: '<label>图片地址</label><input  class="swal2-input">' +
-								'<label>图片alt</label><input  class="swal2-input">',
-							focusConfirm: false,
-							preConfirm: (dom) => {
-								var inputs = Swal.getContent().querySelectorAll('input');
-								return [
-									inputs[0].value,
-									inputs[1].value
-								]
-							},
-							showCancelButton: true,
-							scrollbarPadding :false
-						}).then((formValues) => {
-							formValues = formValues.value;
-							if (!formValues) {
-								return;
-							}
-							var src = formValues[0];
-							var alt = formValues[1];
+        function createInsertFileDialog(rangeInfo) {
+            if (rangeInfo.range == null) {
+                return;
+            }
+            //TODO add video
+            createMenuDialog([{
+                'title': '',
+                'menus': [{
+                    html: '<i class="fas fa-link"></i>超链接',
+                    handler: function(rangeInfo) {
+                        Swal.fire({
+                            html: '<label>超链接地址</label><input  class="swal2-input">' +
+                                '<label>超链接内容</label><input  class="swal2-input">',
+                            focusConfirm: false,
+                            preConfirm: (dom) => {
+                                var inputs = Swal.getContent().querySelectorAll('input');
+                                return [
+                                    inputs[0].value,
+                                    inputs[1].value
+                                ]
+                            },
+                            showCancelButton: true,
+                            scrollbarPadding: false
+                        }).then((formValues) => {
+                            formValues = formValues.value;
+                            if (!formValues) {
+                                return;
+                            }
+                            var src = formValues[0];
+                            var name = formValues[1];
 
-							if (src.trim() != '') {
-								var fileInfo = {type:'image'};
-								fileInfo.url = src.trim();
-								fileInfo.name = alt || '';
-								insertFileAtRange(fileInfo,rangeInfo);
-							}
-						});
-					}
-				}]
-			}],rangeInfo)
-		}
+                            if (src.trim() != '') {
+                                var fileInfo = {
+                                    type: 'file'
+                                };
+                                fileInfo.url = src.trim();
+                                fileInfo.name = name || fileInfo.url;
+                                insertFileAtRange(fileInfo, rangeInfo);
+                            }
+                        });
+                    }
+                }, {
+                    html: '<i class="fas fa-paragraph"></i>图片',
+                    handler: function(rangeInfo) {
+                        Swal.fire({
+                            html: '<label>图片地址</label><input  class="swal2-input">' +
+                                '<label>图片alt</label><input  class="swal2-input">',
+                            focusConfirm: false,
+                            preConfirm: (dom) => {
+                                var inputs = Swal.getContent().querySelectorAll('input');
+                                return [
+                                    inputs[0].value,
+                                    inputs[1].value
+                                ]
+                            },
+                            showCancelButton: true,
+                            scrollbarPadding: false
+                        }).then((formValues) => {
+                            formValues = formValues.value;
+                            if (!formValues) {
+                                return;
+                            }
+                            var src = formValues[0];
+                            var alt = formValues[1];
 
-        function createMenuDialog(menuCards,rangeInfo) {
+                            if (src.trim() != '') {
+                                var fileInfo = {
+                                    type: 'image'
+                                };
+                                fileInfo.url = src.trim();
+                                fileInfo.name = alt || '';
+                                insertFileAtRange(fileInfo, rangeInfo);
+                            }
+                        });
+                    }
+                }]
+            }], rangeInfo)
+        }
+
+        function createMenuDialog(menuCards, rangeInfo) {
             var html = '<div class="heather-menu-breadcrums"></div><ul class="heather-menu-card">';
             html += '</ul>';
             var handler;
             var nodes;
-			var _menus = {};
+            var _menus = {};
 
             var keydownListener = function(e) {
                 if (e.key == 'ArrowLeft') {
@@ -5553,7 +5563,7 @@ var Wysiwyg = (function() {
                     e.stopPropagation();
                     moveCard(Swal.getContent().querySelector('.on').previousElementSibling);
                 }
-				if (e.key == 'Tab') {
+                if (e.key == 'Tab') {
                     e.preventDefault();
                     e.stopPropagation();
                     moveNext();
@@ -5582,12 +5592,12 @@ var Wysiwyg = (function() {
 
             var moveCard = function(next) {
                 var card = Swal.getContent().querySelector('.on');
-				
+
                 if (next != null) {
-					var prevActive = card.querySelector('.active');
-					prevActive.classList.remove('active');
-					onInActive(prevActive);
-					
+                    var prevActive = card.querySelector('.active');
+                    prevActive.classList.remove('active');
+                    onInActive(prevActive);
+
                     card.classList.remove('on');
                     card.classList.add('off');
                     next.classList.remove('off');
@@ -5597,10 +5607,10 @@ var Wysiwyg = (function() {
                     var active = next.querySelector('.active');
                     if (active == null) {
                         next.firstChild.firstChild.classList.add('active');
-						onActive(next.firstChild.firstChild);
+                        onActive(next.firstChild.firstChild);
                     } else {
-						onActive(active);
-					}
+                        onActive(active);
+                    }
                 }
             }
 
@@ -5633,30 +5643,30 @@ var Wysiwyg = (function() {
                 }
                 if (next != null) {
                     active.classList.remove('active');
-					onInActive(active);
+                    onInActive(active);
                     next.classList.add('active');
-					onActive(next);
+                    onActive(next);
                 }
             }
-			
-			
-			var onInActive = function(li){
-				li.removeAttribute('tabindex');
-				var index = parseInt(li.dataset.index);
-				var menu = _menus[index];
-				if(menu.onInActive){
-					menu.onInActive(li);
-				}
-			}
-			var onActive = function(li){
-				li.setAttribute('tabindex',0);
-				li.focus();
-				var index = parseInt(li.dataset.index);
-				var menu = _menus[index];
-				if(menu.onActive){
-					menu.onActive(li);
-				}
-			}
+
+
+            var onInActive = function(li) {
+                li.removeAttribute('tabindex');
+                var index = parseInt(li.dataset.index);
+                var menu = _menus[index];
+                if (menu.onInActive) {
+                    menu.onInActive(li);
+                }
+            }
+            var onActive = function(li) {
+                li.setAttribute('tabindex', 0);
+                li.focus();
+                var index = parseInt(li.dataset.index);
+                var menu = _menus[index];
+                if (menu.onActive) {
+                    menu.onActive(li);
+                }
+            }
             var movePrev = function() {
                 var dom = Swal.getContent().querySelector('.on');
                 var active = dom.querySelector('.active');
@@ -5671,20 +5681,20 @@ var Wysiwyg = (function() {
                 }
                 if (prev != null) {
                     active.classList.remove('active');
-					onInActive(active);
+                    onInActive(active);
                     prev.classList.add('active');
-					onActive(prev);
+                    onActive(prev);
                 }
             }
 
             Swal.fire({
                 animation: false,
                 html: html,
-				scrollbarPadding :false,
+                scrollbarPadding: false,
                 onBeforeOpen: function(dom) {
                     var root = dom.querySelector('.heather-menu-card');
                     var crumbs = [];
-					var index = 0;
+                    var index = 0;
                     for (const card of menuCards) {
                         var menus = card.menus;
                         var title = card.title;
@@ -5702,16 +5712,16 @@ var Wysiwyg = (function() {
                             li.addEventListener('click', function(e) {
                                 e.preventDefault();
                                 e.stopPropagation();
-								if(isInput(e.target)) return ;
+                                if (isInput(e.target)) return;
                                 handler = menu.handler;
                                 nodes = this.childNodes;
                                 Swal.getCloseButton().click();
                             });
 
                             ul.appendChild(li);
-							_menus[index] = menu;
-							li.setAttribute('data-index',index);
-							index++;
+                            _menus[index] = menu;
+                            li.setAttribute('data-index', index);
+                            index++;
                         }
                         var li = document.createElement('li');
                         li.classList.add('off');
@@ -5729,21 +5739,21 @@ var Wysiwyg = (function() {
                     } else {
                         crumbDiv.style.display = 'none';
                     }
-                   
+
                 },
                 onOpen: function(dom) {
-					
-					var root = dom.querySelector('.heather-menu-card');
-					 //find first li and add class on
+
+                    var root = dom.querySelector('.heather-menu-card');
+                    //find first li and add class on
                     var crumbDiv = dom.querySelector('.heather-menu-breadcrums');
-					for(const child of crumbDiv.children){
-						child.addEventListener('click',function(){
-							var nodes = Array.prototype.slice.call(crumbDiv.children);
-							var index = nodes.indexOf(child);
-							var cards = dom.querySelector('.heather-menu-card').children;
-							moveCard(cards[index]);
-						})
-					}
+                    for (const child of crumbDiv.children) {
+                        child.addEventListener('click', function() {
+                            var nodes = Array.prototype.slice.call(crumbDiv.children);
+                            var index = nodes.indexOf(child);
+                            var cards = dom.querySelector('.heather-menu-card').children;
+                            moveCard(cards[index]);
+                        })
+                    }
                     dom.addEventListener('keydown', keydownListener);
                     var first = root.firstElementChild;
                     if (first != null) {
@@ -5753,7 +5763,7 @@ var Wysiwyg = (function() {
                         var subFirst = first.querySelector('ul').firstElementChild;
                         if (subFirst != null) {
                             subFirst.classList.add('active');
-							onActive(subFirst);
+                            onActive(subFirst);
                         }
                         var crumb = crumbDiv.firstElementChild;
                         if (crumb != null) {
@@ -5765,47 +5775,47 @@ var Wysiwyg = (function() {
                     dom.removeEventListener('keydown', keydownListener);
                 },
                 onAfterClose: function() {
-                    if (handler) handler.call(nodes,rangeInfo);
+                    if (handler) handler.call(nodes, rangeInfo);
                 }
             });
         }
-		
-		function isInput(el){
-			var tagName = el.tagName;
-			if(tagName == 'INPUT' || tagName == 'TEXTAREA' || tagName == 'SELECT'){
-				return true;
-			}
-			return false;
-		}
+
+        function isInput(el) {
+            var tagName = el.tagName;
+            if (tagName == 'INPUT' || tagName == 'TEXTAREA' || tagName == 'SELECT') {
+                return true;
+            }
+            return false;
+        }
 
         function showEditorFactoryDialog(callback) {
-			var headingKeydownHandler = function(e){
-				var key = e.key;
-				if(key == '1' || key == '2' || key == '3' || key == '4' || key == '5' || key == '6'){
-					e.preventDefault();
-					e.stopPropagation();
-					this.querySelector('select').value = key;
-				}
-			}
+            var headingKeydownHandler = function(e) {
+                var key = e.key;
+                if (key == '1' || key == '2' || key == '3' || key == '4' || key == '5' || key == '6') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.querySelector('select').value = key;
+                }
+            }
             createMenuDialog([{
                 'title': '',
                 'menus': [{
                     html: '<i class="fas fa-heading"></i><select style="border: none;outline: none;font-size:20px;background:none;-webkit-appearance: none; -moz-appearance: none; appearance: none;"><option value="1">H1</option><option value="2">H2</option><option value="3">H3</option><option value="4">H4</option><option value="5">H5</option><option value="6">H6</option></select>',
                     handler: function() {
-						for(const node of this){
-							if(node.nodeType == 1 && node.tagName == 'SELECT'){
-								callback(document.createElement('h'+node.value));
-								return ;
-							}
-						}
+                        for (const node of this) {
+                            if (node.nodeType == 1 && node.tagName == 'SELECT') {
+                                callback(document.createElement('h' + node.value));
+                                return;
+                            }
+                        }
                     },
-					onActive:function(li){
-						li.addEventListener('keydown',headingKeydownHandler);
-					},
-					onInActive:function(li){
-						document.removeEventListener('keydown',headingKeydownHandler);
-						
-					}
+                    onActive: function(li) {
+                        li.addEventListener('keydown', headingKeydownHandler);
+                    },
+                    onInActive: function(li) {
+                        document.removeEventListener('keydown', headingKeydownHandler);
+
+                    }
                 }, {
                     html: '<i class="fas fa-paragraph"></i>段落',
                     handler: function() {
@@ -5815,7 +5825,7 @@ var Wysiwyg = (function() {
                     html: '<i class="fas fa-table"></i>表格',
                     handler: function() {
                         var table = document.createElement('table');
-                        table.innerHTML = '<tr><th></th><th></th></tr><tr><td></td><td></td></tr>'
+                        table.innerHTML = '<thead><tr><th></th><th></th></tr></thead><tbody><tr><td></td><td></td></tr></tbody>'
                         callback(table);
                     }
                 }, {
@@ -5851,7 +5861,7 @@ var Wysiwyg = (function() {
                 }, {
                     html: '<i class="fas fa-square-root-alt"></i>数学公式块',
                     handler: function() {
-                       callback(createUnparsedKatexBlockElement(''))
+                        callback(createUnparsedKatexBlockElement(''))
                     }
                 }, {
                     html: '<i class="fas">M</i>mermaid图表',
@@ -5868,7 +5878,7 @@ var Wysiwyg = (function() {
             return wysiwyg.inlineMath.createSession(element)
         }
 
-		
+
         function getEditorFactoryByElement(element) {
             for (const factory of editorFactories) {
                 if (factory.match(element))
@@ -5922,8 +5932,8 @@ var Wysiwyg = (function() {
         }
 
         return {
-            create: function(rootElem,config) {
-                return new Wysiwyg(rootElem,config);
+            create: function(rootElem, config) {
+                return new Wysiwyg(rootElem, config);
             },
             DocumentCommandHelper: DocumentCommandHelper,
             HtmlPasteHelper: HtmlPasteHelper,
@@ -5981,65 +5991,65 @@ var Wysiwyg = (function() {
         e.stopPropagation();
         return false;
     }
-	
-	var LazyLoader = (function(){
-		var katexLoading = false;
-		var katexLoaded = false;
 
-		function loadKatex(callback) {
-			if (katexLoaded) {
-				if (callback) callback();
-				return;
-			}
-			if (katexLoading) return;
-			katexLoading = true;
-			
-			var link = document.createElement('link');
-			link.setAttribute('type','text/css');
-			link.setAttribute('rel','stylesheet');
-			link.setAttribute('href',lazyRes.katex_css);
-			document.head.appendChild(link);
-			
-			loadScript(lazyRes.katex_js,function(){
-				 katexLoaded = true;
-				 if (callback) callback();
-			})
-		}
+    var LazyLoader = (function() {
+        var katexLoading = false;
+        var katexLoaded = false;
 
-		var mermaidLoading = false;
-		var mermaidLoaded = false;
+        function loadKatex(callback) {
+            if (katexLoaded) {
+                if (callback) callback();
+                return;
+            }
+            if (katexLoading) return;
+            katexLoading = true;
 
-		function loadMermaid(callback) {
-			if (mermaidLoaded) {
-				if (callback) callback();
-				return;
-			}
-			if (mermaidLoading) return;
-			mermaidLoading = true;
-			loadScript(lazyRes.mermaid_js,function(){
-				 mermaidLoaded = true;
-				 if (callback) callback();
-			})
-		}
-		
-		function loadScript(src, callback, relative){
-			var script = document.createElement('script');
-			script.src = src; 
-			if(callback !== null){
-				script.onload = function() { // Other browsers
-					callback();
-				};
-			}
-			document.body.appendChild(script);
-		}
-		
-		return {
-			loadKatex : loadKatex,
-			loadMermaid : loadMermaid
-		}
-	})();
+            var link = document.createElement('link');
+            link.setAttribute('type', 'text/css');
+            link.setAttribute('rel', 'stylesheet');
+            link.setAttribute('href', lazyRes.katex_css);
+            document.head.appendChild(link);
 
-   
+            loadScript(lazyRes.katex_js, function() {
+                katexLoaded = true;
+                if (callback) callback();
+            })
+        }
+
+        var mermaidLoading = false;
+        var mermaidLoaded = false;
+
+        function loadMermaid(callback) {
+            if (mermaidLoaded) {
+                if (callback) callback();
+                return;
+            }
+            if (mermaidLoading) return;
+            mermaidLoading = true;
+            loadScript(lazyRes.mermaid_js, function() {
+                mermaidLoaded = true;
+                if (callback) callback();
+            })
+        }
+
+        function loadScript(src, callback, relative) {
+            var script = document.createElement('script');
+            script.src = src;
+            if (callback !== null) {
+                script.onload = function() { // Other browsers
+                    callback();
+                };
+            }
+            document.body.appendChild(script);
+        }
+
+        return {
+            loadKatex: loadKatex,
+            loadMermaid: loadMermaid
+        }
+    })();
+
+
 
     function cloneAttributes(element, sourceNode, filter) {
         filter = filter || function() {
@@ -6069,7 +6079,7 @@ var Wysiwyg = (function() {
     function parseHTML(html) {
         return new DOMParser().parseFromString(html, "text/html");
     }
-	
+
     function isEmptyText(text) {
         return text.replaceAll(veryThinChar, '').replaceAll('&nbsp;', '').replaceAll('<br>', '').trim() == ''
     }
@@ -6108,13 +6118,13 @@ var Wysiwyg = (function() {
             }
         }
     }
-	
-	function createUnparsedKatexBlockElement(expression) {
+
+    function createUnparsedKatexBlockElement(expression) {
         var span = document.createElement('span');
-		span.setAttribute('data-block-katex', '');
-		span.classList.add('katex-display');
-		span.innerHTML = '<span class="katex"><annotation encoding="application/x-tex">'+expression+'</annotation></span>';
-		return span;
+        span.setAttribute('data-block-katex', '');
+        span.classList.add('katex-display');
+        span.innerHTML = '<span class="katex"><annotation encoding="application/x-tex">' + expression + '</annotation></span>';
+        return span;
     }
 
     function createUnparsedMermaidElement(expression) {
@@ -6211,63 +6221,63 @@ var Wysiwyg = (function() {
     }
 
     function renderKatexAndMermaid(element) {
-		
-        LazyLoader.loadKatex(function() {
-			var inlines = element.querySelectorAll(".katex-inline");
-			for (var i = 0; i < inlines.length; i++) {
-				var inline = inlines[i];
-				var expression = inline.textContent;
-				var result = parseKatex(expression, false);
-				var div = document.createElement('div');
-				div.innerHTML = result;
-				var child = div.firstChild;
-				child.setAttribute('data-inline-katex', '');
-				inline.outerHTML = child.outerHTML;
-			}
-			var blocks = [];
 
-			if(element.hasAttribute('data-block-katex')){
-				blocks.push(element);
-			} else {
-				for(const elem of element.querySelectorAll(".katex-block")){
-					blocks.push(elem);
-				}
-			}
-			
-			for (var i = 0; i < blocks.length; i++) {
-				var block = blocks[i];
-				var expression = block.textContent;
-				var result = parseKatex(expression, true);
-				var div = document.createElement('div');
-				div.innerHTML = result;
-				var child = div.firstChild;
-				child.setAttribute('data-block-katex', '');
-				block.outerHTML = child.outerHTML;
-			}
-		})
-		LazyLoader.loadMermaid(function() {
-			var config = {
-				startOnLoad:false
-			};
-			mermaid.initialize(config);
-			$(element).find('.mermaid').each(function() {
-				if (!this.hasAttribute("data-processed")) {
-					try {
-						mermaid.parse(this.textContent);
-						mermaid.init({}, $(this));
-					} catch (e) {
-						this.innerHTML = '<pre>' + e.str + '</pre>'
-					}
-				}
-			});
-		});
-       
+        LazyLoader.loadKatex(function() {
+            var inlines = element.querySelectorAll(".katex-inline");
+            for (var i = 0; i < inlines.length; i++) {
+                var inline = inlines[i];
+                var expression = inline.textContent;
+                var result = parseKatex(expression, false);
+                var div = document.createElement('div');
+                div.innerHTML = result;
+                var child = div.firstChild;
+                child.setAttribute('data-inline-katex', '');
+                inline.outerHTML = child.outerHTML;
+            }
+            var blocks = [];
+
+            if (element.hasAttribute('data-block-katex')) {
+                blocks.push(element);
+            } else {
+                for (const elem of element.querySelectorAll(".katex-block")) {
+                    blocks.push(elem);
+                }
+            }
+
+            for (var i = 0; i < blocks.length; i++) {
+                var block = blocks[i];
+                var expression = block.textContent;
+                var result = parseKatex(expression, true);
+                var div = document.createElement('div');
+                div.innerHTML = result;
+                var child = div.firstChild;
+                child.setAttribute('data-block-katex', '');
+                block.outerHTML = child.outerHTML;
+            }
+        })
+        LazyLoader.loadMermaid(function() {
+            var config = {
+                startOnLoad: false
+            };
+            mermaid.initialize(config);
+            $(element).find('.mermaid').each(function() {
+                if (!this.hasAttribute("data-processed")) {
+                    try {
+                        mermaid.parse(this.textContent);
+                        mermaid.init({}, $(this));
+                    } catch (e) {
+                        this.innerHTML = '<pre>' + e.str + '</pre>'
+                    }
+                }
+            });
+        });
+
     }
 
-////https://gist.github.com/gordonbrander/2230317
-	function createUniqueId(){
-		return '_' + Math.random().toString(36).substr(2, 9);
-	}
+    ////https://gist.github.com/gordonbrander/2230317
+    function createUniqueId() {
+        return '_' + Math.random().toString(36).substr(2, 9);
+    }
 
     function deleteStartWhiteSpace(str, count) {
         var rst = str;
@@ -6275,53 +6285,53 @@ var Wysiwyg = (function() {
             if (rst.startsWith(" ")) {
                 rst = rst.substring(1);
             } else {
-				if(rst.startsWith(tabSpace)){
-					return rst.substring(1);
-				}
+                if (rst.startsWith(tabSpace)) {
+                    return rst.substring(1);
+                }
                 return rst;
             }
         }
         return rst;
     }
-	
-	function getKatexExpression(elem) {
-		return elem.querySelector('[encoding="application/x-tex"]').textContent;
-	}
 
-	function getMermaidExpression(elem) {
-		return elem.querySelector('.mermaid-source').value;
-	}
-	
-	function morphdomUpdate(target,source){
-		var elem = morphdom(target, source, {
-			onBeforeElUpdated: function(f, t) {
-				if (f.isEqualNode(t)) {
-					return false;
-				}
-				if (f.classList.contains('mermaid-block') &&
-					t.classList.contains('mermaid-block')) {
-					var oldEle = f.getElementsByClassName('mermaid-source')[0];
-					var nowEle = t.getElementsByClassName('mermaid-source')[0];
-					if (isUndefined(oldEle) || isUndefined(nowEle)) {
-						return true;
-					}
-					var old = oldEle.value;
-					var now = nowEle.value;
-					if (old == now) {
-						//更新属性
-						cloneAttributes(f, t);
-						return false;
-					}
-				}
-				return true;
-			}
-		});
-		renderKatexAndMermaid(elem);
-		$(elem).find('img').one('error',function(){
-			this.classList.add('heather_img_error');
-		})
-		return elem;
-	}
+    function getKatexExpression(elem) {
+        return elem.querySelector('[encoding="application/x-tex"]').textContent;
+    }
 
-   return Wysiwyg;
+    function getMermaidExpression(elem) {
+        return elem.querySelector('.mermaid-source').value;
+    }
+
+    function morphdomUpdate(target, source) {
+        var elem = morphdom(target, source, {
+            onBeforeElUpdated: function(f, t) {
+                if (f.isEqualNode(t)) {
+                    return false;
+                }
+                if (f.classList.contains('mermaid-block') &&
+                    t.classList.contains('mermaid-block')) {
+                    var oldEle = f.getElementsByClassName('mermaid-source')[0];
+                    var nowEle = t.getElementsByClassName('mermaid-source')[0];
+                    if (isUndefined(oldEle) || isUndefined(nowEle)) {
+                        return true;
+                    }
+                    var old = oldEle.value;
+                    var now = nowEle.value;
+                    if (old == now) {
+                        //更新属性
+                        cloneAttributes(f, t);
+                        return false;
+                    }
+                }
+                return true;
+            }
+        });
+        renderKatexAndMermaid(elem);
+        $(elem).find('img').one('error', function() {
+            this.classList.add('heather_img_error');
+        })
+        return elem;
+    }
+
+    return Wysiwyg;
 })();
