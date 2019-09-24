@@ -1,14 +1,6 @@
-# heather 2.0 
+# heather 
 
-## doc
-
-https://www.qyh.me/document/heather2.0.md
-
-## demo
-
-https://md.qyh.me/wysiwyg.html
-
-# heather 1.6 
+## an online markdown editor
 
 ## doc
 
