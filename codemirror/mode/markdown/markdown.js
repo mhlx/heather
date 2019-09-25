@@ -573,10 +573,8 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
           setEm = false
       }
       if (len > 1) { // Strong
-        if (!state.strong && leftFlanking && (ch === "*" || !rightFlanking || punctuation.test(before))){
-			setStrong = true;
-		}
-          
+        if (!state.strong && leftFlanking && (ch === "*" || !rightFlanking || punctuation.test(before)))
+          setStrong = true
         else if (state.strong == ch && rightFlanking && (ch === "*" || !leftFlanking || punctuation.test(after)))
           setStrong = false
       }

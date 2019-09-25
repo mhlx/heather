@@ -284,7 +284,7 @@ CodeMirror.defineMode("clike", function(config, parserConfig) {
   // and those that end in _t (Reserved by POSIX for types)
   // http://www.gnu.org/software/libc/manual/html_node/Reserved-Names.html
   function cTypes(identifier) {
-    return contains(basicCTypes, identifier) || /.+_t/.test(identifier);
+    return contains(basicCTypes, identifier) || /.+_t$/.test(identifier);
   }
 
   // Returns true if identifier is a "Objective C" type.
@@ -467,7 +467,7 @@ CodeMirror.defineMode("clike", function(config, parserConfig) {
   def("text/x-java", {
     name: "clike",
     keywords: words("abstract assert break case catch class const continue default " +
-                    "do else enum extends final finally float for goto if implements import " +
+                    "do else enum extends final finally for goto if implements import " +
                     "instanceof interface native new package private protected public " +
                     "return static strictfp super switch synchronized this throw throws transient " +
                     "try volatile while @interface"),
@@ -676,11 +676,16 @@ CodeMirror.defineMode("clike", function(config, parserConfig) {
         state.tokenize = tokenKotlinString(stream.match('""'));
         return state.tokenize(stream, state);
       },
+      "/": function(stream, state) {
+        if (!stream.eat("*")) return false;
+        state.tokenize = tokenNestedComment(1);
+        return state.tokenize(stream, state)
+      },
       indent: function(state, ctx, textAfter, indentUnit) {
         var firstChar = textAfter && textAfter.charAt(0);
         if ((state.prevToken == "}" || state.prevToken == ")") && textAfter == "")
           return state.indented;
-        if (state.prevToken == "operator" && textAfter != "}" ||
+        if ((state.prevToken == "operator" && textAfter != "}" && state.context.type != "}") ||
           state.prevToken == "variable" && firstChar == "." ||
           (state.prevToken == "}" || state.prevToken == ")") && firstChar == ".")
           return indentUnit * 2 + ctx.indented;

@@ -116,9 +116,6 @@ var EditorWrapper = (function() {
         return str;
     }
 
-    CodeMirror.keyMap.default["Shift-Tab"] = "indentLess";
-    CodeMirror.keyMap.default["Tab"] = "indentMore";
-
     var mac = CodeMirror.browser.mac;
     var mobile = CodeMirror.browser.mobile;
     var ios = CodeMirror.browser.ios;
@@ -406,6 +403,90 @@ var EditorWrapper = (function() {
                 editor.replaceSelection("`" + text + "`");
             }
         },
+		
+		indentLess : function(wrapper){
+			wrapper.editor.execCommand('indentLess');
+		},
+		
+		indentMore:function(wrapper){
+			var editor = wrapper.editor;
+			if(!editor.somethingSelected() && wrapper.rendered === true){
+				var cursor = editor.getCursor();
+				var line = cursor.line;
+				var out = document.getElementById("heather_out");
+				var mappingElem ;
+				for(const element of out.children){
+					if(element.hasAttribute('data-line')){
+						var startLine = parseInt(element.dataset.line);
+						var endLine = parseInt(element.dataset.endLine);
+						if(line >= startLine && line<=endLine){
+							//detect conflict endLine 
+							var conflict = false;
+							if(line == endLine){
+								var elem = out.querySelector('[data-line="'+endLine+'"]');
+								if(elem != null){
+									conflict = true;
+									mappingElem = elem;
+								}
+							}
+							if(!mappingElem)
+								mappingElem = element;
+							mappingElem.startLine = startLine;
+							mappingElem.endLine = conflict ? endLine - 1 : endLine;
+							break;
+						}
+					}
+				}
+				if(mappingElem){
+					if(mappingElem.tagName === 'TABLE'){
+						
+						var setNextCursor = function(i){
+							var lineStr = i == line ? editor.getLine(i).substring(cursor.ch) : editor.getLine(i);
+							var firstCh,lastCh;
+							for(var j=0;j<lineStr.length;j++){
+								var ch = lineStr.charAt(j);
+								if(ch == '|'){
+									//find prev char '\';
+									var prevChar = j == 0 ? '' : lineStr.charAt(j-1);
+									if(prevChar != '\\'){
+										//find first
+										//need to find next
+										if(isUndefined(firstCh)){
+											firstCh = j;
+										}else {
+											lastCh = j;
+											break;
+										}
+									}
+								}
+							}
+							if(!isUndefined(firstCh) && !isUndefined(lastCh)){
+								//set cursor at middle
+								var ch = parseInt(Math.ceil((lastCh - firstCh)/2))+ firstCh + (i == line ? cursor.ch : 0);
+								editor.setCursor({line : i,ch : ch});
+								return true;
+							} else {
+								return false;
+							}
+						}
+						var hasNext = false;
+						for(var i=line;i<=mappingElem.endLine-1;i++){
+							if(setNextCursor(i)){
+								hasNext = true;
+								break;
+							}
+						}
+						
+						if(!hasNext){
+							setNextCursor(mappingElem.startLine);
+						}
+						
+						return ;
+					}
+				}
+			}
+			wrapper.editor.execCommand('indentMore');
+		},
 
         uncheck: function(wrapper) {
             var editor = wrapper.editor;
@@ -422,6 +503,7 @@ var EditorWrapper = (function() {
 			Swal.fire({
                 html: '<input class="swal2-input" placeholder="行">' +
                     '<input class="swal2-input" placeholder="列">',
+				focusConfirm: false,
                 preConfirm: function() {
                     return new Promise(function(resolve) {
                         var inputs = $(Swal.getContent()).find('input');
@@ -440,20 +522,22 @@ var EditorWrapper = (function() {
                 if (cols < 1)
                     cols = 3;
                 var text = '';
-                for (var i = 0; i <= cols; i++) {
+                for (var i = 0; i < cols; i++) {
                     text += '|    ';
                 }
+				text += '|'
                 text += "\n";
                 for (var i = 0; i < cols; i++) {
-                    text += '|  -  ';
+                    text += '|  --  ';
                 }
                 text += '|'
                 if (rows > 1) {
                     text += '\n';
                     for (var i = 0; i < rows - 1; i++) {
-                        for (var j = 0; j <= cols; j++) {
+                        for (var j = 0; j < cols; j++) {
                             text += '|    ';
                         }
+						text += '|'
                         if (i < rows - 2)
                             text += "\n";
                     }
@@ -802,7 +886,7 @@ var EditorWrapper = (function() {
                         theme: theme.mermaid.theme || 'default'
                     });
                     $(element).find('.mermaid').each(function() {
-                        if (this.getAttribute("data-processed") == null) {
+                        if (!this.hasAttribute("data-processed")) {
                             try {
                                 mermaid.parse(this.textContent);
                                 mermaid.init({}, $(this));
@@ -976,7 +1060,7 @@ var EditorWrapper = (function() {
             var lines = [];
             var lineMarkers = getLineMarker(scrollElement);
             lineMarkers.forEach(function(ele) {
-                lines.push(parseInt(ele.getAttribute('data-line')));
+                lines.push(parseInt(ele.dataset.line));
             });
             var currentPosition = editor.getScrollInfo().top
             let lastMarker
@@ -992,7 +1076,7 @@ var EditorWrapper = (function() {
                 }
             }
             if (!isUndefined(lastMarker) && isUndefined(nextMarker)) {
-                nextMarker = parseInt(lineMarkers[lineMarkers.length - 1].getAttribute('data-end-line'));
+                nextMarker = parseInt(lineMarkers[lineMarkers.length - 1].dataset.endLine);
             }
             let percentage = 0
             if (!isUndefined(lastMarker) && !isUndefined(nextMarker) && lastMarker !== nextMarker) {
@@ -1680,15 +1764,15 @@ var EditorWrapper = (function() {
                 });
             }
 
-            function parseString(string) {
-                return string.replace(/\\([nrt\\])/g, function(match, ch) {
-                    if (ch == "n") return "\n"
-                    if (ch == "r") return "\r"
-                    if (ch == "t") return "\t"
-                    if (ch == "\\") return "\\"
-                    return match
-                })
-            }
+			function parseString(string) {
+				return string.replace(/\\([nrt\\])/g, function(match, ch) {
+				  if (ch == "n") return "\n"
+				  if (ch == "r") return "\r"
+				  if (ch == "t") return "\t"
+				  if (ch == "\\") return "\\"
+				  return match
+				})
+			  }
 
             function parseQuery(query) {
                 if (query == '') return query;
@@ -2208,6 +2292,11 @@ var EditorWrapper = (function() {
             if (!mobile) {
                 this.enableAutoRender();
             }
+			
+            this.editor.on('change', function(){
+				wrapper.rendered = false;
+			});
+			this.rendered = true;
             triggerEvent(this, 'load');
         }
 
@@ -2382,8 +2471,8 @@ var EditorWrapper = (function() {
                     var endLine;
                     var startLine;
                     $("#heather_out").find('[data-line]').each(function() {
-                        var _startLine = parseInt(this.getAttribute('data-line'));
-                        var _endLine = parseInt(this.getAttribute('data-end-line')) - 1;
+                        var _startLine = parseInt(this.dataset.line);
+                        var _endLine = parseInt(this.dataset.endLine) - 1;
                         if (_startLine <= line && _endLine >= line) {
                             node = this;
                             endLine = _endLine;
@@ -2658,7 +2747,9 @@ var EditorWrapper = (function() {
 				},
                 "Cmd-Enter": function() {
                     toggleFullscreen(wrapper);
-                }
+                },
+				"Tab":'indentMore',
+				"Shift-Tab":'indentLess'
             } : {
                 "Ctrl-B": 'bold',
                 "Ctrl-I": 'italic',
@@ -2675,7 +2766,9 @@ var EditorWrapper = (function() {
 				},
                 "Ctrl-Enter": function() {
                     toggleFullscreen(wrapper);
-                }
+                },
+				"Tab":'indentMore',
+				"Shift-Tab":'indentLess'
             }
             wrapper.bindKey(keyMap);
         }
@@ -2784,6 +2877,7 @@ var EditorWrapper = (function() {
         EditorWrapper.prototype.doRender = function(patch, options) {
             this.render.renderAt(this.editor.getValue(), $("#heather_out")[0], patch, options);
             renderToc();
+			this.rendered = true;
             triggerEvent(this, 'afterRender');
         }
 
@@ -3021,34 +3115,33 @@ var EditorWrapper = (function() {
 
 
         EditorWrapper.prototype.toToc = function(callback, _ms) {
-            this.editor.unfocus();
-            if (mobile) {
-                this.doRender(true);
-            }
+			this.editor.unfocus();
             var me = this;
             var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
             $("#heather_wrapper").animate({
                 scrollLeft: 0
-            }, ms, function() {		
+            }, ms, function() {	
+				if (mobile) {
+					me.doRender(true);
+				}			
                 if (callback) callback();
             });
         }
 
         EditorWrapper.prototype.toPreview = function(callback, _ms) {
-            var me = this;
-            if (mobile || me.inFullscreen()) {
+            if (mobile || this.inFullscreen()) {
                 this.editor.unfocus();
-                if (mobile) {
-                    this.doRender(true);
-                    this.doSync();
-                }
+                var me = this;
                 var ms = getDefault(_ms, getDefault(this.config.swipe_animateMs, 500));
                 $("#heather_wrapper").animate({
                     scrollLeft: $("#heather_out")[0].offsetLeft
                 }, ms, function() {
+					if (mobile) {
+						me.doRender(true);
+						me.doSync();
+					}
                     if (callback) callback();
                 });
-				this.inlinePreview.disableAutoRender
             }
         }
 
@@ -3179,13 +3272,18 @@ var EditorWrapper = (function() {
                                 'liquibyte': 'liquibyte',
                                 'lucario': 'lucario',
                                 'material': 'material',
+                                'material-darker': 'material-darker',
+                                'material-ocean': 'material-ocean',
+                                'material-palenight': 'material-palenight',
                                 'mbo': 'mbo',
                                 'mdn-like': 'mdn-like',
                                 'midnight': 'midnight',
                                 'monokai': 'monokai',
+                                'moxer': 'moxer',
                                 'neat': 'neat',
                                 'neo': 'neo',
                                 'night': 'night',
+                                'nord': 'nord',
                                 'oceanic-next': 'oceanic-next',
                                 'panda-syntax': 'panda-syntax',
                                 'paraiso-dark': 'paraiso-dark',
@@ -3206,6 +3304,7 @@ var EditorWrapper = (function() {
                                 'xq-dark': 'xq-dark',
                                 'xq-light': 'xq-light',
                                 'yeti': 'yeti',
+                                'yonce': 'yonce',
                                 'zenburn': 'zenburn'
                             },
                             inputPlaceholder: '选择主题',
@@ -3553,7 +3652,7 @@ var EditorWrapper = (function() {
             for (var i = 0; i < headings.length; i++) {
                 var head = headings[i];
                 var index = head.tagName.substring(1);
-                var line = head.getAttribute('data-line');
+                var line = head.dataset.line;
                 if (toc.length == 0) {
                     toc.push([{
                         indent: index,
@@ -4502,8 +4601,8 @@ var EditorWrapper = (function() {
 				var cm = wrapper.editor;
 				cm.setOption('readOnly',true);
 				wrapper.disableExtraEditorSpace = true;
-				var line = parseInt(root.getAttribute('data-line'));
-				var endLine = parseInt(root.getAttribute('data-end-line'));
+				var line = parseInt(root.dataset.line);
+				var endLine = parseInt(root.dataset.endLine);
 				var str = cm.getLines(line,endLine);
 				
 				var body = parseHTML(str).body;
@@ -4681,8 +4780,8 @@ var EditorWrapper = (function() {
 				if(root == null){
 					return ;
 				}
-				var line = parseInt(root.getAttribute('data-line'));
-				var endLine = parseInt(root.getAttribute('data-end-line'));
+				var line = parseInt(root.dataset.line);
+				var endLine = parseInt(root.dataset.endLine);
 				var str = wrapper.editor.getLines(line,endLine);
 				
 				var body = parseHTML(str).body;
