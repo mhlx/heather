@@ -1,633 +1,74 @@
-/*from bootstrap 4.3.1*/
-#heather_wrapper *,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
 
-#heather_wrapper .form-control{
-	display: block;
-    width: 100%;
-    height: calc(1.5em + .75rem + 2px);
-    padding: .375rem .75rem;
-    font-size: 1rem;
-    font-weight: 400;
-    line-height: 1.5;
-    color: #495057;
-    background-clip: padding-box;
-    border-radius: .25rem;
-}
-
-#heather_wrapper .form-control:focus {
-    outline-width: 0;
-}
-
-#heather_wrapper .input-group {
-  position: relative;
-  display: -ms-flexbox;
-  display: flex;
-  -ms-flex-wrap: wrap;
-  flex-wrap: wrap;
-  -ms-flex-align: stretch;
-  align-items: stretch;
-  width: 100%;
-}
-
-#heather_wrapper .input-group > .form-control,
-#heather_wrapper .input-group > .form-control-plaintext{
-  position: relative;
-  -ms-flex: 1 1 auto;
-  flex: 1 1 auto;
-  width: 1%;
-  margin-bottom: 0;
-}
-
-#heather_wrapper .input-group-text {
-  display: -ms-flexbox;
-  display: flex;
-  -ms-flex-align: center;
-  align-items: center;
-  padding: 0.375rem 0.75rem;
-  margin-bottom: 0;
-  font-size: 1rem;
-  font-weight: 400;
-  line-height: 1.5;
-  text-align: center;
-  white-space: nowrap;
-  background-color: #fff;
-  border: none;
-  border-radius: 0.25rem;
-}
-
-
-#heather_wrapper .input-group > .form-control + .form-control,
-#heather_wrapper .input-group > .form-control + .custom-select,
-#heather_wrapper .input-group > .form-control + .custom-file,
-#heather_wrapper .input-group > .form-control-plaintext + .form-control,
-#heather_wrapper .input-group > .form-control-plaintext + .custom-select,
-#heather_wrapper .input-group > .form-control-plaintext + .custom-file{
-  margin-left: -1px;
-}
-
-#heather_wrapper .input-group > .form-control:focus {
-  z-index: 3;
-}
-
-#heather_wrapper .input-group > .input-group-prepend > .btn,
-#heather_wrapper .input-group > .input-group-prepend > .input-group-text,
-#heather_wrapper .input-group > .input-group-append:not(:last-child) > .btn,
-#heather_wrapper .input-group > .input-group-append:not(:last-child) > .input-group-text,
-#heather_wrapper .input-group > .input-group-append:last-child > .btn:not(:last-child):not(.dropdown-toggle),
-#heather_wrapper .input-group > .input-group-append:last-child > .input-group-text:not(:last-child) {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-#heather_wrapper .input-group > .input-group-append > .btn,
-#heather_wrapper .input-group > .input-group-append > .input-group-text,
-#heather_wrapper .input-group > .input-group-prepend:not(:first-child) > .btn,
-#heather_wrapper .input-group > .input-group-prepend:not(:first-child) > .input-group-text,
-#heather_wrapper .input-group > .input-group-prepend:first-child > .btn:not(:first-child),
-#heather_wrapper .input-group > .input-group-prepend:first-child > .input-group-text:not(:first-child) {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-#heather_wrapper .input-group > .form-control:not(:last-child) {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-#heather_wrapper .input-group > .form-control:not(:first-child) {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-
-#heather_wrapper .input-group-prepend,
-#heather_wrapper .input-group-append {
-  display: -ms-flexbox;
-  display: flex;
-}
-
-#heather_wrapper .input-group-prepend .btn,
-#heather_wrapper .input-group-append .btn {
-  position: relative;
-  z-index: 2;
-}
-
-#heather_wrapper .input-group-prepend .btn:focus,
-#heather_wrapper .input-group-append .btn:focus {
-  z-index: 3;
-}
-
-#heather_wrapper .input-group-prepend .btn + .btn,
-#heather_wrapper .input-group-prepend .btn + .input-group-text,
-#heather_wrapper .input-group-prepend .input-group-text + .input-group-text,
-#heather_wrapper .input-group-prepend .input-group-text + .btn,
-#heather_wrapper .input-group-append .btn + .btn,
-#heather_wrapper .input-group-append .btn + .input-group-text,
-#heather_wrapper .input-group-append .input-group-text + .input-group-text,
-#heather_wrapper .input-group-append .input-group-text + .btn {
-  margin-left: -1px;
-}
-
-#heather_wrapper .input-group-prepend {
-  margin-right: -1px;
-}
-
-#heather_wrapper .input-group-append {
-  margin-left: -1px;
-}
-#heather_wrapper h1, h2, h3, h4, h5, h6{
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  line-height: 1.2;
-}
-/*from bootstrap end*/
-
-#heather_wrapper .table{
-	width:100%	
-}
-#heather_wrapper * {
-	-webkit-overflow-scrolling: touch;
-}
-
-#heather_in .CodeMirror {
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	width: auto;
-	height: auto;
-	font-size: 15px;
-	padding-top: 30px;
-}
-
-.CodeMirror{
-	background-color:#f9f9f7
-}
-
-#heather_in .CodeMirror-scroll {
-	padding: 10px;
-	box-sizing: border-box;
-	overflow-x: hidden !important;
-}
-
-#heather_wrapper .icon,
-#heather_wrapper .middle-icon {
+.heather_icon{
 	margin-top: 5px;
 	cursor: pointer;
 	font-size: 16px;
-	margin-right: 20px;
+	margin-right: 10px;
 	margin-bottom: 5px
 }
-
-
-
-#heather_wrapper .noclick{
-	pointer-events: none
-}
-
-#heather_stat {
-	position: absolute;
-	left: 0;
-	bottom: 0;
-	width: 100%;
-	text-align: right;
-	display: none;
-	z-index: 999;
-}
-
-#heather_wrapper .styled-background {
-	background-color: #ff7 !important;
-}
-
-#heather_toolbar {
-	height: 30px;
-	position: absolute;
-	left: 0;
-	width: 100%;
-	padding-left: 10px;
-	padding-right: 10px;
-	overflow: auto;
-	overflow-y: hidden;
-	z-index: 99;
-	white-space: nowrap;
-}
-
-#heather_wrapper {
-	position: absolute;
-	top: 0;
-	left: 0;
-	bottom: 0;
-	width: 100%;
-	height: 100%;
-	overflow-x: hidden;
-	z-index: 9999998;
-	background-color:#f9f9f7
-}
-
-.swal2-container {
-	z-index: 99999999 !important
-}
-
-#heather_in {
-	position: absolute;
-	top: 0;
-	left: 20%;
-	bottom: 0;
-	width: 50%;
-	height: auto;
-	overflow-y: hidden;
-	display: none;
-}
-
-#heather_out {
-	position: absolute;
-	top: 0;
-	right: 0;
-	left: 70%;
-	bottom: 0;
-	overflow: auto;
-	padding: 10px;
-	width: 50%;
-	padding-left: 20px;
-	font-size: 16px;
-	line-height: 1.5em;
-	visibility: hidden;
-	scrollbar-color: #bcd transparent;
-	scrollbar-width: thin;
-	padding-bottom:301px;
-}
-
-.heather_wysiwyg{
-	padding-top:40px !important;
-}
-
-.heather_fullscreen .heather_wysiwyg_toolbar{
-	margin-left:15%;
-	margin-right:15%
-}
-.heather_wysiwyg_toolbar{
-	z-index:9999998;
+.heather_toolbar_bar,
+.heather_command_bar{
+	overflow-y: auto;
+    white-space: nowrap;
+	width:95%;
 	position:absolute;
-	background:#f9f9f7;
-	width:100%;
-	padding-top:5px;
-	top:0px;
-	height:30px;
-	left:200%;
-}
-
-#heather_toc {
-	position: absolute;
-	top: 0;
-	left: 0;
-	bottom: 0;
-	height: auto;
-	overflow: auto;
-	padding: 10px;
-	width: 20%;
-	word-break: break-word;
-	scrollbar-color: #bcd transparent;
-	scrollbar-width: thin
-}
-
-#heather_toc h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-	cursor: pointer;
-}
-
-#heather_toc h1 {
-	margin: 1rem 0;
-	font-size: 15px;
-}
-
-#heather_toc h2 {
-	margin: .7rem 0;
-	margin-left: 30px;
-	font-size: 14px;
-}
-
-#heather_toc h3 {
-	margin: .6rem 0;
-	margin-left: 45px;
-	font-size: 13px;
-}
-
-#heather_toc h4 {
-	margin: .5rem 0;
-	margin-left: 60px;
-	font-size: 12px;
-}
-
-#heather_toc h5 {
-	margin: .4rem 0;
-	margin-left: 75px;
-	font-size: 11px;
-}
-
-#heather_toc h6 {
-	margin: 0.3rem 0;
-	margin-left: 90px;
-	font-size: 10px;
-}
-
-#heather_in .CodeMirror-code {
-	height: auto;
-	margin-bottom: 301px;
-}
-
-#heather_out img {
-	max-height: 200px;
-}
-
-@media (min-width:768px) {
-	#heather_wrapper ::-webkit-scrollbar {
-		width: 6px;
-	}
-	#heather_wrapper ::-webkit-scrollbar-track {
-		box-shadow: none;
-		border-radius: 3px;
-	}
-	#heather_wrapper ::-webkit-scrollbar-thumb {
-		border-radius: 10px;
-		background-color: #bcd;
-	}
-	#heather_wrapper .pc-hide {
-		display: none;
-	}
-	#heather_hljs_tip .selected{
-		background-color:#70B7FD;
-	}
-	#heather_hljs_tip{
-		max-height:200px;
-		max-width:200px;
-	}
-}
-
-@media (max-width: 768px) {
-	.heather_wysiwyg_toolbar{
-		padding-left:20px;
-	}
-	.heather_contenteditable_bar {
-		width: 90%;
-		left: 5%
-	}
-	#heather_wrapper .middle-icon {
-		font-size: 24px
-	}
-	#heather_hljs_tip{
-		max-height:120px;
-		max-width:200px;
-	}
-	#heather_hljs_tip .selected{
-		background-color:inherit;
-	}
-	#heather_hljs_tip tr{
-		height:30px;
-	}
-	#heather_wrapper .mobile-hide {
-		display: none;
-	}
-	#heather_in {
-		left: 100%;
-		width: 100%;
-		display: block;
-		visibility: visible
-	}
-	#heather_out {
-		width: 100%;
-		left: 200%;
-		visibility: visible;
-		overflow-y: auto;
-	}
-	#heather_toolbar {
-		height: 45px;
-		width: 100%
-	}
-	#heather_wrapper .icon {
-		font-size: 30px
-	}
-	#heather_in .CodeMirror-scroll {
-		margin-top: 10px
-	}
-	#heather_in .CodeMirror {
-		font-size: 1.5rem;
-		padding-top: 40px;
-	}
-	#heather_stat {
-		width: 100%
-	}
-	#fullscreen-icon {
-		display: none
-	}
-	#heather_toc-icon {
-		display: none
-	}
-	#heather_toc h1 {
-		margin: 1rem 0;
-		font-size: 1.3rem;
-	}
-	#heather_toc h2 {
-		margin: .7rem 0;
-		margin-left: 40px;
-		font-size: 1.2rem;
-	}
-	#heather_toc h3 {
-		margin: .6rem 0;
-		margin-left: 60px;
-		font-size: 1.1em;
-	}
-	#heather_toc h4 {
-		margin: .5rem 0;
-		margin-left: 80px;
-		font-size: 1em;
-	}
-	#heather_toc h5 {
-		margin: .4rem 0;
-		margin-left: 100px;
-		font-size: 0.9em;
-	}
-	#heather_toc h6 {
-		margin: 0.3rem 0;
-		margin-left: 120px;
-		font-size: 0.8em;
-	}
-	#heather_toc {
-		display: block;
-		width: 100%;
-		overflow-y: auto;
-	}
-	#heather_innerBar {
-		white-space: nowrap;
-		max-width: 100% !important;
-		overflow-x: auto;
-		line-height: 60px;
-		height: 60px;
-	}
-}
-
-#heather_innerBar {
-	z-index: 99;
-	padding-left: 10px;
-	padding-right: 10px, visibility:hidden;
-	position: absolute;
-}
-
-.heather_status_on{
-	color:green;
-}
-
-.heather_fullscreen #heather_toc,
-.heather_fullscreen #heather_out,
-.heather_fullscreen #heather_in{
-	position: absoulte !important;
-    top: 0px !important;
-    right: 0px !important;
-    bottom: 0px !important;
-    left: 0px !important;
-    box-sizing: border-box !important;
-    min-width: 0px !important;
-    max-width: none !important;
-    min-height: 0px !important;
-    max-height: none !important;
-    width: 100% !important;
-    height: 100% !important;
-    transform: none !important;
-    margin: 0px !important;
-}
-
-.heather_fullscreen #heather_in{
-	left:100% !important;
-}
-
-.heather_fullscreen #heather_out{
-	left:200% !important;
-	padding-left:15% !important;
-	padding-right:15% !important;
-}
-
-.heather_fullscreen #heather_toc{
-	padding-left:15% !important;
-	padding-right:15% !important;
-}
-
-.heather_fullscreen #heather_toolbar{
-	padding-left:15%;
-	padding-right:15%;
-}
-.heather_fullscreen #heather_stat{
-	padding-left:15%;
-	padding-right:15%;
-}
-.heather_fullscreen .CodeMirror-lines{
-	padding-left:15%;
-	padding-right:15%;
-}
-.heather_fullscreen #heather_innerBar{
-	padding-left:15%;
-	padding-right:15%;
-}
-.heather_fullscreen #heather_searchHelper{
-	padding-left:15% !important;
-	padding-right:15% !important;
-}
-
-.heather_fullscreen .CodeMirror-linewidget{
-	width:100% !important;
-}
-.katex-preview,
-.katex-inline-preview,
-.mermaid-preview,
-.heather_fullscreen .inline-preview{
-	min-height: 20px;
-	margin-bottom: 20px;
-	background-color: #f5f5f5;
-	padding: 19px; 
-	border: 1px solid #e3e3e3;
-	border-radius: 4px; 
-	-webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.05);
-	box-shadow: inset 0 1px 1px rgba(0,0,0,.05);
-	margin-top:10px;
-	margin-bottom:10px;
-	left:0px;
-	margin-left:15%;
-	margin-right:15%;
+	left : 0px !important;
 	z-index:99;
+	margin-left:5px;
 }
-.mermaid-preview,
-.katex-preview{
-	visibility:hidden;
-	z-index:9999999;
-	margin-right:10px;
-	position:static;
-	display:inline-block;
-	margin-left:0px;
-	width:100%;
-	margin-top:5px;
+.heather_hljs_tip .selected{
+	background-color:#70B7FD;
 }
-.katex-inline-preview{
-	visibility:hidden;
-	z-index:9999999;
-	position:fixed;
-	margin-left:0%;
-	margin-right:0%;
+.heather_hljs_tip{
+	max-height:200px;
+	max-width:200px;
 }
-.mermaid-preview pre,
-.katex-inline-preview pre,
-.katex-preview pre {
+.heather_part_preview{
+	opacity:0.75;
+	z-index:10;
+	padding:4px;
+	max-height:200px;
+	overflow-y:auto;
+    word-break: break-word;
+	background-color: #f5f5f5;
+	border: 1px solid #e3e3e3;
+	left:0px !important;
+	position:absolute;
+}
+
+.heather_part_preview  pre,
+.heather_part_preview  pre code{
 	word-wrap: break-word !important;
-	white-space: pre-wrap !important;
-	word-break: break-all !important;
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
 }
 
-.mermaid-preview{
-	visibility:visible;
-	display:none;
+.heather_part_preview a{
+	 pointer-events: none;
 }
-#heather_wrapper .close {
-    position: absolute;
-    color: white;
-    top: 3px;
-    right: 3px;
-	color:#000;
-	font-size:15px;
-	cursor:pointer;
-}
-
-.heather_fullscreen .nofullscreen{
-	display:none !important;
+.heather_preview{
+	overflow-y:auto;
+	width:100%;
+	height:100%;
+	position:absolute;
+	background:#fff;
+	top:0;
+	left:0;
+	z-index:99;
+    padding: 15px;
 }
 
-.heather_noscroll{
-	margin: 0 !important; 
-	height: 100% !important; 
-	overflow:hidden !important;
+.heather_preview_close{
+	position:absolute;
+	right:30px;
+	top:10px;
 }
 
-
-#heather_toc:focus,
-#heather_out:focus {
-    outline: 0px solid transparent;
+@media (max-width:768px) {
+	.heather_icon{
+		font-size:24px;
+	}
 }
-
-.heather_contenteditable_bar{
-	position: absolute;
-	visibility: hidden;
-	z-index: 9999999;
-	background-color: #70B7FD;
-	border-radius: 10px;
-	padding: 5px;
-	max-width:300px;
-}
-
 .heather_progressbar {
 	position: relative;
   background-color: #70B7FD;
@@ -644,52 +85,65 @@ h6 {
 	  height: 25px;
 }
 
-
-#heather_wrapper blockquote{
-	min-height:20px;
+.heather_part_preview img,
+.heather_part_preview video{
+	max-width:200px;
+	height:auto;
 }
 
-.heather-menu-dialog{
-	list-style-type:none;
+.heather_selection_helper{
+	position:absolute;
+	z-index:99;
 }
 
-.heather-menu-card{
-	list-style-type:none;
-	text-align:left;
-	font-size:20px;
-	padding:0px;
-}
-.heather-menu-card .off{
-	display:none;
+.heather_selection_marked{
+	
+	background:lightblue;
 }
 
-.heather-menu-dialog li{
-	padding-top:10px;
-	padding-bottom:10px;
-	cursor:pointer;
-	outline:none;
-}
-.heather-menu-dialog li i{
-	margin-right:50px;
-}
-.heather-menu-breadcrums{
-	text-align:left;
-	padding:10px;
-}
-	.heather-menu-breadcrums .active{
-		color:#70B7FD
-	}
-@media (min-width:768px) {
-
-	.heather-menu-dialog .active{
-		background-color:#D3D3D3
-	}
+.CodeMirror-fullscreen{
+	z-index:9999999
 }
 
-
-.heather-menu-breadcrums span{
-	display:inline-block;
-	margin-right:25px;
+.heather_hljs_tip{
+	visibility:hidden;
+	position:absolute;
+	z-index:99;
+	overflow:auto;
+	background-color:#fff
 }
 
+.heather_command_table{
+	border:1px solid #000;
+	padding:5px;
+}
 
+.heather_sync_view_editor {
+	width:50% !important;
+}
+
+.heather_sync_view{
+	width:50%;
+	position:absolute;
+	left:50%;
+	height:100%;
+	overflow-y:auto;
+	top:0;
+}
+
+.heather_sync_view_container{
+	padding:15px;
+}
+
+.heather_editor_wrapper{
+	position:relative
+}
+
+.heather_sync_view_container img,
+.heather_sync_view_container video{
+	max-width:200px;
+	height:auto;
+}
+.heather_sync_view_container a{
+	 pointer-events: none;
+}
