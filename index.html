@@ -27,7 +27,8 @@ font-size: 16px;
 <link rel="stylesheet" href="css/style.css">
 
 <div style="padding:15%">
-<button id="sync_preview_btn">同步预览</button><textarea id="editor" style="display:none"></textarea></div>
+<button id="sync_preview_btn">同步预览</button>
+<textarea id="editor" style="display:none"></textarea></div>
 <script src="codemirror/lib/codemirror.js"></script>
 <script src="codemirror//addon/mode/overlay.js"></script>
 <script src="codemirror/mode/markdown/markdown.js"></script>
@@ -65,7 +66,7 @@ font-size: 16px;
 		
 		
 		var heather = Heather.create(document.getElementById("editor"),config);
-		//heather.setFullscreen(true);
+		heather.setFullscreen(true);
 		
 		var toolbar = heather.getToolbar();
 		toolbar.addIcon('fa fa-expand heather_icon',function(elem){
@@ -82,7 +83,10 @@ font-size: 16px;
 		var selectionHelperOpen = false;
 		heather.on('selectionHelperChange',function(sc){
 			selectionHelperOpen = sc;
-		})
+		});
+		
+		
+		
 		if(Heather.Util.mobile){
 			toolbar.addIcon('fas fa-arrows-alt heather_icon', function() {
 				if(!selectionHelperOpen){

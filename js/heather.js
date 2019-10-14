@@ -90,6 +90,10 @@ var Heather = (function(){
 		return target.split(search).join(replacement);
 	}
 	
+    String.prototype.splice = function(start, delCount, newSubStr) {
+        return this.slice(0, start) + newSubStr + this.slice(start + Math.abs(delCount));
+    }
+	
 	function Editor(textarea,config){
 		config = Object.assign({}, defaultConfig, config);
 		this.eventHandlers = [];
@@ -107,6 +111,8 @@ var Heather = (function(){
 		if(config.focused === true){
 			this.setFocused(true);
 		}
+		
+		this.tableHelper = new TableHelper(this);
 	}
 	
 	Editor.prototype.getValue = function(){
@@ -435,29 +441,34 @@ var Heather = (function(){
 		this.editor.addKeyMap(keyMap);
 	}	
 	
+	Editor.prototype.unbindKey = function(keys) {
+		var keyMaps = this.editor.state.keyMaps;
+		for (var i = 0; i < keys.length; i++) {
+			for (var j = 0; j < keyMaps.length; j++) {
+				delete keyMaps[j][keys[i]];
+			}
+		}
+	}
+	
 	Editor.prototype.render = function(){
 		var value = this.editor.getValue();
 		var node = Util.parseHTML(this.markdownParser.render(value)).body;
 		this.node = node;
-		triggerEvent(this,'rendered',value,this.node.innerHTML);
 		this.rendered = true;
+		triggerEvent(this,'rendered',value,this.node.innerHTML);
 	}
 	
 	function handleDefaultEditorEvent(heather){
 		var editor = heather.editor;
-		//auto render
-		var doRender = function(){
-			heather.render();
-		}
 		if(editor.getValue() != '')
-			doRender();
+			heather.render();
 		editor.on('change',function(cm,change){
 			heather.rendered = false;
 			if(heather.renderTimer){
 				clearTimeout(heather.renderTimer);
 			}
 			heather.renderTimer = setTimeout(function(){
-				doRender();
+				heather.render();
 			},heather.config.autoRenderMill);	
 		});	
 		//change task list status
@@ -549,9 +560,7 @@ var Heather = (function(){
 				heather.setPreview(!heather.isPreview())
 			},
 			"Tab":function(){
-				if(!tab(heather)){
-					heather.editor.execCommand('indentMore');
-				}
+				heather.editor.execCommand('indentMore');
 			},
 			"Shift-Tab":function(){
 				heather.editor.execCommand('indentLess')
@@ -574,9 +583,7 @@ var Heather = (function(){
 				heather.setPreview(!heather.isPreview())
 			},
 			"Tab":function(){
-				if(!tab(heather)){
-					heather.editor.execCommand('indentMore');
-				}
+				heather.editor.execCommand('indentMore');
 			},
 			"Shift-Tab":function(){
 				heather.editor.execCommand('indentLess')
@@ -624,16 +631,16 @@ var Heather = (function(){
 			var editor = heather.editor;
 			
 			var html = '';
-            html += '<div style="height:26.66%;text-align:center">';
-            html += '<i class="fas fa-arrow-up" data-arrow="goLineUp" style="font-size:50px;cursor:pointer"></i>'
+            html += '<div style="height:33.3%;text-align:center">';
+            html += '<i class="fas fa-arrow-up" data-arrow="goLineUp" style="cursor:pointer"></i>'
             html += '</div>';
-            html += '<div style="height:26.66%">'
-            html += '<i class="fas fa-arrow-left" data-arrow="goCharLeft" style="font-size:50px;float:left;cursor:pointer;margin-right:20px"></i>';
-            html += '<i class="fas fa-arrow-right" data-arrow="goCharRight" style="font-size:50px;float:right;cursor:pointer"></i>';
+            html += '<div style="height:33.3%">'
+            html += '<i class="fas fa-arrow-left" data-arrow="goCharLeft" style="float:left;cursor:pointer;"></i>';
+            html += '<i class="fas fa-arrow-right" data-arrow="goCharRight" style="float:right;cursor:pointer"></i>';
             html += '<div style="clear:both"></div>';
             html += '</div>';
-            html += '<div style="height:26.66%;text-align:center">';
-            html += '<i class="fas fa-arrow-down" data-arrow="goLineDown" style="font-size:50px;cursor:pointer"></i>';
+            html += '<div style="height:33.3%;text-align:center">';
+            html += '<i class="fas fa-arrow-down" data-arrow="goLineDown" style="cursor:pointer"></i>';
             html += '</div>';
 			var div = document.createElement('div');
 			div.classList.add('heather_selection_helper');
@@ -641,7 +648,11 @@ var Heather = (function(){
 			div.setAttribute('data-widget','');
 			div.innerHTML = html;
 			editor.addWidget({line:0,ch:0},div);
-			div.style.width = div.clientHeight+'px';
+			var max = Math.min(div.clientHeight,editor.getWrapperElement().clientWidth-5-editor.getGutterElement().offsetWidth);
+			div.style.width = max+'px';
+			if(max < div.clientHeight){
+				div.style.height = max+'px';
+			}
 			div.style.visibility = 'visible';
 			
 			this.start = editor.getCursor(true);
@@ -955,11 +966,12 @@ var Heather = (function(){
 			div.classList.add('heather_toolbar_bar');
 			div.setAttribute('data-widget','');
 			div.style.visibility = 'hidden';
-			cm.addWidget({line:0,ch:0},div);
-			div.style.top = '0px';
-			cm.on('scroll',function(cm){
-				div.style.top = cm.getScrollInfo().top+'px';
-			});
+			
+			var gutterWidth = cm.getGutterElement().offsetWidth;
+			div.style.left = gutterWidth + 'px';
+			
+			cm.getWrapperElement().appendChild(div);
+			
 			this.heather = heather;
 			this.cm = cm;
 			this.bar = new Bar(div);
@@ -1042,15 +1054,12 @@ var Heather = (function(){
 		}
 		
 		CommandBar.prototype.rePosition = function(){
-			if(!this.bar){
+			if(!this.bar || this.keepHidden === true){
 				return ;
 			}
 			var cm = this.cm;
 			var pos = cm.cursorCoords(true,'local');
-			if(this.keepHidden !== true)
-				this.bar.style.visibility = 'visible';
-			else
-				this.bar.style.visibility = 'hidden';
+			this.bar.style.visibility = 'visible';
 			var toolbarHeight = this.heather.toolbar.getHeight();
 			var top = pos.top - cm.getScrollInfo().top - toolbarHeight;
 			var distance = 2*cm.defaultTextHeight();
@@ -1095,8 +1104,8 @@ var Heather = (function(){
 			var div = document.createElement('div');
 			div.classList.add('heather_command_bar')
 			var bar = new Bar(div);
-			bar.addIcon('fas fa-heading heather_icon', function() {
-				heather.execCommand('heading')
+			bar.addIcon('fas fa-bars heather_icon', function() {
+				heather.execCommand('commands')
 			});
 			bar.addIcon('fas fa-bold heather_icon', function() {
 				heather.execCommand('bold')
@@ -1105,10 +1114,6 @@ var Heather = (function(){
 			bar.addIcon('fas fa-italic heather_icon',function(){
 				heather.execCommand('italic')
 			});
-			
-			bar.addIcon('fas fa-quote-left heather_icon', function() {
-				heather.execCommand('quote');
-			})
 			
 			bar.addIcon('fas fa-strikethrough heather_icon', function() {
 				heather.execCommand('strikethrough');
@@ -1120,22 +1125,6 @@ var Heather = (function(){
 			
 			bar.addIcon('fas fa-code heather_icon', function() {
 				heather.execCommand('code');
-			})
-
-			bar.addIcon('fas fa-file-code heather_icon', function() {
-				heather.execCommand('codeBlock');
-			})
-			
-			bar.addIcon('far fa-square heather_icon', function() {
-				heather.execCommand('uncheck');
-			})
-			
-			bar.addIcon('far fa-check-square heather_icon', function() {
-				heather.execCommand('check');
-			})
-			
-			bar.addIcon('fas fa-table heather_icon', function() {
-				heather.execCommand('table');
 			})
 
 			bar.addIcon('fas fa-undo heather_icon', function() {
@@ -1218,7 +1207,7 @@ var Heather = (function(){
 		}
 		
 		PartPreview.prototype.rePosition = function(){
-			if (this.widget) {
+			if (this.widget && this.keepHidden !== true) {
 				this.widget.update();
 			}
 		}
@@ -1924,6 +1913,398 @@ var Heather = (function(){
         }
     })();
 	
+	
+	var TableHelper = (function(){
+		
+		function TableHelper(heather){
+			
+			
+			var commandsHandler = commands['commands'];
+			
+			commands['commands'] = function(heather){
+				var cm = heather.editor;
+				var context = getTableMenuContext(cm);
+				if(context === 'no'){
+					commandsHandler(heather);
+					return ;
+				}
+				if(context === 'hide') return;
+				
+				var node = context.node;
+				var startLine = context.startLine;
+				var endLine = context.endLine;
+				var rowIndex = context.rowIndex;
+				var colIndex = context.colIndex;
+				
+				var div = addCommandWidget(heather);
+				
+				div.appendChild(createListCommandWidget(heather,[{
+					html : '插入列(前方)',
+					handler : function(){
+						addCol(cm,colIndex,startLine,endLine,true);
+					}
+				},{
+					html : '插入列(后方)',
+					handler : function(){
+						addCol(cm,colIndex,startLine,endLine,false);
+					}
+				},{
+					html : '删除列',
+					handler : function(){
+						delCol(cm,colIndex,startLine,endLine);
+					}
+				},{
+					html : '插入行(上方)',
+					handler : function(){
+						addRow(cm,rowIndex,startLine,endLine,true,node);
+					}
+				},{
+					html : '插入行(下方)',
+					handler : function(){
+						addRow(cm,rowIndex,startLine,endLine,false,node);
+					}
+				},{
+					html : '删除行',
+					handler : function(){
+						delRow(cm,rowIndex,startLine,endLine);
+					}
+				}]));
+				
+				posCommandWidget(heather,div);
+			}
+			
+			
+			var getTableMenuContext = function(cm){
+				if(cm.somethingSelected()) return 'no';
+				var cursor = cm.getCursor();
+				var line = cursor.line;
+				var nodes = heather.getNodesByLine(line);
+				if(nodes.length == 0) return 'no';
+				var node = nodes[nodes.length-1];
+				if(node.tagName !== 'TABLE') return 'no';
+				var startLine = parseInt(node.dataset.line);
+				var endLine = parseInt(node.dataset.endLine);
+				
+				var rowIndex = line - startLine;
+				if(rowIndex == 1) return 'hide';
+				if(rowIndex > 1) rowIndex --;
+				
+				var lineStr = cm.getLine(cursor.line);
+				var lineLeft = lineStr.substring(0,cursor.ch);
+				var lineRight = lineStr.substring(cursor.ch+1);
+				
+				var colIndex = -1;
+				
+				for(var i=0;i<lineLeft.length;i++){
+					var ch = lineLeft.charAt(i);
+					if(ch === '|' && (i == 0 || lineLeft.charAt(i - 1) != '\\')){
+						colIndex ++ ;
+					}
+				}
+				if(lineRight.indexOf('|') == -1) colIndex--;
+				
+				return {
+					node:node,
+					startLine:startLine,
+					endLine : endLine,
+					rowIndex : rowIndex,
+					colIndex : colIndex
+				}
+			}
+			
+			var keyMap = {}
+			
+			keyMap.Tab = function(cm){
+				if(!tab(heather))
+					heather.editor.execCommand('indentMore');
+			}
+			
+			heather.addKeyMap(keyMap);
+			
+			if(Util.mobile){
+				
+			}
+		}
+		
+		function tab(heather){
+			var editor = heather.editor;
+			if(!editor.somethingSelected()){
+				var cursor = editor.getCursor();
+				var line = cursor.line;
+				var nodes = heather.getNodesByLine(line);
+				var mappingElem;
+				if(nodes.length > 0)
+					mappingElem = nodes[0];
+				if(mappingElem && mappingElem.tagName === 'TABLE'){
+					var startLine = parseInt(mappingElem.dataset.line);
+					var endLine = parseInt(mappingElem.dataset.endLine) - 1;
+					var setNextCursor = function(i,substr){
+						if(i == startLine+1) return false;// 
+						substr = i == line && substr === true;
+						var lineStr = substr ? editor.getLine(i).substring(cursor.ch) : editor.getLine(i);
+						var firstCh,lastCh;
+						for(var j=0;j<lineStr.length;j++){
+							var ch = lineStr.charAt(j);
+							if(ch == '|'){
+								//find prev char '\';
+								var prevChar = j == 0 ? '' : lineStr.charAt(j-1);
+								if(prevChar != '\\'){
+									//find first
+									//need to find next
+									if(Util.isUndefined(firstCh)){
+										firstCh = j;
+									}else {
+										lastCh = j;
+										break;
+									}
+								}
+							}
+						}
+						if(!Util.isUndefined(firstCh) && !Util.isUndefined(lastCh)){
+							//set cursor at middle
+							var ch = parseInt(Math.ceil((lastCh - firstCh)/2))+ firstCh + (substr ? cursor.ch : 0);
+							editor.setCursor({line : i,ch : ch});
+							return true;
+						} else {
+							return false;
+						}
+					}
+					
+					var hasNext = false;
+					for(var i=line;i<=endLine;i++){
+						if(setNextCursor(i,true)){
+							hasNext = true;
+							break;
+						}
+					}
+					
+					if(!hasNext){
+						return setNextCursor(startLine);
+					}
+					
+					return true;
+				}	
+			}
+			return false;
+		}
+		
+		function addCol(cm,colIndex,startLine,endLine,before){
+			var line = cm.getCursor().line;
+			var array = [];
+			var lineIndex = 0;
+			var _ch = 0;
+			cm.eachLine(startLine,endLine,function(handle){
+				var index = -2;
+				var text = handle.text;
+				for(var i=0;i<text.length;i++){
+					var ch = text.charAt(i);
+					if(ch == '|' && (i == 0 || text.charAt(i - 1) !== '|')){
+						index ++ ;
+						var flag = before === true ? index == colIndex - 1 : index == colIndex;
+						if(flag){
+							if(lineIndex != 1)
+								array.push(text.splice(i, 1, '|    |'));
+							else
+								array.push(text.splice(text.lastIndexOf('|'), 1, '|  --  |'));
+							if(lineIndex+startLine == line){
+								_ch =  i+3;
+							}
+							break;
+						}
+					}
+				}
+				lineIndex++;
+			});
+			if(array.length != endLine  - startLine) return ;
+			cm.setSelection({line:startLine,ch:0},{line:endLine,ch:0});
+			cm.replaceSelection(array.join('\n'));
+			cm.focus();
+			cm.setCursor({
+				line:line,
+				ch:_ch
+			})
+		}
+		
+		
+		function delCol(cm,colIndex,startLine,endLine){
+			var array = [];
+			var lineIndex = 0;
+			var line = cm.getCursor().line;
+			var _ch = 0;
+			cm.eachLine(startLine,endLine,function(handle){
+				var index = -2;
+				var prevIndex = -1;
+				var text = handle.text;
+				for(var i=0;i<text.length;i++){
+					var ch = text.charAt(i);
+					if(ch == '|' && (i == 0 || text.charAt(i - 1) !== '|')){
+						index ++ ;
+						if(index == colIndex){
+							if(prevIndex == -1) {
+								return false;
+							}
+							var newStr = text.splice(prevIndex, i-prevIndex, '');
+							array.push(newStr == '|' ? '' : newStr);
+							if(lineIndex+startLine == line){
+								_ch = prevIndex;
+							}
+							break;
+						}
+						prevIndex = i;
+					}
+				}
+				lineIndex++;
+			});
+			if(array.length != endLine  - startLine) return ;
+			cm.setSelection({line:startLine,ch:0},{line:endLine,ch:0});
+			var table = array.join('\n');
+			cm.replaceSelection(table.trim() == '' ? '' : table);
+			cm.focus();
+			cm.setCursor({
+				line:line,
+				ch:_ch
+			})
+		}
+		
+		function delRow(cm,rowIndex,startLine,endLine){
+			if(rowIndex < 1) return ;
+			var array = [];
+			var lineIndex = 0;
+			var line = cm.getCursor().line;
+			cm.eachLine(startLine,endLine,function(handle){
+				var _rowIndex = lineIndex > 1 ? lineIndex - 1 : lineIndex;
+				if(rowIndex != _rowIndex || lineIndex == 1){
+					array.push(handle.text);
+				}
+				lineIndex ++;
+			});
+			cm.setSelection({line:startLine,ch:0},{line:endLine,ch:0});
+			cm.replaceSelection(array.join('\n'));
+			cm.focus();
+			var line = line - 1;
+			if(line == startLine + 1){
+				line -- ;
+			}
+			cm.setCursor({
+				line:line,
+				ch:1
+			})
+		}
+		
+		function addRow(cm,rowIndex,startLine,endLine,before,node){
+			if(rowIndex == 0 && before === true) return ;
+			var lineIndex = rowIndex < 1 ? rowIndex : rowIndex+1;
+			var newLine = '';
+			var tr = node.querySelectorAll('tr')[rowIndex];
+			for(var i=0;i<tr.children.length;i++){
+				newLine += '|    ';
+				if(i == tr.children.length - 1)
+					newLine += '|';
+			}
+			if(before === true){
+				cm.setSelection({line:startLine+lineIndex,ch:0});
+				cm.replaceSelection(newLine+'\n');
+				cm.focus();
+				cm.setCursor({
+					line:startLine+lineIndex,
+					ch:3
+				});
+			} else {
+				var targetLine = startLine+lineIndex;
+				if(rowIndex == 0){
+					targetLine = startLine + 1;
+				}
+				cm.setSelection({line:targetLine,ch:cm.getLine(targetLine).length});
+				cm.replaceSelection('\n'+newLine);
+				cm.focus();
+				cm.setCursor({
+					line:targetLine+1,
+					ch:3
+				});
+			}
+		}
+		
+		
+		return TableHelper;
+	
+	})();
+	
+	
+	function createListCommandWidget(heather,items){
+		var ul = document.createElement('ul');
+		ul.classList.add('heather_command_list');
+		
+		for(var i=0;i<items.length;i++){
+			var item = items[i];
+			var li = document.createElement('li');
+			li.innerHTML = item.html;
+			li.setAttribute('data-index',i);
+			if(i == 0)
+				li.classList.add('active');
+			ul.appendChild(li);
+		}
+		
+		var execute = function(li){
+			var handler = items[parseInt(li.dataset.index)].handler;
+			if(handler){
+				handler();
+			}
+			heather.editor.removeKeyMap(keyMap);
+			removeCommandWidget(heather);
+		}
+		
+		var keyMap = {
+			'Up': function() {
+				var current = ul.querySelector('.active');
+				var prev = current.previousElementSibling;
+				if (prev != null) {
+					current.classList.remove('active');
+					prev.classList.add('active');
+				} else {
+					var lis = ul.querySelectorAll('li');
+					if(lis.length > 0){
+						var last = lis[lis.length - 1];
+						current.classList.remove('active');
+						last.classList.add('active');
+					}
+				}
+			},
+			'Down': function() {
+				var current = ul.querySelector('.active');
+				var next = current.nextElementSibling;
+				if (next != null) {
+					current.classList.remove('active');
+					next.classList.add('active');
+				} else {
+					var li = ul.querySelector('li');
+					if(li != null){
+						current.classList.remove('active');
+						li.classList.add('active');
+					}
+				}
+			},
+			'Enter': function() {
+				var li = ul.querySelector('.active');
+				execute(li);
+			},
+			'Esc': function(){
+				heather.editor.removeKeyMap(keyMap);
+				removeCommandWidget(heather);
+			}
+		}
+		
+		heather.editor.addKeyMap(keyMap);
+		
+		for(const li of ul.querySelectorAll('li')){
+			li.addEventListener('click',function(){
+				execute(this);
+			})
+		}
+		
+		return ul;
+	}
+	
+	
 	function removeCommandWidget(heather){
 		if(heather.commandWidget){
 			heather.commandWidget.remove();
@@ -1941,7 +2322,7 @@ var Heather = (function(){
 		var cm = heather.editor;
 		var cursor = cm.getCursor();
 		var div = document.createElement('div');
-		div.style['z-index'] = "99";
+		div.classList.add('heather_command_widget')
 		div.setAttribute('data-widget','');
 		cm.addWidget(cursor,div);
 		
@@ -1960,10 +2341,11 @@ var Heather = (function(){
 		return div;
 	}
 	
-	function posCommandWidget(cm,div){
+	function posCommandWidget(heather,div){
+		var cm = heather.editor;
 		var pos = cm.cursorCoords(true,'local');
 		
-		var top = pos.top-cm.getScrollInfo().top;
+		var top = pos.top-cm.getScrollInfo().top-heather.getToolbar().getHeight();
 		var left = parseFloat(div.style.left);
 		var code = cm.getWrapperElement().querySelector('.CodeMirror-code');
 		if(left + div.clientWidth + 5 > code.clientWidth){
@@ -1980,228 +2362,142 @@ var Heather = (function(){
 	}
 	
 	commands['heading'] = function(heather){
-		var div = addCommandWidget(heather);
-		
-		var innerHTML = '<div class="heather_command_heading"><select class="heather_command_heading_select">';
-		for(var i=1;i<=6;i++){
-			innerHTML += '<option value="'+i+'">H'+i+'</option>';
-		}
-		innerHTML += '</select>';
-		if(Util.mobile){
-			innerHTML += '<button class="heather_command_heading_button">取消</button>';
-			innerHTML += '<button class="heather_command_heading_button">确定</button>';
-		}
-		innerHTML += '</div>';
-		div.innerHTML = innerHTML;	
-			
-		function doHeading(){
-			var value = div.querySelector('select').value;
-			if(value != ''){
-				var cm = heather.editor;
-				var v = parseInt(value);
-				var status = cm.selectionStatus();
-				selectionBreak(status, function(text) {
-					var prefix = '';
-					for (var i = 0; i < v; i++) {
-						prefix += '#';
+		var cm = heather.editor;
+		var line = cm.getCursor().line;
+		var heading = 1;
+		if(line > 0 && heather.node){
+			var nodes = heather.node.children;
+			for(var i=nodes.length-1;i>=0;i--){
+				var node = nodes[i];
+				var startLine = parseInt(node.dataset.line);
+				if(startLine <= line){
+					var tagName = node.tagName;
+					if(tagName.startsWith('H')){
+						var h = parseInt(tagName.substring(1));
+						if(h >= 1 && h <= 6){
+							heading = h;
+							break;
+						}
 					}
-					prefix += ' ';
-					return prefix + text;
-				});
-				if (status.selected == '') {
-					cm.replaceRange(status.text, cm.getCursor());
-					cm.focus();
-					cm.setCursor({
-						line: status.startLine,
-						ch: v + 1
-					});
-				} else {
-					cm.replaceSelection(status.text);
 				}
 			}
 		}
-		var select = div.querySelector('select');
-		select.addEventListener('keydown',function(e){
-			if(e.key == 'Enter'){
-				e.preventDefault();
-				e.stopPropagation();
-				doHeading();
+		var status = cm.selectionStatus();
+		selectionBreak(status, function(text) {
+			var prefix = '';
+			for (var i = 0; i < heading; i++) {
+				prefix += '#';
 			}
-			if(e.key == 'Escape'){
-				e.preventDefault();
-				e.stopPropagation();
-				div.remove();
-				heather.editor.focus();
-			}
+			prefix += ' ';
+			return prefix + text;
 		});
-		
-		if(Util.mobile){
-			var buttons = div.querySelectorAll('button');
-			buttons[0].addEventListener('click',function(){
-				div.remove();
-				heather.editor.focus();
+		if (status.selected == '') {
+			cm.replaceRange(status.text, cm.getCursor());
+			cm.focus();
+			cm.setCursor({
+				line: status.startLine,
+				ch: heading + 1
 			});
-			buttons[1].addEventListener('click',function(){
-				doHeading();
-			});
+		} else {
+			cm.replaceSelection(status.text);
 		}
-		
-		
-		select.size = 6;
-		select.focus();
-		
-		posCommandWidget(heather.editor,div);
 	}
 	
 	commands['commands'] = function(heather){
 		var div = addCommandWidget(heather);
 		
-		var innerHTML = '<div class="heather_command_commands"><select class="heather_command_commands_select">';
-		innerHTML += '<option value="heading">标题</option>';
-		innerHTML += '<option value="table">表格</option>';
-		innerHTML += '<option value="codeBlock">代码块</option>';
-		innerHTML += '<option value="check">任务列表</option>';
-		innerHTML += '<option value="quote">引用</option>';
-		innerHTML += '<option value="mathBlock">数学公式块</option>';
-		innerHTML += '<option value="mermaid">mermaid图表</option>';
-		innerHTML += '</select>';
-		if(Util.mobile){
-			innerHTML += '<button class="heather_command_commands_button">取消</button>';
-			innerHTML += '<button class="heather_command_commands_button">确定</button>';
-		}
-		innerHTML += '</div>';
-		div.innerHTML = innerHTML;
-		function execCommand(){
-			div.remove();
-			var value = div.querySelector('select').value;
-			heather.execCommand(value);
-		}
-		div.querySelector('select').addEventListener('keydown',function(e){
-			if(e.key == 'Enter'){
-				e.preventDefault();
-				e.stopPropagation();
-				execCommand();
+		div.appendChild(createListCommandWidget(heather,[{
+			html : '标题',
+			handler : function(){
+				heather.execCommand('heading');
 			}
-			if(e.key == 'Escape'){
-				e.preventDefault();
-				e.stopPropagation();
-				div.remove();
-				heather.editor.focus();
+		},{
+			html : '表格',
+			handler : function(){
+				heather.execCommand('table');
 			}
-		});
-		if(Util.mobile){
-			var buttons = div.querySelectorAll('button');
-			buttons[0].addEventListener('click',function(){
-				div.remove();
-				heather.editor.focus();
-			});
-			buttons[1].addEventListener('click',function(){
-				execCommand();
-			});
-		}
-		var select = div.querySelector('select');
-		select.size = 7;
-		select.focus();
-		posCommandWidget(heather.editor,div);
+		},{
+			html : '代码块',
+			handler : function(){
+				heather.execCommand('codeBlock');
+			}
+		},{
+			html : '任务列表',
+			handler : function(){
+				heather.execCommand('tasklist');
+			}
+		},{
+			html : '引用',
+			handler : function(){
+				heather.execCommand('quote');
+			}
+		},{
+			html : '数学公式块',
+			handler : function(){
+				heather.execCommand('mathBlock');
+			}
+		},{
+			html : 'mermaid图表',
+			handler : function(){
+				heather.execCommand('mermaid');
+			}
+		}]));
+		posCommandWidget(heather,div);
 	}
 	
 	commands['table'] = function(heather){
-		var div = addCommandWidget(heather);
-		var innerHTML = '<div class="heather_command_table">行：<input type="number" value="" style="width:80px">&nbsp;';
-		innerHTML += '列：<input type="number" value="" style="width:80px">&nbsp;';
-		innerHTML += '<button class="heather_command_table_button">确定</button></div>';
-		div.innerHTML = innerHTML;
-		
-		var inputs = div.querySelectorAll('input');
-		for(const input of inputs){
-			input.addEventListener('keydown',function(e){
-				if(e.key == 'Escape'){
-					e.preventDefault();
-					e.stopPropagation();
-					div.remove();
-					heather.editor.focus();
-				}
-			});	
+		var cm = heather.editor;
+		var rows = cols = 2;
+		var text = '';
+		for (var i = 0; i < cols; i++) {
+			text += '|    ';
 		}
-		div.querySelector('button').addEventListener('click',function(){
-			var cm = heather.editor;
-			var inputs = div.querySelectorAll('input');
-			var rows;
-			try{
-				rows = parseInt(inputs[0].value);
-			}catch(e){rows = 3}
-			if(!rows || isNaN(rows)){
-				rows = 3;
-			}
-			var cols;
-			try{
-				cols = parseInt(inputs[1].value);
-			}catch(e){cols = 3}
-			if(!cols || isNaN(cols)){
-				cols = 3;
-			}
-			if (rows < 1)
-				rows = 3;
-			if (cols < 1)
-				cols = 3;
-			var text = '';
-			for (var i = 0; i < cols; i++) {
-				text += '|    ';
-			}
-			text += '|'
-			text += "\n";
-			for (var i = 0; i < cols; i++) {
-				text += '|  --  ';
-			}
-			text += '|'
-			if (rows > 1) {
-				text += '\n';
-				for (var i = 0; i < rows - 1; i++) {
-					for (var j = 0; j < cols; j++) {
-						text += '|    ';
-					}
-					text += '|'
-					if (i < rows - 2)
-						text += "\n";
+		text += '|'
+		text += "\n";
+		for (var i = 0; i < cols; i++) {
+			text += '|  --  ';
+		}
+		text += '|'
+		if (rows > 1) {
+			text += '\n';
+			for (var i = 0; i < rows - 1; i++) {
+				for (var j = 0; j < cols; j++) {
+					text += '|    ';
 				}
+				text += '|'
+				if (i < rows - 2)
+					text += "\n";
 			}
-			var cursor = cm.getCursor();
-			var status = cm.selectionStatus();
-			selectionBreak(status, function(selected) {
-				return text;
-			});
-			cm.replaceSelection(status.text);
-			var lineStr = cm.getLine(status.startLine);
-			var startCh,endCh;
-			
-			for(var i=0;i<lineStr.length;i++){
-				if(lineStr.charAt(i) == '|'){
-					if(!Util.isUndefined(startCh)){
-						endCh = i;
-						break;
-					}
-					startCh = i;
+		}
+		var cursor = cm.getCursor();
+		var status = cm.selectionStatus();
+		selectionBreak(status, function(selected) {
+			return text;
+		});
+		cm.replaceSelection(status.text);
+		var lineStr = cm.getLine(status.startLine);
+		var startCh,endCh;
+		
+		for(var i=0;i<lineStr.length;i++){
+			if(lineStr.charAt(i) == '|'){
+				if(!Util.isUndefined(startCh)){
+					endCh = i;
+					break;
 				}
+				startCh = i;
 			}
-			
-			if(!Util.isUndefined(startCh) && !Util.isUndefined(endCh)){
-				var ch = startCh + (endCh - startCh)/2;
-				cm.focus();
-				cm.setCursor({line : status.startLine,ch:ch});
-			}	
-		})
-		div.querySelector('input').focus();
-		posCommandWidget(heather.editor,div);
+		}
+		
+		if(!Util.isUndefined(startCh) && !Util.isUndefined(endCh)){
+			var ch = startCh + (endCh - startCh)/2;
+			cm.focus();
+			cm.setCursor({line : status.startLine,ch:ch});
+		}	
 	}
 	
-	commands['uncheck'] = function(heather){
+	commands['tasklist'] = function(heather){
 		var cm = heather.editor;
 		insertTaskList(cm, false);
-	}
-	
-	commands['check'] = function(heather){
-		var cm = heather.editor;
-		insertTaskList(cm, true);
 	}
 	
 	commands['code'] = function(heather){
@@ -2613,70 +2909,6 @@ var Heather = (function(){
 				}
 			}
 		}
-	}
-	
-	function tab(heather){
-		var editor = heather.editor;
-		if(!editor.somethingSelected() && heather.rendered === true){
-			var cursor = editor.getCursor();
-			var line = cursor.line;
-			var nodes = heather.getNodesByLine(line);
-			var mappingElem;
-			if(nodes.length > 0)
-				mappingElem = nodes[0];
-			if(mappingElem){
-				if(mappingElem.tagName === 'TABLE'){
-					var startLine = parseInt(mappingElem.dataset.line);
-					var endLine = parseInt(mappingElem.dataset.endLine) - 1;
-					var setNextCursor = function(i,substr){
-						if(i == startLine+1) return false;// 
-						substr = i == line && substr === true;
-						var lineStr = substr ? editor.getLine(i).substring(cursor.ch) : editor.getLine(i);
-						var firstCh,lastCh;
-						for(var j=0;j<lineStr.length;j++){
-							var ch = lineStr.charAt(j);
-							if(ch == '|'){
-								//find prev char '\';
-								var prevChar = j == 0 ? '' : lineStr.charAt(j-1);
-								if(prevChar != '\\'){
-									//find first
-									//need to find next
-									if(Util.isUndefined(firstCh)){
-										firstCh = j;
-									}else {
-										lastCh = j;
-										break;
-									}
-								}
-							}
-						}
-						if(!Util.isUndefined(firstCh) && !Util.isUndefined(lastCh)){
-							//set cursor at middle
-							var ch = parseInt(Math.ceil((lastCh - firstCh)/2))+ firstCh + (substr ? cursor.ch : 0);
-							editor.setCursor({line : i,ch : ch});
-							return true;
-						} else {
-							return false;
-						}
-					}
-					
-					var hasNext = false;
-					for(var i=line;i<=endLine;i++){
-						if(setNextCursor(i,true)){
-							hasNext = true;
-							break;
-						}
-					}
-					
-					if(!hasNext){
-						return setNextCursor(startLine);
-					}
-					
-					return true;
-				}
-			}	
-		}
-		return false;
 	}
 	
 	function createUnparsedMermaidElement(expression) {

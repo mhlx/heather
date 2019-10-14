@@ -6,16 +6,27 @@
 	margin-right: 10px;
 	margin-bottom: 5px
 }
+
+.heather_toolbar_bar{
+	position: absolute;
+   left: 0; right: 0;
+   top:0;
+}
+
 .heather_toolbar_bar,
 .heather_command_bar{
 	overflow-y: auto;
     white-space: nowrap;
 	width:95%;
 	position:absolute;
-	left : 0px !important;
 	z-index:99;
 	margin-left:5px;
 }
+
+.heather_command_bar{
+	left:0px !important;
+}
+
 .heather_hljs_tip .selected{
 	background-color:#70B7FD;
 }
@@ -54,7 +65,7 @@
 	background:#fff;
 	top:0;
 	left:0;
-	z-index:99;
+	z-index:100;/*bigger than heather_toolbar_bar*/
     padding: 15px;
 }
 
@@ -94,6 +105,7 @@
 .heather_selection_helper{
 	position:absolute;
 	z-index:99;
+	font-size:50px;
 }
 
 .heather_selection_marked{
@@ -101,7 +113,7 @@
 	background:lightblue;
 }
 
-.CodeMirror-fullscreen{
+.heather_editor_wrapper .CodeMirror-fullscreen{
 	z-index:9999999
 }
 
@@ -113,10 +125,6 @@
 	background-color:#fff
 }
 
-.heather_command_table{
-	border:1px solid #000;
-	padding:5px;
-}
 
 .heather_sync_view_editor {
 	width:50% !important;
@@ -146,4 +154,22 @@
 }
 .heather_sync_view_container a{
 	 pointer-events: none;
+}
+
+.heather_editor_wrapper .CodeMirror-dialog-top{
+	z-index:100
+}
+.heather_command_widget{
+	z-index:99
+}
+
+.heather_command_list{
+	list-style: none;
+	padding: 5px;
+    margin: 0;
+    border: 1px solid #000;
+}
+
+.heather_command_list .active{
+	background:#e8f2ff;
 }
