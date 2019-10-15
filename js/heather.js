@@ -67,7 +67,15 @@ var Heather = (function(){
 	var defaultConfig = {
 		markdownParser:{
 			html : true,
-			linkify:true
+			linkify:true,
+			callback:function(md){
+				if(window.markdownitTaskLists)
+					md.use(window.markdownitTaskLists);
+				if(window.markdownitKatex)
+					md.use(window.markdownitKatex);
+				if(window.markdownItAnchor)
+					md.use(window.markdownItAnchor);
+			}
 		},
 		commandBarEnable : Util.mobile,
 		partPreviewEnable : !Util.mobile,
@@ -76,6 +84,9 @@ var Heather = (function(){
 			dragDrop:true,
 			extraKeys:{
 				'Enter':'newlineAndIndentContinueMarkdownList'
+			},
+			callback:function(cm){
+				
 			}
 		},
 		autoRenderMill:300,
@@ -437,17 +448,20 @@ var Heather = (function(){
 	
 	Editor.prototype.addKeyMap = function(keyMap) {
 		var me = this;
+		var _keyMap = {};
 		for (const key in keyMap) {
 			var v = keyMap[key];
 			if(typeof v === 'string'){
 				var value = v;
-				keyMap[key] = function(){
+				_keyMap[key] = function(){
 					me.execCommand(value);
 				}
+			} else {
+				_keyMap[key] = v;
 			}
 		}
-		this.editor.addKeyMap(keyMap);
-		return keyMap;
+		this.editor.addKeyMap(_keyMap);
+		return _keyMap;
 	}	
 	
 	Editor.prototype.removeKeyMap = function(keyMap) {
@@ -613,6 +627,11 @@ var Heather = (function(){
 		editor.getRootNode = function(){
 			return node;
 		}
+		
+		if(config.callback){
+			config.callback(editor);
+		}
+		
 		return editor;
 	}
 	
@@ -1376,9 +1395,9 @@ var Heather = (function(){
                 }
 			}
 			var md = window.markdownit(config);
-			md.use(window.markdownitTaskLists);
-			md.use(window.markdownitKatex);
 			addLineNumberAttribute(md);
+			if(config.callback)
+				config.callback(md);
 			this.md = md;
 		}
 		
@@ -2790,6 +2809,7 @@ var Heather = (function(){
 		},
 		commands : commands,
 		lazyRes : lazyRes,
-		Util : Util
+		Util : Util,
+		defaultConfig : defaultConfig
 	};
 })();
