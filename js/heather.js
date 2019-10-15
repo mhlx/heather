@@ -545,13 +545,7 @@ var Heather = (function(){
 		var keyMap = Util.mac ? {
 			"Ctrl-B": 'bold',
 			"Ctrl-I": 'italic',
-			"Shift-Cmd-T": 'table',
-			"Ctrl-H": 'heading',
 			"Ctrl-L": 'link',
-			"Ctrl-Q": 'quote',
-			"Shift-Cmd-B": 'codeBlock',
-			"Shift-Cmd-U": 'uncheck',
-			"Shift-Cmd-I": 'check',
 			"Cmd-/": 'commands',
 			"Cmd-Enter": function() {
 				heather.setFullscreen(!heather.isFullscreen());
@@ -568,13 +562,7 @@ var Heather = (function(){
 		} : {
 			"Ctrl-B": 'bold',
 			"Ctrl-I": 'italic',
-			"Alt-T": 'table',
-			"Ctrl-H": 'heading',
 			"Ctrl-L": 'link',
-			"Ctrl-Q": 'quote',
-			"Alt-B": 'codeBlock',
-			"Alt-U": 'uncheck',
-			"Alt-I": 'check',
 			"Alt-/": 'commands',
 			"Ctrl-Enter": function() {
 				heather.setFullscreen(!heather.isFullscreen());
@@ -1258,10 +1246,9 @@ var Heather = (function(){
 
 			Widget.prototype.update = function() {
 				var editor = this.preview.editor;
-				var status = editor.selectionStatus();
 				
 				var html;
-				if(status.selected == ''){
+				if(!editor.somethingSelected()){
 					var nodeStatus = getNodeStatus(this.preview.heather);
 					if(nodeStatus == null){
 						this.hide();
@@ -1269,7 +1256,7 @@ var Heather = (function(){
 					};
 					html = nodeStatus.node.outerHTML;
 				} else if(this.preview.config.renderSelected === true){
-					html = Util.parseHTML(this.preview.heather.markdownParser.render(status.selected)).body.innerHTML;
+					html = Util.parseHTML(this.preview.heather.markdownParser.render(editor.getSelection())).body.innerHTML;
 				}
 				
 				if(!html){
@@ -1587,23 +1574,22 @@ var Heather = (function(){
                     var lang = selected.textContent;
                     var cursor = editor.getCursor();
                     var text = editor.getLine(cursor.line);
+					var startSpaceLength = text.length - text.trimStart().length;
+					var index = text.indexOf('``` ');
                     editor.setSelection({
                         line: cursor.line,
-                        ch: 4
+                        ch: index+4
                     }, {
                         line: cursor.line,
                         ch: text.length
                     });
                     editor.replaceSelection(lang);
-					var line = cursor.line+1;
-					if(line == editor.lineCount()){
-						editor.replaceRange('\n', {
-							line: cursor.line,
-							ch: 4+lang.length
-						});
+					if(cursor.line + 1 == editor.lineCount()){
+						editor.execCommand('newlineAndIndent');
+					} else {
+						editor.execCommand('goLineDown');
 					}
 					editor.focus();
-					editor.setCursor({line:line,ch:0})
                     state.hideOnNextChange = true;
                     hideTip();
                 }
@@ -1665,48 +1651,44 @@ var Heather = (function(){
                     hideTip();
                     if (editor.getSelection() == '') {
                         var cursor = editor.getCursor();
-                        if (cursor.ch >= 5) {
+						var text = editor.getLine(cursor.line).trimStart();
+                        if (text.substring(0,cursor.ch).startsWith("``` ")) {
                             if (hljsTimer) {
                                 clearTimeout(hljsTimer);
                             }
                             hljsTimer = setTimeout(function() {
-                                var text = editor.getLine(cursor.line);
-                                if (text.startsWith("``` ")) {
-                                    var lang = text.substring(4, cursor.ch).trimStart();
-                                    var tips = [];
-                                    for (var i = 0; i < hljsLanguages.length; i++) {
-                                        var hljsLang = hljsLanguages[i];
-                                        if (hljsLang.indexOf(lang) != -1) {
-                                            tips.push(hljsLang);
-                                        }
-                                    }
+								var lang = text.substring(4, cursor.ch).trimStart();
+								var tips = [];
+								for (var i = 0; i < hljsLanguages.length; i++) {
+									var hljsLang = hljsLanguages[i];
+									if (hljsLang.indexOf(lang) != -1) {
+										tips.push(hljsLang);
+									}
+								}
 
-                                    if (tips.length > 0) {
-                                        if (state.hideOnNextChange) {
-                                            state.hideOnNextChange = false;
-                                            return;
-                                        }
-                                        state.running = true;
-                                        state.cursor = cursor;
-                                        var html = '<table style="width:100%">';
-                                        for (var i = 0; i < tips.length; i++) {
-                                            var clazz = i == 0 ? 'selected' : '';
-                                            html += '<tr class="' + clazz + '"><td >' + tips[i] + '</td></tr>';
-                                        }
-                                        html += '</table>';
-                                        var pos = editor.cursorCoords(true,'local');
-                                        tip.innerHTML = html;
-                                        var height = tip.clientHeight;
-										tip.style.top = pos.top + editor.defaultTextHeight()+'px';
-										tip.style.left = pos.left+'px';
-										tip.style.visibility = 'visible';
-                                        editor.addKeyMap(languageInputKeyMap);
-                                    } else {
-                                        hideTip();
-                                    }
-                                } else {
-                                    hideTip();
-                                }
+								if (tips.length > 0) {
+									if (state.hideOnNextChange) {
+										state.hideOnNextChange = false;
+										return;
+									}
+									state.running = true;
+									state.cursor = cursor;
+									var html = '<table style="width:100%">';
+									for (var i = 0; i < tips.length; i++) {
+										var clazz = i == 0 ? 'selected' : '';
+										html += '<tr class="' + clazz + '"><td >' + tips[i] + '</td></tr>';
+									}
+									html += '</table>';
+									var pos = editor.cursorCoords(true,'local');
+									tip.innerHTML = html;
+									var height = tip.clientHeight;
+									tip.style.top = pos.top + editor.defaultTextHeight()+'px';
+									tip.style.left = pos.left+'px';
+									tip.style.visibility = 'visible';
+									editor.addKeyMap(languageInputKeyMap);
+								} else {
+									hideTip();
+								}
                             }, 100)
                         }
                     }
@@ -2020,10 +2002,6 @@ var Heather = (function(){
 			}
 			
 			heather.addKeyMap(keyMap);
-			
-			if(Util.mobile){
-				
-			}
 		}
 		
 		function tab(heather){
@@ -2034,7 +2012,7 @@ var Heather = (function(){
 				var nodes = heather.getNodesByLine(line);
 				var mappingElem;
 				if(nodes.length > 0)
-					mappingElem = nodes[0];
+					mappingElem = nodes[nodes.length-1];
 				if(mappingElem && mappingElem.tagName === 'TABLE'){
 					var startLine = parseInt(mappingElem.dataset.line);
 					var endLine = parseInt(mappingElem.dataset.endLine) - 1;
@@ -2196,6 +2174,9 @@ var Heather = (function(){
 			var lineIndex = rowIndex < 1 ? rowIndex : rowIndex+1;
 			var newLine = '';
 			var tr = node.querySelectorAll('tr')[rowIndex];
+			var rowLine = cm.getLine(startLine+rowIndex);
+			var startSpaceLength = rowLine.length - rowLine.trimStart().length;
+			newLine += " ".repeat(startSpaceLength);
 			for(var i=0;i<tr.children.length;i++){
 				newLine += '|    ';
 				if(i == tr.children.length - 1)
@@ -2207,7 +2188,7 @@ var Heather = (function(){
 				cm.focus();
 				cm.setCursor({
 					line:startLine+lineIndex,
-					ch:3
+					ch:startSpaceLength+3
 				});
 			} else {
 				var targetLine = startLine+lineIndex;
@@ -2219,7 +2200,7 @@ var Heather = (function(){
 				cm.focus();
 				cm.setCursor({
 					line:targetLine+1,
-					ch:3
+					ch:startSpaceLength+3
 				});
 			}
 		}
@@ -2382,25 +2363,9 @@ var Heather = (function(){
 				}
 			}
 		}
-		var status = cm.selectionStatus();
-		selectionBreak(status, function(text) {
-			var prefix = '';
-			for (var i = 0; i < heading; i++) {
-				prefix += '#';
-			}
-			prefix += ' ';
-			return prefix + text;
-		});
-		if (status.selected == '') {
-			cm.replaceRange(status.text, cm.getCursor());
-			cm.focus();
-			cm.setCursor({
-				line: status.startLine,
-				ch: heading + 1
-			});
-		} else {
-			cm.replaceSelection(status.text);
-		}
+		
+		cm.replaceSelection("#".repeat(heading)+" "+cm.getSelection());
+		cm.focus();
 	}
 	
 	commands['commands'] = function(heather){
@@ -2447,6 +2412,7 @@ var Heather = (function(){
 	
 	commands['table'] = function(heather){
 		var cm = heather.editor;
+		var cursor = cm.getCursor();
 		var rows = cols = 2;
 		var text = '';
 		for (var i = 0; i < cols; i++) {
@@ -2454,6 +2420,8 @@ var Heather = (function(){
 		}
 		text += '|'
 		text += "\n";
+		var prefix = " ".repeat(cursor.ch);
+		text += prefix;
 		for (var i = 0; i < cols; i++) {
 			text += '|  --  ';
 		}
@@ -2461,6 +2429,7 @@ var Heather = (function(){
 		if (rows > 1) {
 			text += '\n';
 			for (var i = 0; i < rows - 1; i++) {
+				text += prefix;
 				for (var j = 0; j < cols; j++) {
 					text += '|    ';
 				}
@@ -2469,13 +2438,10 @@ var Heather = (function(){
 					text += "\n";
 			}
 		}
-		var cursor = cm.getCursor();
-		var status = cm.selectionStatus();
-		selectionBreak(status, function(selected) {
-			return text;
-		});
-		cm.replaceSelection(status.text);
-		var lineStr = cm.getLine(status.startLine);
+		
+		cm.replaceSelection(text);
+		
+		var lineStr = cm.getLine(cursor.line);
 		var startCh,endCh;
 		
 		for(var i=0;i<lineStr.length;i++){
@@ -2491,13 +2457,14 @@ var Heather = (function(){
 		if(!Util.isUndefined(startCh) && !Util.isUndefined(endCh)){
 			var ch = startCh + (endCh - startCh)/2;
 			cm.focus();
-			cm.setCursor({line : status.startLine,ch:ch});
+			cm.setCursor({line : cursor.line,ch:ch});
 		}	
 	}
 	
 	commands['tasklist'] = function(heather){
 		var cm = heather.editor;
-		insertTaskList(cm, false);
+		cm.replaceSelection('- [ ] '+cm.getSelection());
+		cm.focus();
 	}
 	
 	commands['code'] = function(heather){
@@ -2520,21 +2487,19 @@ var Heather = (function(){
 	
 	commands['codeBlock'] = function(heather){
 		var cm = heather.editor;
-		var status = cm.selectionStatus();
-		selectionBreak(status, function(text) {
-			var newText = "``` ";
-			newText += '\n';
-			newText += text;
-			newText += '\n'
-			newText += "```";
-			return newText;
-		});
+		var cursor = cm.getCursor();
+		var prefix = " ".repeat(cursor.ch);
+		var newText = "``` ";
+		newText += '\n';
+		newText += prefix+cm.getSelection();
+		newText += '\n'
+		newText += prefix+"```";
+		cm.replaceSelection(newText);
 		cm.focus();
-		cm.replaceSelection(status.text);
 		cm.setCursor({
-			line: status.startLine + 1,
-			ch: 0
-		});	
+			line:cursor.line+1,
+			ch : cursor.ch
+		});
 	}
 	
 	commands['link'] = function(heather){
@@ -2577,61 +2542,57 @@ var Heather = (function(){
 	
 	commands['mermaid'] = function(heather){
 		var cm = heather.editor;
-		var status = cm.selectionStatus();
-		selectionBreak(status, function(text) {
-			var newText = "``` mermaid";
-			newText += '\n';
-			newText += text;
-			newText += '\n'
-			newText += "```";
-			return newText;
-		});
+		var cursor = cm.getCursor();
+		var prefix = " ".repeat(cursor.ch);
+		var newText = "``` mermaid";
+		newText += '\n';
+		newText += prefix+cm.getSelection();
+		newText += '\n'
+		newText += prefix+"```";
+		cm.replaceSelection(newText);
 		cm.focus();
-		cm.replaceSelection(status.text);
 		cm.setCursor({
-			line: status.startLine + 1,
-			ch: 0
-		});
+			line:cursor.line+1,
+			ch : cursor.ch
+		})
 	}
 	
 	commands['mathBlock'] = function(heather){
 		var cm = heather.editor;
-		var status = cm.selectionStatus();
-		selectionBreak(status, function(text) {
-			return '$$\n' + text+"\n$$";
-		});
-		if (status.selected == '') {
-			cm.replaceRange(status.text, cm.getCursor());
-			cm.focus();
-			cm.setCursor({
-				line: status.startLine+1,
-				ch: 0
-			});
-		} else {
-			cm.replaceSelection(status.text);
-		}
+		var cursor = cm.getCursor();
+		var prefix = " ".repeat(cursor.ch);
+		var newText = "$$";
+		newText += '\n';
+		newText += prefix+cm.getSelection();
+		newText += '\n'
+		newText += prefix+"$$";
+		cm.replaceSelection(newText);
+		cm.focus();
+		cm.setCursor({
+			line:cursor.line+1,
+			ch : cursor.ch
+		})
 	}
 	
 	commands['quote'] = function(heather){
 		var cm = heather.editor;
-		var status = cm.selectionStatus();
-		selectionBreak(status, function(text) {
-			var lines = [];
-			for(const line of text.split('\n')){
-				lines.push("> "+line);
+		var cursor = cm.getCursor();
+		var prefix = " ".repeat(cursor.ch);
+		var text = cm.getSelection();
+		var lines = text.split('\n');
+		var newText = '';
+		for(var i=0;i<lines.length;i++){
+			var line = lines[i].trimStart();
+			if(i > 0){
+				newText += prefix + '> ' + line
+			} else {
+				newText += "> "+line;
 			}
-			return lines.join('\n');
-		});
-		if (status.selected == '') {
-			cm.replaceRange(status.text, cm.getCursor());
-			cm.focus();
-			cm.setCursor({
-				line: status.startLine,
-				ch: 2
-			});
-		} else {
-			cm.replaceSelection(status.text);
+			if(i < lines.length - 1)
+				newText += '\n'
 		}
+		cm.replaceSelection(newText);
+		cm.focus();
 	}
 	
 	commands['bold'] = function(heather){
@@ -2673,139 +2634,6 @@ var Heather = (function(){
 			cm.replaceSelection("*" + text + "*");
 		}
 	}
-	
-	CodeMirror.prototype.selectionStatus = function() {
-        var status = {
-            selected: '',
-            startLine: -1,
-            startCh: -1,
-            endLine: -1,
-            endCh: -1,
-            prev: '',
-            next: '',
-            prevLine: '',
-            nextLine: ''
-        }
-        var startCursor = this.getCursor(true);
-        var endCursor = this.getCursor(false);
-
-        status.startLine = startCursor.line;
-        status.endLine = endCursor.line;
-        status.startCh = startCursor.ch;
-        status.endCh = endCursor.ch;
-        status.prevLine = startCursor.line == 0 ? '' : this.getLine(startCursor.line - 1);
-        status.nextLine = endCursor.line == this.lineCount() - 1 ? '' : this.getLine(endCursor.line + 1);
-
-        var startLine = this.getLine(status.startLine);
-        var text = this.getSelection();
-        if (text == '') {
-            if (startCursor.ch == 0) {
-                status.next = startLine;
-            } else {
-                status.prev = startLine.substring(0, startCursor.ch);
-                status.next = startLine.substring(startCursor.ch, startLine.length);
-            }
-        } else {
-
-            var endLine = this.getLine(status.endLine);
-            if (status.startCh == 0) {
-                status.prev = '';
-            } else {
-                status.prev = startLine.substring(0, status.startCh);
-            }
-            if (status.endCh == endLine.length) {
-                status.next = '';
-            } else {
-                status.next = endLine.substring(status.endCh, endLine.length);
-            }
-        }
-        status.selected = text;
-        return status;
-    }
-	
-	
-	function insertTaskList(editor, checked) {
-        var status = editor.selectionStatus();
-        var text = '';
-        if (status.prev != '') {
-            if (status.next == '') {
-                if (!status.prev.startsWith("- [ ] ") && !status.prev.startsWith("- [x] ")) {
-                    text += '\n\n';
-                } else {
-                    text += '\n';
-                }
-            } else {
-                text += '\n\n';
-            }
-        } else {
-            if (status.prevLine != '' && !status.prevLine.startsWith("- [ ] ") && !status.prevLine.startsWith("- [x] ")) {
-                text += '\n';
-            }
-        }
-        var prefix = checked ? '- [x]  ' : '- [ ]  ';
-		
-		var lines = [];
-		for(const line of status.selected.split('\n')){
-			lines.push(prefix + line);
-		}
-		text += lines.join('\n');
-		
-        if (status.next != '') {
-            if (status.prev == '') {
-                if (!status.next.startsWith("- [ ] ") && !status.next.startsWith("- [x] ")) {
-                    text += '\n\n';
-                } else {
-                    text += '\n';
-                }
-            } else {
-                text += '\n\n';
-            }
-        } else {
-            if (status.nextLine != '' && !status.nextLine.startsWith("- [ ] ") && !status.nextLine.startsWith("- [x] ")) {
-                text += '\n';
-            }
-        }
-		var line = editor.getCursor(true).line;
-		var ch = 0;
-		for(const lineStr of text.split('\n')){
-			if(lineStr == ''){
-				line ++ ;
-			} else {
-				ch = lineStr.length;
-				break;
-			}
-		}
-        editor.replaceSelection(text);
-		editor.focus();
-		editor.setCursor({line:line,ch:ch});
-    }
-	
-	function selectionBreak(status, callback) {
-        var _text = '';
-        if (status.prev != '') {
-            _text += '\n\n';
-            status.startLine += 2;
-        } else {
-            if (status.prevLine != '') {
-                _text += '\n';
-                status.startLine += 1;
-            }
-        }
-        if (callback) {
-            _text += callback(status.selected);
-        }
-        if (status.next != '') {
-            _text += '\n\n';
-            status.endLine += 2;
-        } else {
-            if (status.nextLine != '') {
-                _text += '\n';
-                status.endLine += 1;
-            }
-        }
-        status.text = _text;
-        return status;
-    }
 	
 	function renderKatexAndMermaid(element,config) {
 		LazyLoader.loadKatex(function() {
