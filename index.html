@@ -27,7 +27,6 @@ font-size: 16px;
 <link rel="stylesheet" href="css/style.css">
 
 <div style="padding:15%">
-<button id="sync_preview_btn">同步预览</button>
 <textarea id="editor" style="display:none"></textarea></div>
 <script src="codemirror/lib/codemirror.js"></script>
 <script src="codemirror//addon/mode/overlay.js"></script>
@@ -48,57 +47,68 @@ font-size: 16px;
 <script src="js/morphdom-umd.min.js"></script>
 <script src="js/heather.js"></script>
 <script>
-		var config = {
-			upload:{
-				url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
-				uploadFinish:function(resp){
-					return {
-						type : 'video',
-						url : 'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov',
-						poster:'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov/960'
-					};
-				},
-				beforeUpload:function(upload,file){
-					upload.start();
-				}
+	var config = {
+		upload:{
+			url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
+			uploadFinish:function(resp){
+				return {
+					type : 'video',
+					url : 'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov',
+					poster:'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov/960'
+				};
+			},
+			beforeUpload:function(upload,file){
+				upload.start();
 			}
-		};
-		
-		
-		var heather = Heather.create(document.getElementById("editor"),config);
-		heather.setFullscreen(true);
-		
-		var toolbar = heather.getToolbar();
-		toolbar.addIcon('fa fa-expand heather_icon',function(elem){
-			heather.setFullscreen(!heather.isFullscreen());
-		});
-		toolbar.addIcon('fas fa-eye heather_icon', function() {
-			heather.setPreview(true);
-		});
-		
-		document.getElementById('sync_preview_btn').addEventListener('click',function(){
-			heather.setSyncView(true);
-		})
-		
-		var selectionHelperOpen = false;
-		heather.on('selectionHelperChange',function(sc){
-			selectionHelperOpen = sc;
-		});
-		
-		
-		
-		if(Heather.Util.mobile){
-			toolbar.addIcon('fas fa-arrows-alt heather_icon', function() {
-				if(!selectionHelperOpen){
-					heather.openSelectionHelper();
-				} else {
-					heather.closeSelectionHelper();
-				}
-			});
 		}
-		
-	//	heather.setSyncView(true);
-		
+	};
+	
+	
+	var heather = Heather.create(document.getElementById("editor"),config);
+	
+	heather.on('fullscreenChange',function(fs){
+		heather.setSyncView(fs);
+	})
+	
+	heather.setFullscreen(true);
+	
+	var toolbar = heather.getToolbar();
+	toolbar.addIcon('fa fa-expand heather_icon',function(elem){
+		heather.setFullscreen(!heather.isFullscreen());
+	});
+	toolbar.addIcon('fas fa-eye heather_icon', function() {
+		heather.setPreview(true);
+	});
+	
+	var selectionHelperOpen = false;
+	heather.on('selectionHelperChange',function(sc){
+		selectionHelperOpen = sc;
+	})
+	
+	
+	if(Heather.Util.mobile){
+		toolbar.addIcon('fas fa-arrows-alt heather_icon', function() {
+			if(!selectionHelperOpen){
+				heather.openSelectionHelper();
+			} else {
+				heather.closeSelectionHelper();
+			}
+		});
+	}
+	
+	var storage = localStorage;
+	
+	heather.on('rendered',function(value){
+		storage.setItem('markdown',value);
+		console.log(heather.getToc());
+	});
+	
+	var old = storage.getItem('markdown');
+	if(old != null){
+		heather.setValue(old);
+	}
+	
+	
 </script>
 </body>
 </html>

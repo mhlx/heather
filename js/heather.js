@@ -119,6 +119,10 @@ var Heather = (function(){
 		return this.editor.getValue();
 	}
 	
+	Editor.prototype.getHtmlNode = function(){
+		return this.node;
+	}	
+	
 	Editor.prototype.setValue = function(value){
 		this.editor.setValue(value);
 	}	
@@ -223,6 +227,10 @@ var Heather = (function(){
 	Editor.prototype.getToolbar = function(){
 		return this.toolbar;
 	}
+	
+	Editor.prototype.getCommandBar = function(){
+		return this.commandBar;
+	}	
 	
 	Editor.prototype.isFullscreen = function(){
 		return this.fullscreen === true;
@@ -439,15 +447,11 @@ var Heather = (function(){
 			}
 		}
 		this.editor.addKeyMap(keyMap);
+		return keyMap;
 	}	
 	
-	Editor.prototype.unbindKey = function(keys) {
-		var keyMaps = this.editor.state.keyMaps;
-		for (var i = 0; i < keys.length; i++) {
-			for (var j = 0; j < keyMaps.length; j++) {
-				delete keyMaps[j][keys[i]];
-			}
-		}
+	Editor.prototype.removeKeyMap = function(keyMap) {
+		this.editor.addKeyMap(keyMap);
 	}
 	
 	Editor.prototype.render = function(){
@@ -543,9 +547,9 @@ var Heather = (function(){
 		
 	function initKeyMap(heather) {
 		var keyMap = Util.mac ? {
-			"Ctrl-B": 'bold',
-			"Ctrl-I": 'italic',
-			"Ctrl-L": 'link',
+			"Cmd-B": 'bold',
+			"Cmd-I": 'italic',
+			"Cmd-L": 'link',
 			"Cmd-/": 'commands',
 			"Cmd-Enter": function() {
 				heather.setFullscreen(!heather.isFullscreen());
@@ -1056,6 +1060,10 @@ var Heather = (function(){
 			} else {
 				this.bar.style.top = (pos.top + distance)+'px';
 			}
+		}
+		
+		CommandBar.prototype.getBarHelper = function(){
+			return this.bar;
 		}
 		
 		CommandBar.prototype.enable = function(){
@@ -2346,7 +2354,7 @@ var Heather = (function(){
 		var cm = heather.editor;
 		var line = cm.getCursor().line;
 		var heading = 1;
-		if(line > 0 && heather.node){
+		if(heather.node){
 			var nodes = heather.node.children;
 			for(var i=nodes.length-1;i>=0;i--){
 				var node = nodes[i];
