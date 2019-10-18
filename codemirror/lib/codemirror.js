@@ -9616,11 +9616,11 @@
 
   function fromTextArea(textarea, options) {
     var place = function (node) { return textarea.parentNode.insertBefore(node, textarea.nextSibling); };
-	fromTextArea(textarea,options,place);
+	return _fromTextArea(textarea,options,place);
   }
 
 
-  function fromTextArea(textarea, options,place) {
+  function _fromTextArea(textarea, options,place) {
     options = options ? copyObj(options) : {};
     options.value = textarea.value;
     if (!options.tabindex && textarea.tabIndex)
@@ -9760,6 +9760,7 @@
   };
 
   CodeMirror.fromTextArea = fromTextArea;
+  CodeMirror._fromTextArea = _fromTextArea;
 
   addLegacyProps(CodeMirror);
 

@@ -623,7 +623,7 @@ var Heather = (function(){
 		node.classList.add('heather_editor_wrapper');
 		textarea.after(node);
 		
-		var editor = CodeMirror.fromTextArea(textarea, config,node);
+		var editor = CodeMirror._fromTextArea(textarea, config,node);
 		editor.getRootNode = function(){
 			return node;
 		}
@@ -1635,6 +1635,7 @@ var Heather = (function(){
                         if (prev != null) {
                             current.classList.remove('selected');
                             prev.classList.add('selected');
+							tip.scrollTop = prev.offsetTop;
                         }
                     },
                     'Down': function() {
@@ -1643,6 +1644,7 @@ var Heather = (function(){
                         if (next != null) {
                             current.classList.remove('selected');
                             next.classList.add('selected');
+							tip.scrollTop = next.offsetTop;
                         }
                     },
                     'Enter': function(editor) {
@@ -1679,12 +1681,15 @@ var Heather = (function(){
                     if (editor.getSelection() == '') {
                         var cursor = editor.getCursor();
 						var text = editor.getLine(cursor.line).trimStart();
-                        if (text.substring(0,cursor.ch).startsWith("``` ")) {
+						var subLeft = text.substring(0,cursor.ch);
+						var inQuote = subLeft.startsWith("> ``` ");
+                        if (subLeft.startsWith("``` ") || inQuote) {
                             if (hljsTimer) {
                                 clearTimeout(hljsTimer);
                             }
                             hljsTimer = setTimeout(function() {
-								var lang = text.substring(4, cursor.ch).trimStart();
+								var lang = text.substring(inQuote ? 6 : 4, cursor.ch).trimStart();
+								if(lang == '') return ;
 								var tips = [];
 								for (var i = 0; i < hljsLanguages.length; i++) {
 									var hljsLang = hljsLanguages[i];
@@ -2203,19 +2208,21 @@ var Heather = (function(){
 			var tr = node.querySelectorAll('tr')[rowIndex];
 			var rowLine = cm.getLine(startLine+rowIndex);
 			var startSpaceLength = rowLine.length - rowLine.trimStart().length;
-			newLine += " ".repeat(startSpaceLength);
+			var inQuote = cm.getLine(startLine).trimStart().startsWith("> ");
+			newLine += inQuote ? " ".repeat(Math.max(0,startSpaceLength))+"> " :  " ".repeat(startSpaceLength);
 			for(var i=0;i<tr.children.length;i++){
 				newLine += '|    ';
 				if(i == tr.children.length - 1)
 					newLine += '|';
 			}
+			var newCh = startSpaceLength+3+(inQuote?2 : 0);
 			if(before === true){
 				cm.setSelection({line:startLine+lineIndex,ch:0});
 				cm.replaceSelection(newLine+'\n');
 				cm.focus();
 				cm.setCursor({
 					line:startLine+lineIndex,
-					ch:startSpaceLength+3
+					ch:newCh
 				});
 			} else {
 				var targetLine = startLine+lineIndex;
@@ -2227,7 +2234,7 @@ var Heather = (function(){
 				cm.focus();
 				cm.setCursor({
 					line:targetLine+1,
-					ch:startSpaceLength+3
+					ch:newCh
 				});
 			}
 		}
@@ -2268,12 +2275,14 @@ var Heather = (function(){
 				if (prev != null) {
 					current.classList.remove('active');
 					prev.classList.add('active');
+					ul.scrollTop = prev.offsetTop;
 				} else {
 					var lis = ul.querySelectorAll('li');
 					if(lis.length > 0){
 						var last = lis[lis.length - 1];
 						current.classList.remove('active');
 						last.classList.add('active');
+						ul.scrollTop = last.offsetTop;
 					}
 				}
 			},
@@ -2283,11 +2292,13 @@ var Heather = (function(){
 				if (next != null) {
 					current.classList.remove('active');
 					next.classList.add('active');
+					ul.scrollTop = next.offsetTop;
 				} else {
 					var li = ul.querySelector('li');
 					if(li != null){
 						current.classList.remove('active');
 						li.classList.add('active');
+						ul.scrollTop = li.offsetTop;
 					}
 				}
 			},
@@ -2447,7 +2458,7 @@ var Heather = (function(){
 		}
 		text += '|'
 		text += "\n";
-		var prefix = " ".repeat(cursor.ch);
+		var prefix = createPrefix(cm,cursor);
 		text += prefix;
 		for (var i = 0; i < cols; i++) {
 			text += '|  --  ';
@@ -2515,7 +2526,7 @@ var Heather = (function(){
 	commands['codeBlock'] = function(heather){
 		var cm = heather.editor;
 		var cursor = cm.getCursor();
-		var prefix = " ".repeat(cursor.ch);
+		var prefix = createPrefix(cm,cursor);
 		var newText = "``` ";
 		newText += '\n';
 		newText += prefix+cm.getSelection();
@@ -2570,7 +2581,7 @@ var Heather = (function(){
 	commands['mermaid'] = function(heather){
 		var cm = heather.editor;
 		var cursor = cm.getCursor();
-		var prefix = " ".repeat(cursor.ch);
+		var prefix = createPrefix(cm,cursor);
 		var newText = "``` mermaid";
 		newText += '\n';
 		newText += prefix+cm.getSelection();
@@ -2587,7 +2598,7 @@ var Heather = (function(){
 	commands['mathBlock'] = function(heather){
 		var cm = heather.editor;
 		var cursor = cm.getCursor();
-		var prefix = " ".repeat(cursor.ch);
+		var prefix = createPrefix(cm,cursor);
 		var newText = "$$";
 		newText += '\n';
 		newText += prefix+cm.getSelection();
@@ -2604,7 +2615,7 @@ var Heather = (function(){
 	commands['quote'] = function(heather){
 		var cm = heather.editor;
 		var cursor = cm.getCursor();
-		var prefix = " ".repeat(cursor.ch);
+		var prefix = createPrefix(cm,cursor);
 		var text = cm.getSelection();
 		var lines = text.split('\n');
 		var newText = '';
@@ -2801,6 +2812,21 @@ var Heather = (function(){
 	
 	function createStamp(){
 		return Date.now() + Math.random();
+	}
+	
+	function isAtQuotePoint(cm,cursor){
+		return cm.getLine(cursor.line).substring(0,cursor.ch).trimStart() == '> ';
+	}
+	
+	function createPrefix(cm,cursor){
+		var prefix;
+		var inQuote = isAtQuotePoint(cm,cursor);
+		if(inQuote){
+			prefix = " ".repeat(Math.max(cursor.ch-2,0))+"> ";
+		} else {
+			prefix = " ".repeat(cursor.ch);
+		}
+		return prefix;
 	}
 	
 	return {
