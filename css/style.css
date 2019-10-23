@@ -72,9 +72,7 @@
 	background: #fff;
 	top: 0;
 	left: 0;
-	z-index: 100;
-	/*bigger than heather_toolbar_bar*/
-	padding: 15px;
+	z-index: 100;/*bigger than heather_toolbar*/
 }
 
 .heather_preview_close {
@@ -109,12 +107,6 @@
 .heather_part_preview video {
 	max-width: 200px;
 	height: auto;
-}
-
-.heather_selection_helper {
-	position: absolute;
-	z-index: 99;
-	font-size: 50px;
 }
 
 .heather_selection_marked {
@@ -171,7 +163,8 @@
 }
 
 .heather_command_widget {
-	z-index: 99
+	z-index: 99;
+	background-color:white
 }
 
 .heather_command_list {
@@ -183,4 +176,64 @@
 
 .heather_command_list .active {
 	background: #e8f2ff;
+}
+
+@media (max-width :768px) {
+	.heather_command_list{
+		font-size:24px
+	}
+}
+
+.heather_selection_helper{
+	position: absolute;
+	z-index: 99;
+	width:60%;
+	left:20%;
+	right:20%;
+	-webkit-user-select: none;
+    -moz-user-select: none;
+    -khtml-user-select: none; 
+    -ms-user-select: none; 
+	opacity:0.7
+}
+
+.heather_selection_helper_wrap {
+  position: absolute;
+  top: 0;
+  left: 25%;
+  height: 25%;
+  width: 50%;
+  overflow: hidden;
+}
+.heather_selection_helper_touch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 200%;
+  width: 200%;
+  transform: rotate(45deg);
+  transform-origin: top left;
+  background: gray;
+
+}
+.heather_selection_helper_wrap:nth-child(2) {
+  transform: rotate(90deg);
+  transform-origin: top left;
+  top: 25%;
+  left: 100%;
+}
+.heather_selection_helper_wrap:nth-child(3) {
+  transform: rotate(180deg);
+  transform-origin: top left;
+  top: 100%;
+  left: 75%;
+}
+.heather_selection_helper_wrap:nth-child(4) {
+  transform: rotate(-90deg);
+  transform-origin: top left;
+  top: 75%;
+  left: 0;
+}
+.heather_selection_helper_touch:hover {
+  background: tomato;
 }

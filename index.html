@@ -25,9 +25,7 @@ font-size: 16px;
 <link rel="stylesheet" href="css/markdown.css">
 <link rel="stylesheet" href="fontawesome-free/css/all.min.css">
 <link rel="stylesheet" href="css/style.css">
-
-<div style="padding:15%">
-<textarea id="editor" style="display:none"></textarea></div>
+<textarea id="editor" style="display:none"></textarea>
 <script src="codemirror/lib/codemirror.js"></script>
 <script src="codemirror//addon/mode/overlay.js"></script>
 <script src="codemirror/mode/markdown/markdown.js"></script>
@@ -66,11 +64,13 @@ font-size: 16px;
 	
 	var heather = Heather.create(document.getElementById("editor"),config);
 	
-	heather.on('fullscreenChange',function(fs){
-		heather.setSyncView(fs);
-	})
+	if(!Heather.Util.mobile){
+		heather.on('fullscreenChange',function(fs){
+			heather.setSyncView(fs);
+		})
+	}
 	
-	heather.setFullscreen(true);
+	
 	
 	var toolbar = heather.getToolbar();
 	toolbar.addIcon('fa fa-expand heather_icon',function(elem){
@@ -79,6 +79,7 @@ font-size: 16px;
 	toolbar.addIcon('fas fa-eye heather_icon', function() {
 		heather.setPreview(true);
 	});
+
 	
 	var selectionHelperOpen = false;
 	heather.on('selectionHelperChange',function(sc){
@@ -100,15 +101,14 @@ font-size: 16px;
 	
 	heather.on('rendered',function(value){
 		storage.setItem('markdown',value);
-		console.log(heather.getToc());
 	});
 	
 	var old = storage.getItem('markdown');
 	if(old != null){
 		heather.setValue(old);
 	}
-	
-	
+
+	heather.setFullscreen(true);
 </script>
 </body>
 </html>

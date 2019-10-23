@@ -173,10 +173,28 @@
     }
   }
 
-  var Delayed = function() {this.id = null;};
+  var Delayed = function() {
+    this.id = null;
+    this.f = null;
+    this.time = 0;
+    this.handler = bind(this.onTimeout, this);
+  };
+  Delayed.prototype.onTimeout = function (self) {
+    self.id = 0;
+    if (self.time <= +new Date) {
+      self.f();
+    } else {
+      setTimeout(self.handler, self.time - +new Date);
+    }
+  };
   Delayed.prototype.set = function (ms, f) {
-    clearTimeout(this.id);
-    this.id = setTimeout(f, ms);
+    this.f = f;
+    var time = +new Date + ms;
+    if (!this.id || time < this.time) {
+      clearTimeout(this.id);
+      this.id = setTimeout(this.handler, ms);
+      this.time = time;
+    }
   };
 
   function indexOf(array, elt) {
@@ -7301,6 +7319,7 @@
     if (signalDOMEvent(cm, e) || display.activeTouch && display.input.supportsTouch()) { return }
     display.input.ensurePolled();
     display.shift = e.shiftKey;
+
     if (eventInWidget(display, e)) {
       if (!webkit) {
         // Briefly turn off draggability, to allow widgets to do
@@ -8598,6 +8617,7 @@
           ++lineNo$$1;
         });
         this.curOp.forceUpdate = true;
+        signal(this, "resize", this);
         signal(this, "refresh", this);
       }),
 
@@ -9613,12 +9633,11 @@
   TextareaInput.prototype.setUneditable = function () {};
 
   TextareaInput.prototype.needsContentAttribute = false;
-
-  function fromTextArea(textarea, options) {
-    var place = function (node) { return textarea.parentNode.insertBefore(node, textarea.nextSibling); };
+  
+  function fromTextArea(textarea,options){
+	var place = function (node) { return textarea.parentNode.insertBefore(node, textarea.nextSibling); };
 	return _fromTextArea(textarea,options,place);
   }
-
 
   function _fromTextArea(textarea, options,place) {
     options = options ? copyObj(options) : {};
@@ -9672,10 +9691,10 @@
     };
 
     textarea.style.display = "none";
-    var cm = CodeMirror(place,
-      options);
+	var cm = CodeMirror(place,options);
     return cm
   }
+
   function addLegacyProps(CodeMirror) {
     CodeMirror.off = off;
     CodeMirror.on = on;
@@ -9764,7 +9783,7 @@
 
   addLegacyProps(CodeMirror);
 
-  CodeMirror.version = "5.49.0";
+  CodeMirror.version = "5.49.2";
 
   return CodeMirror;
 
