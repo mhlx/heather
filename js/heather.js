@@ -1616,8 +1616,7 @@ var Heather = (function(){
 				},tip)
                 var state = {
                     running: false,
-                    cursor: undefined,
-                    hideOnNextChange: false
+                    cursor: undefined
                 };
 				
 				tip.addEventListener('click',function(e){
@@ -1646,7 +1645,6 @@ var Heather = (function(){
 						editor.execCommand('goLineDown');
 					}
 					editor.focus();
-                    state.hideOnNextChange = true;
                     hideTip();
                 }
 
@@ -1711,13 +1709,20 @@ var Heather = (function(){
                         var cursor = editor.getCursor();
 						var text = editor.getLine(cursor.line).trimStart();
 						var subLeft = text.substring(0,cursor.ch);
-						var inQuote = subLeft.startsWith("> ``` ");
-                        if (subLeft.startsWith("``` ") || inQuote) {
+						var quote = {size:0,tip:false};
+						while(subLeft.startsWith("> ")){
+							quote.size ++;
+							subLeft = subLeft.substring(2);
+						}
+						if(quote.size > 0 && subLeft.startsWith("``` ")){
+							quote.tip = true;
+						}
+                        if (quote.tip) {
                             if (hljsTimer) {
                                 clearTimeout(hljsTimer);
                             }
                             hljsTimer = setTimeout(function() {
-								var lang = text.substring(inQuote ? 6 : 4, cursor.ch).trimStart();
+								var lang = text.substring(4 + quote.size*2, cursor.ch).trimStart();
 								if(lang == '') return ;
 								var tips = [];
 								for (var i = 0; i < hljsLanguages.length; i++) {
@@ -1726,12 +1731,7 @@ var Heather = (function(){
 										tips.push(hljsLang);
 									}
 								}
-
 								if (tips.length > 0) {
-									if (state.hideOnNextChange) {
-										state.hideOnNextChange = false;
-										return;
-									}
 									state.running = true;
 									state.cursor = cursor;
 									var html = '<table style="width:100%">';
@@ -2241,16 +2241,18 @@ var Heather = (function(){
 			var tr = node.querySelectorAll('tr')[rowIndex];
 			var rowLine = cm.getLine(startLine+rowIndex);
 			var startSpaceLength = rowLine.length - rowLine.trimStart().length;
-			var inQuote = cm.getLine(startLine).trimStart().startsWith("> ");
-			newLine += inQuote ? " ".repeat(Math.max(0,startSpaceLength))+"> " :  " ".repeat(startSpaceLength);
+			var quoteSize = getQuoteSizeAtLine(cm,startLine);
+			newLine += quoteSize>0 ? " ".repeat(Math.max(0,startSpaceLength))+"> ".repeat(quoteSize) :  " ".repeat(startSpaceLength);
 			for(var i=0;i<tr.children.length;i++){
 				newLine += '|    ';
 				if(i == tr.children.length - 1)
 					newLine += '|';
 			}
-			var newCh = startSpaceLength+3+(inQuote?2 : 0);
+			var newCh = startSpaceLength+3+quoteSize*2;
+			var targetLine = startLine+lineIndex;
 			if(before === true){
-				cm.setSelection({line:startLine+lineIndex,ch:0});
+				if(targetLine >= cm.lineCount()) return ;
+				cm.setSelection({line:targetLine,ch:0});
 				cm.replaceSelection(newLine+'\n');
 				cm.focus();
 				cm.setCursor({
@@ -2258,10 +2260,10 @@ var Heather = (function(){
 					ch:newCh
 				});
 			} else {
-				var targetLine = startLine+lineIndex;
 				if(rowIndex == 0){
 					targetLine = startLine + 1;
 				}
+				if(targetLine >= cm.lineCount()) return ;
 				cm.setSelection({line:targetLine,ch:cm.getLine(targetLine).length});
 				cm.replaceSelection('\n'+newLine);
 				cm.focus();
@@ -2271,7 +2273,6 @@ var Heather = (function(){
 				});
 			}
 		}
-		
 		
 		return TableHelper;
 	
@@ -2853,15 +2854,33 @@ var Heather = (function(){
 		return elem;
 	}	
 	
-	function isAtQuotePoint(cm,cursor){
-		return cm.getLine(cursor.line).substring(0,cursor.ch).trimStart() == '> ';
+	function getQuoteSizeAtLine(cm,lineNumber){
+		var lineStr = cm.getLine(lineNumber);
+		return getQuoteSize(lineStr);
+	}
+	
+	function getQuoteSizeAtPoint(cm,cursor){
+		var left = cm.getLine(cursor.line).substring(0,cursor.ch).trimStart();
+		return getQuoteSize(left);
+	}
+	
+	function getQuoteSize(str){
+		//> => 1
+		//> > => 2
+		//> 1 > 1 => 1
+		var size = 0;
+		while(str.startsWith("> ")){
+			size ++;
+			str = str.substring(2);
+		}
+		return size;
 	}
 	
 	function createPrefix(cm,cursor){
 		var prefix;
-		var inQuote = isAtQuotePoint(cm,cursor);
-		if(inQuote){
-			prefix = " ".repeat(Math.max(cursor.ch-2,0))+"> ";
+		var size = getQuoteSizeAtPoint(cm,cursor);
+		if(size > 0){
+			prefix = " ".repeat(Math.max(cursor.ch-2*size,0))+"> ".repeat(size);
 		} else {
 			prefix = " ".repeat(cursor.ch);
 		}
