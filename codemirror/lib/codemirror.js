@@ -7266,7 +7266,6 @@
   }
 
   function onKeyPress(e) {
-	if(e.code === 'Unidentified') return ;//TODO ios 13+ can not input emoji character
     var cm = this;
     if (eventInWidget(cm.display, e) || signalDOMEvent(cm, e) || e.ctrlKey && !e.altKey || mac && e.metaKey) { return }
     var keyCode = e.keyCode, charCode = e.charCode;
@@ -7317,7 +7316,7 @@
   function onMouseDown(e) {
     var cm = this, display = cm.display;
     if (signalDOMEvent(cm, e) || display.activeTouch && display.input.supportsTouch()) { return }
-    display.input.ensurePolled();
+    display.input.ensurePolled(true);
     display.shift = e.shiftKey;
 
     if (eventInWidget(display, e)) {
@@ -7967,7 +7966,12 @@
     }
     on(d.scroller, "touchstart", function (e) {
       if (!signalDOMEvent(cm, e) && !isMouseLikeTouchEvent(e) && !clickInGutter(cm, e)) {
-        d.input.ensurePolled();
+        d.input.ensurePolled(true);
+		
+		if(d.input.composing){
+			return ;
+		}
+		
         clearTimeout(touchFinished);
         var now = +new Date;
         d.activeTouch = {start: now, moved: false,
@@ -8617,7 +8621,6 @@
           ++lineNo$$1;
         });
         this.curOp.forceUpdate = true;
-        signal(this, "resize", this);
         signal(this, "refresh", this);
       }),
 
@@ -9321,6 +9324,21 @@
       cm.state.pasteIncoming = +new Date;
       input.fastPoll();
     });
+	
+	  
+	  if(ios) {
+		document.addEventListener('focusout', function(e) {
+			if(input.cm.ignoreNextFocusout === true){
+				input.cm.ignoreNextFocusout = undefined;
+				return ;
+			}
+			if(input.composing){
+				setTimeout(function(){
+					te.blur()
+				},20)
+			}
+		})
+	  }
 
     function prepareCopyCut(e) {
       if (signalDOMEvent(cm, e)) { return }
@@ -9378,6 +9396,7 @@
         input.composing = null;
       }
     });
+	
   };
 
   TextareaInput.prototype.createField = function (_display) {
@@ -9535,8 +9554,15 @@
     return true
   };
 
-  TextareaInput.prototype.ensurePolled = function () {
-    if (this.pollingFast && this.poll()) { this.pollingFast = false; }
+  TextareaInput.prototype.ensurePolled = function (byClick) {
+    if (this.pollingFast && this.poll()) {
+		this.pollingFast = false;
+	}
+	if(byClick === true && this.composing){
+		this.textarea.blur();
+		if(android)
+			this.textarea.focus();
+	}
   };
 
   TextareaInput.prototype.onKeyPress = function () {
@@ -9635,8 +9661,8 @@
   TextareaInput.prototype.needsContentAttribute = false;
   
   function fromTextArea(textarea,options){
-	var place = function (node) { return textarea.parentNode.insertBefore(node, textarea.nextSibling); };
-	return _fromTextArea(textarea,options,place);
+	  var place = function (node) { return textarea.parentNode.insertBefore(node, textarea.nextSibling); };
+	  return _fromTextArea(textarea,options,place);
   }
 
   function _fromTextArea(textarea, options,place) {
@@ -9691,7 +9717,8 @@
     };
 
     textarea.style.display = "none";
-	var cm = CodeMirror(place,options);
+    var cm = CodeMirror(place,
+      options);
     return cm
   }
 
@@ -9783,7 +9810,7 @@
 
   addLegacyProps(CodeMirror);
 
-  CodeMirror.version = "5.49.2";
+  CodeMirror.version = "5.49.3";
 
   return CodeMirror;
 

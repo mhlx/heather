@@ -99,51 +99,39 @@ var Heather = (function(){
 		config = Object.assign({}, defaultConfig, config);
 		this.eventHandlers = [];
 		this.editor = createEditor(textarea,config);
+		this.gutterWidth = this.editor.getGutterElement().offsetWidth;
+		this.node = document.createElement('body');
+		this.top = new Top(this);
 		this.markdownParser = new MarkdownParser(config.markdownParser);
 		this.toolbar = new Toolbar(this,config);
 		this.commandBar = new CommandBar(this,config);
 		this.tooltip = new Tooltip(this.editor,config);
 		this.partPreview = new PartPreview(this,config);
 		this.config = config;
-		this.rendered = true;
 		initKeyMap(this);
 		handleDefaultEditorEvent(this);
 		this.tableHelper = new TableHelper(this);
 		if(config.focused === true){
 			this.setFocused(true);
 		}
-		
 	}
 	
 	Editor.prototype.getValue = function(){
 		return this.editor.getValue();
 	}
 	
-	Editor.prototype.getHtmlNode = function(){
-		return this.node;
-	}	
-	
 	Editor.prototype.setValue = function(value){
 		this.editor.setValue(value);
 	}	
-	/*
-	是否启用了文件上传
-	*/
+	
 	Editor.prototype.isFileUploadEnable = function(){
 		var config = this.config.upload;
 		return !Util.isUndefined(config) && !Util.isUndefined(config.url) && !Util.isUndefined(config.uploadFinish);
 	}
 	
-	/*
-	根据markdown行号获取对应的html节点
-	一个行号可能对应多个节点，例如：
-	0. - [ ] todo list
-	1.     <div></div>
-	那么行号1对应的节点应该为 [ul,li,div]
-	*/
 	Editor.prototype.getNodesByLine = function(line){
-		if(!this.node) return [];
 		var nodes = [];
+		var cm = this.editor;
 		var addNode = function(node){
 			for(const dataLine of node.querySelectorAll('[data-line]')){
 				var _startLine = parseInt(dataLine.dataset.line);
@@ -153,7 +141,7 @@ var Heather = (function(){
 					clone.startLine = _startLine;
 					clone.endLine = _endLine;
 					nodes.push(clone);
-					addNode(clone);
+					addNode(dataLine);
 					break;
 				}
 			}
@@ -161,23 +149,19 @@ var Heather = (function(){
 		addNode(this.node);
 		return nodes;
 	}
-	
-	/*
-	当前是否处于预览模式
-	*/
+		
 	Editor.prototype.isPreview = function(){
 		return !Util.isUndefined(this.previewState);
 	}
 	
 	Editor.prototype.execCommand = function(name){
 		var handler = commands[name];
-		if(!Util.isUndefined(handler))
+		if(!Util.isUndefined(handler)){
+			this.editor.ignoreNextFocusout = true;
 			handler(this);
+		}
 	}
 	
-	/*
-	设置是否预览
-	*/
 	Editor.prototype.setPreview = function(preview){
 		if(preview === true && this.previewState) return;
 		if(preview !== true && !this.previewState) return;
@@ -188,7 +172,7 @@ var Heather = (function(){
 			var div = document.createElement('div');
 			div.classList.add('markdown-body');
 			div.classList.add('heather_preview');
-			div.innerHTML = this.node ? this.node.innerHTML : '';
+			div.innerHTML = this.node.innerHTML;
 			
 			var close = document.createElement('div');
 			close.classList.add('heather_preview_close');
@@ -254,23 +238,29 @@ var Heather = (function(){
 			
 			this.editor.getRootNode().appendChild(div);
 			
+			var mill = me.config.autoRenderMill;
+			
 			var renderedHandler = function(value,html){
-				var node = container.cloneNode(false);
-				node.innerHTML = html;
-				morphdomUpdate(container,node,me.config);
+				if(me.renderTimeout)
+					clearTimeout(me.renderTimeout);
+				me.renderTimeout = setTimeout(function(){
+					var node = container.cloneNode(false);
+					node.innerHTML = html;
+					morphdomUpdate(container,node,me.config);
+				},mill)
 			}
+			this.render();
+			renderedHandler(null,this.node.innerHTML);
 			
-			if(this.node)
-				renderedHandler(null,this.node.innerHTML);
 			
-			this.on('rendered',renderedHandler);
+			var unregisters = [];
+			registerEvents('rendered',this,renderedHandler,unregisters);
+			
 			var sync = new Sync(this.editor,div);
 			
-			var scrollHandler = function(){
+			registerEvents('editor.scroll',this,function(){
 				sync.doSync();
-			}
-			
-			this.editor.on('scroll',scrollHandler);
+			},unregisters);
 			
 			var fullscreenChangeHandler = function(fs){
 				if(fs){
@@ -291,39 +281,33 @@ var Heather = (function(){
 			}
 			previewChangeHandler(this.isPreview());
 			
-			var focusedHeightChange = function(h){
+			var focusedHeightChangeHandler = function(h){
 				div.querySelector('.heather_sync_view_container').style['paddingBottom'] = h + 'px';
 			}
 			
-			if(this.focusedState){
-				if(!Util.isUndefined(this.focusedState.height)){
-					focusedHeightChange(this.focusedState.height);
+			if(this.isFocused()){
+				var h = parseFloat(this.editor.display.mover.style.paddingBottom);
+				if(!isNaN(h)){
+					focusedHeightChangeHandler(h);
 				}
 			}
-			this.on('fullscreenChange',fullscreenChangeHandler);
-			this.on('previewChange',previewChangeHandler);
-			this.on('focusedHeightChange',focusedHeightChange);
+			
+			registerEvents('fullscreenChange',this,fullscreenChangeHandler,unregisters);	
+			registerEvents('previewChange',this,previewChangeHandler,unregisters);	
+			registerEvents('focusedHeightChange',this,focusedHeightChangeHandler,unregisters);
+			
 			this.syncViewState = {
 				view : div,
-				renderedHandler : renderedHandler,
-				scrollHandler : scrollHandler,
-				fullscreenChangeHandler : fullscreenChangeHandler,
-				previewChangeHandler : previewChangeHandler,
-				focusedHeightChange : focusedHeightChange
+				unregisters : unregisters
 			}
 			
 		} else {
 			this.syncViewState.view.remove();
-			this.off('rendered',this.syncViewState.renderedHandler);
-			this.off('fullscreenChange',this.syncViewState.fullscreenChangeHandler);
-			this.off('previewChange',this.syncViewState.previewChangeHandler);
-			this.off('focusedHeightChange',this.syncViewState.focusedHeightChange);
-			this.editor.off('scroll',this.scrollHandler);
-			
+			unregisterEvents(this.syncViewState.unregisters);
 			this.syncViewState = undefined;
 			wrap.classList.remove('heather_sync_view_editor');
 		}
-		triggerEvent(this,'syncViewChange',this.hasSyncView());
+		triggerEvent(this,'syncViewChange',syncView === true);
 		CodeMirror.signal(this.editor, "resize", this.editor);
 	}
 	
@@ -346,15 +330,26 @@ var Heather = (function(){
 	}
 	
 	Editor.prototype.on = function(eventName, handler) {
+		var me = this;
 		if(eventName.startsWith("editor.")){
 			eventName = eventName.substring(eventName.indexOf('.')+1);
 			this.editor.on(eventName,handler);
+			return {
+				off : function(){
+					me.editor.off(eventName,handler)
+				}
+			}
 			return ;
 		}
 		this.eventHandlers.push({
 			name : eventName,
 			handler : handler
 		});
+		return {
+			off : function(){
+				me.off(eventName,handler)
+			}
+		}
 	}
 
 	Editor.prototype.off = function(eventName, handler) {
@@ -379,35 +374,35 @@ var Heather = (function(){
 		if(focus === true){
 			var me = this;
 			
-			this.focusedState = {
-				changeHandler : function(){
-					scrollToMiddle(me);
-				},
-				resizeHandler: function(cm){
-					var wrapper = cm.getWrapperElement();
-					var height = wrapper.clientHeight/2;
-					cm.display.mover.style.paddingBottom = height + 'px';
-					cm.refresh();
-				},
-				fullscreenChangeHandler : function(){
-					scrollToMiddle(me);
-				}
+			var setPadding = function(cm){
+				var wrapper = cm.getWrapperElement();
+				var height = wrapper.clientHeight/2;
+				cm.display.mover.style.paddingBottom = height + 'px';
+				cm.refresh();
+				triggerEvent(me,'focusedHeightChange',height);
 			}
-			this.focusedState.resizeHandler(this.editor);
-			this.editor.on('resize',this.focusedState.resizeHandler);
-			this.editor.on('change',this.focusedState.changeHandler);
-			this.on('fullscreenChange',this.focusedState.fullscreenChangeHandler);
+			var unregisters = [];
+			
+			if(!Util.android){
+				setPadding(this.editor);
+				registerEvents('editor.resize',this,setPadding,unregisters);
+			}
+			
+			registerEvents('editor.change','editor.touchstart','fullscreenChange',this,function(cm){
+				scrollToMiddleByCursor(me);
+			},unregisters);
+			
+			this.focusedState = {
+				unregisters : unregisters
+			}
 			triggerEvent(this,'focusedChange',true);
 		} else {
-			this.editor.off('resize',this.focusedState.resizeHandler);
-			this.editor.off('change',this.focusedState.changeHandler);
-			this.off('fullscreenChange',this.focusedState.fullscreenChangeHandler);
+			unregisterEvents(this.focusedState.unregisters);
 			this.focusedState = undefined;
 			this.editor.display.mover.style.paddingBottom = '';
 			triggerEvent(this,'focusedChange',false);
 			triggerEvent(this,'focusedHeightChange',0);
 		}
-		this.editor.focus();
 	}
 	
 	Editor.prototype.isFocused = function(){
@@ -416,9 +411,9 @@ var Heather = (function(){
 	
 	Editor.prototype.openSelectionHelper = function(){
 		if(!this.isPreview()){
-			this.closeSelectionHelper();
+			this.closeSelectionHelper(true);
 			this.selectionHelper = new SelectionHelper(this);
-			triggerEvent(this,'selectionHelperChange',true);
+			triggerEvent(this,'selectionHelperOpen',this);
 		}
 	}
 	
@@ -426,11 +421,11 @@ var Heather = (function(){
 		return !Util.isUndefined(this.selectionHelper);
 	}	
 	
-	Editor.prototype.closeSelectionHelper = function(){
+	Editor.prototype.closeSelectionHelper = function(unselect){
 		if(this.selectionHelper){
-			this.selectionHelper.remove(true);
+			this.selectionHelper.remove(unselect !== true);
 			this.selectionHelper = undefined;
-			triggerEvent(this,'selectionHelperChange',false);
+			triggerEvent(this,'selectionHelperClose',this);
 		}
 	}
 	
@@ -459,18 +454,17 @@ var Heather = (function(){
 	Editor.prototype.render = function(){
 		var value = this.editor.getValue();
 		var node = Util.parseHTML(this.markdownParser.render(value)).body;
+		triggerEvent(this,'rendered',value,node.innerHTML);
 		this.node = node;
-		this.rendered = true;
-		triggerEvent(this,'rendered',value,this.node.innerHTML);
 	}
 	
-	function scrollToMiddle(heather){
+	function scrollToMiddleByCursor(heather,cursor){
 		var cm = heather.editor;
 		cm.operation(function(){
 			if(cm.somethingSelected()) return ;
 			var height = cm.getWrapperElement().clientHeight/2;
-			var pos = cm.cursorCoords(true,'local');
-			var space = pos.top - height + heather.toolbar.getHeight();
+			var pos = cm.cursorCoords(cursor || true,'local');
+			var space = pos.top - height + heather.top.getHeight();
 			if(Util.ios && heather.isFullscreen()){
 				//ios will scroll screen when focused
 				window.scrollTo(0,0);
@@ -482,18 +476,27 @@ var Heather = (function(){
 	}
 	
 	function handleDefaultEditorEvent(heather){
+		
 		var editor = heather.editor;
-		if(editor.getValue() != '')
-			heather.render();
-		editor.on('change',function(cm,change){
-			heather.rendered = false;
-			if(heather.renderTimer){
-				clearTimeout(heather.renderTimer);
+		
+		function checkGutterWidth(){
+			var gutterWidth = editor.getGutterElement().offsetWidth;
+			if(heather.gutterWidth !== gutterWidth){
+				triggerEvent(heather,'gutterWidthChange',gutterWidth);
+				heather.gutterWidth = gutterWidth;
 			}
-			heather.renderTimer = setTimeout(function(){
-				heather.render();
-			},heather.config.autoRenderMill);	
-		});	
+		}
+		
+		if(editor.getValue() != ''){
+			heather.render();
+			checkGutterWidth();
+		}
+		
+		editor.on('change',function(cm){
+			heather.render();
+			checkGutterWidth();
+		});
+		
 		//change task list status
 		editor.on('mousedown',function(cm,e){
 			if(isWidget(e.target,cm)){
@@ -558,49 +561,52 @@ var Heather = (function(){
 	}
 	
 	function isWidget(target,cm){
-		for(const widget of cm.getWrapperElement().querySelectorAll('[data-widget]')){
-			if(widget.contains(target)) 
-				return true;
+		var _target = target;
+		while(_target != null){
+			if(_target.hasAttribute('data-widget')) return true;
+			_target = _target.parentElement;
 		}
 		return false;
 	}
 		
 	function initKeyMap(heather) {
+		
+		function toggleFullscreen(){
+			heather.setFullscreen(!heather.isFullscreen());
+		}
+		
+		function togglePreview(){
+			heather.setPreview(!heather.isPreview());
+		}
+		
+		function indentMore(){
+			heather.editor.execCommand('indentMore');
+		}
+		
+		function indentLess(){
+			heather.editor.execCommand('indentLess');
+		}
+		
 		var keyMap = Util.mac ? {
 			"Cmd-B": 'bold',
 			"Cmd-I": 'italic',
 			"Cmd-L": 'link',
 			"Cmd-/": 'commands',
-			"Cmd-Enter": function() {
-				heather.setFullscreen(!heather.isFullscreen());
-			},
-			"Cmd-P": function() {
-				heather.setPreview(!heather.isPreview())
-			},
-			"Tab":function(){
-				heather.editor.execCommand('indentMore');
-			},
-			"Shift-Tab":function(){
-				heather.editor.execCommand('indentLess')
-			}
+			"Cmd-Enter": toggleFullscreen,
+			"Cmd-P": togglePreview,
+			"Tab":indentMore,
+			"Shift-Tab":indentLess
 		} : {
 			"Ctrl-B": 'bold',
 			"Ctrl-I": 'italic',
 			"Ctrl-L": 'link',
 			"Alt-/": 'commands',
-			"Ctrl-Enter": function() {
-				heather.setFullscreen(!heather.isFullscreen());
-			},
-			"Ctrl-P": function() {
-				heather.setPreview(!heather.isPreview())
-			},
-			"Tab":function(){
-				heather.editor.execCommand('indentMore');
-			},
-			"Shift-Tab":function(){
-				heather.editor.execCommand('indentLess')
-			}
+			"Ctrl-Enter": toggleFullscreen,
+			"Ctrl-P": togglePreview,
+			"Tab":indentMore,
+			"Shift-Tab":indentLess
 		}
+		
 		heather.addKeyMap(keyMap);
 	}
 	
@@ -618,8 +624,8 @@ var Heather = (function(){
 	
 	function createEditor(textarea,config){
 		config = config.editor || {};
-		config.styleActiveLine =  true;
-		config.inputStyle = 'contenteditable';
+		config.styleActiveLine =  true;	
+		config.inputStyle = 'textarea';
 		config.mode = {name:'gfm'};
 		config.lineWrapping = true;
 		config.value = textarea.value;
@@ -645,6 +651,7 @@ var Heather = (function(){
 		function SelectionHelper(heather){
 			
 			var editor = heather.editor;
+			var eventUnregisters = [];
 			
 			var html = '';
             html += '<span class="heather_selection_helper_wrap" data-arrow="goLineUp"><span class="heather_selection_helper_touch" ></span></span> ';
@@ -659,10 +666,28 @@ var Heather = (function(){
 			div.innerHTML = html;
 			editor.addWidget({line:0,ch:0},div);
 			
+			
 			var pos = function(){
-				div.style.height = div.offsetWidth+'px';
-				div.style.left = "";
-				div.style.top = (editor.cursorCoords(false,'local').top+editor.defaultTextHeight())+'px';
+				div.innerHTML = html;
+				var w = editor.getWrapperElement().clientWidth*0.6;
+				div.style.width = w+'px'
+				div.style.height = w+'px';
+				div.style.left = '';
+				if(heather.isFullscreen()){
+					div.style.position = 'fixed';
+					div.style.top = '';
+					div.style.bottom = '0px';
+				} else {
+					div.style.position = 'absolute';
+					div.style.bottom = '';
+					
+					var top = editor.cursorCoords(false,'local').top+editor.defaultTextHeight();
+					var h = editor.getScrollInfo().height;
+					if(top + w > h){
+						top = h - w;
+					}
+					div.style.top = top+'px';
+				}
 			}
 			
 			pos();
@@ -675,7 +700,7 @@ var Heather = (function(){
 			});
 			var me = this;
 			
-			this.cursorActivityHandler = function(cm){
+			var cursorActivityHandler = function(cm){
 				if (me.movedByMouseOrTouch === true) {
 					me.movedByMouseOrTouch = false;
 					me.start = editor.getCursor();
@@ -683,19 +708,8 @@ var Heather = (function(){
 				pos();
 			};
 			
-			this.cursorActivityHandler(editor);
+			cursorActivityHandler(editor);
 			
-			this.movedHandler = function(cm,e){
-				if(isWidget(e.target,cm)){
-					e.codemirrorIgnore  = true;
-					return ;
-				}
-				me.movedByMouseOrTouch = true;
-				me.end = undefined;
-				if(me.marked){
-					me.marked.clear();
-				}
-			}
 			editor.setOption('readOnly','nocursor');
 			div.addEventListener('click',function(e){
 				var target = e.target;
@@ -725,15 +739,23 @@ var Heather = (function(){
 				}
 			});
 			
-			this.resizeHandler = function(){
-				pos();
-			}
-			editor.on('cursorActivity',this.cursorActivityHandler);
-			editor.on("mousedown", this.movedHandler);
-            editor.on("touchstart", this.movedHandler);
-			editor.on('resize',this.resizeHandler);
+			registerEvents('editor.cursorActivity',heather,cursorActivityHandler,eventUnregisters);
+			registerEvents('editor.mousedown','editor.touchstart',heather,function(cm,e){
+				if(isWidget(e.target,cm)){
+					e.codemirrorIgnore  = true;
+					return ;
+				}
+				me.movedByMouseOrTouch = true;
+				me.end = undefined;
+				if(me.marked){
+					me.marked.clear();
+				}
+			},eventUnregisters);
+			registerEvents('editor.resize',heather,pos,eventUnregisters);
+			
 			this.div = div;
 			this.heather = heather;
+			this.eventUnregisters = eventUnregisters;
 		}
 		
 		SelectionHelper.prototype.getCursors = function(){
@@ -762,10 +784,8 @@ var Heather = (function(){
 				editor.setSelection(cursors.start,cursors.end);
 			}
 			this.div.remove();
-			editor.off('cursorActivity',this.cursorActivityHandler);
-			editor.off("mousedown", this.movedHandler);
-            editor.off("touchstart", this.movedHandler);
-			editor.off('resize',this.resizeHandler);
+			
+			unregisterEvents(this.eventUnregisters);
 			editor.setOption('readOnly',false);
 			editor.focus();
 		}
@@ -875,7 +895,7 @@ var Heather = (function(){
 		}
 
 		Bar.prototype.height = function() {
-			return this.element.clientHeight;
+			return this.element.offsetHeight;
 		}
 
 		Bar.prototype.width = function() {
@@ -966,6 +986,48 @@ var Heather = (function(){
 		return Bar;
 	})();	
 	
+	var Top = (function(){
+		
+		function Top(heather){
+			var div = document.createElement('div');
+			div.classList.add('heather_top');
+			div.style.left = heather.gutterWidth+'px';
+			heather.editor.getWrapperElement().append(div);
+			this.div = div;
+			this.components = [];
+			this.cm = heather.editor;
+			this.cachedHeight = 0;
+			var me = this;
+			heather.on('editor.resize',function(){
+				me.calcMarginTop();
+			});
+			heather.on('gutterWidthChange',function(w){
+				div.style.left = w+'px';
+			})
+		}
+		
+		Top.prototype.addComponent = function(cmp){
+			this.components.push(cmp)
+		}
+		
+		Top.prototype.calcMarginTop = function(){
+			var h = 0;
+			for(const cmp of this.components){
+				h += cmp.getHeight();
+			}
+			if(h !== this.cachedHeight){
+				this.cachedHeight = h;
+				this.cm.display.lineDiv.style.marginTop = h + 'px';
+				CodeMirror.signal(this.cm, "resize", this.cm);
+			}
+		}
+		
+		Top.prototype.getHeight = function(){
+			return this.cachedHeight;
+		}
+		
+		return Top;
+	})();
 	
 	var Toolbar = (function(){
 		
@@ -974,71 +1036,63 @@ var Heather = (function(){
 			var div = document.createElement('div');
 			div.classList.add('heather_toolbar_bar');
 			div.setAttribute('data-widget','');
-			div.style.visibility = 'hidden';
 			
 			var gutterWidth = cm.getGutterElement().offsetWidth;
 			div.style.left = gutterWidth + 'px';
 			
-			cm.getWrapperElement().appendChild(div);
-			
+			heather.top.div.appendChild(div);
+			this.height = 0;
 			this.heather = heather;
 			this.cm = cm;
 			this.bar = new Bar(div);
+			
+			var me = this;
+			
+			heather.top.addComponent({
+				getHeight : function(){
+					return me.bar.getElement().style.display === 'none' ? 0 : me.bar.height();
+				}
+			});
 		}
 		
 		Toolbar.prototype.addElement = function(element){
 			this.bar.addElement(element);
-			calcMarginTop(this);
+			this.heather.top.calcMarginTop();
 		}
 		
 		Toolbar.prototype.insertElement = function(element,index){
 			this.bar.insertElement(element,index);
-			calcMarginTop(this);
+			this.heather.top.calcMarginTop();
 		}	
 		
 		Toolbar.prototype.addIcon = function(icon,handler,callback){
 			this.bar.addIcon(icon,handler,callback);
-			calcMarginTop(this);
+			this.heather.top.calcMarginTop();
 		}
 		
 		Toolbar.prototype.insertIcon = function(clazz, handler, index, callback){
 			this.bar.addIcon(clazz, handler, index, callback);
-			calcMarginTop(this);
+			this.heather.top.calcMarginTop();
 		}	
 		
 		Toolbar.prototype.removeElement = function(deleteChecker){
 			this.bar.removeElement(deleteChecker);
-			calcMarginTop(this);
+			this.heather.top.calcMarginTop();
 		}
 		
 		Toolbar.prototype.clear = function(){
 			this.bar.clear();
-			calcMarginTop(this);
+			this.heather.top.calcMarginTop();
 		}
 	
 		Toolbar.prototype.hide = function(){
-			this.cm.getWrapperElement().querySelector('.CodeMirror-code').style.marginTop = '';
-			this.bar.getElement().style.visibility = 'hidden';
+			this.bar.getElement().style.display = 'none'
+			this.heather.top.calcMarginTop();
 		}
 		
 		Toolbar.prototype.show = function(){
-			calcMarginTop(this);
-		}
-		
-		Toolbar.prototype.getHeight = function(){
-			return this.bar.length() == 0 ? 0 : this.bar.height();
-		}
-		
-		function calcMarginTop(toolbar){
-			if(toolbar.bar.length() == 0){
-				toolbar.cm.getWrapperElement().querySelector('.CodeMirror-code').style.marginTop = '';
-				toolbar.bar.getElement().style.visibility = 'hidden';
-				return ;
-			}
-			toolbar.cm.getWrapperElement().querySelector('.CodeMirror-code').style.marginTop = toolbar.bar.getElement().clientHeight+'px';
-			toolbar.bar.getElement().style.visibility = 'visible';
-			this.heather.commandBar.rePosition();
-			this.heather.partPreview.rePosition();
+			this.bar.getElement().style.display = ''
+			this.heather.top.calcMarginTop();
 		}
 		
 		return Toolbar;
@@ -1047,39 +1101,9 @@ var Heather = (function(){
 	var CommandBar = (function(){
 		
 		function CommandBar(heather,config){
-			var me = this;
-			this.cursorActivityListener = function(cm){
-				if(me.ignoreNextActivity === true){
-					me.ignoreNextActivity = false;
-					return ;
-				}
-				if(!me.bar){
-					me.bar = createBar(cm,heather);
-					me.bar.setAttribute('data-widget','');
-					cm.addWidget({line:0,ch:0},me.bar);
-				}
-				me.rePosition();
-			}
-			this.resizeHandler = function(cm){
-				me.rePosition();
-				me.ignoreNextActivity = true;
-			}
-			this.hiddenHandler = function(){
-				me.setKeepHidden(true);
-			}
-			this.visibleHandler = function(hidden){
-				if(hidden === true){
-					me.setKeepHidden(true);
-				} else {
-					if(heather.hasSelectionHelper()
-						|| !Util.isUndefined(heather.commandWidget)){
-						return ;
-					}
-					me.setKeepHidden(false);
-				}
-			}
 			this.cm = heather.editor;
 			this.heather = heather;
+			this.eventUnregisters = [];
 			if(config.commandBarEnable !== false)
 				this.enable();
 		}
@@ -1091,7 +1115,7 @@ var Heather = (function(){
 			var cm = this.cm;
 			var pos = cm.cursorCoords(true,'local');
 			this.bar.style.visibility = 'visible';
-			var toolbarHeight = this.heather.toolbar.getHeight();
+			var toolbarHeight = this.heather.top.getHeight();
 			var top = pos.top - cm.getScrollInfo().top - toolbarHeight;
 			var distance = 2*cm.defaultTextHeight();
 			if(top > distance+this.bar.clientHeight){
@@ -1106,29 +1130,56 @@ var Heather = (function(){
 		}
 		
 		CommandBar.prototype.enable = function(){
-			this.cursorActivityListener(this.cm);
-			this.cm.on('cursorActivity',this.cursorActivityListener)
-			this.cm.on('resize',this.resizeHandler);
-			this.heather.on('selectionHelperChange',this.visibleHandler);
-			this.heather.on('commandWidgetChange',this.visibleHandler);
+			if(this.enabled === true) return ;
+			var me = this;
+			var cursorActivityListener = function(cm){
+				if(me.ignoreNextActivity === true){
+					me.ignoreNextActivity = false;
+					return ;
+				}
+				if(!me.bar){
+					me.bar = createBar(cm,me.heather);
+					me.bar.setAttribute('data-widget','');
+					cm.addWidget({line:0,ch:0},me.bar);
+				}
+				me.rePosition();
+			}
+			cursorActivityListener(this.cm);
+			
+			registerEvents('editor.cursorActivity',this.heather,cursorActivityListener,this.eventUnregisters);
+			registerEvents('editor.resize',this.heather,function(){
+				me.rePosition();
+				me.ignoreNextActivity = true;
+			},this.eventUnregisters);
+			
+			registerEvents('selectionHelperOpen','commandWidgetOpen',this.heather,function(){
+				me.setKeepHidden(true);
+			},this.eventUnregisters);
+			
+			registerEvents('selectionHelperClose','commandWidgetClose',this.heather,function(){
+				me.setKeepHidden(false);
+			},this.eventUnregisters);
+			
+			this.enabled = true;
 		}	
 		
 		CommandBar.prototype.disable = function(){
+			if(this.enabled !== true) return ;
 			if(this.bar){
 				this.bar.remove();
 				this.bar = undefined;
 			}
-			this.cm.off('cursorActivity',this.cursorActivityListener)
-			this.cm.off('resize',this.resizeHandler)
-			this.heather.off('selectionHelperChange',this.visibleHandler);
-			this.heather.off('commandWidgetChange',this.visibleHandler);
+			unregisterEvents(this.eventUnregisters);
+			this.eventUnregisters = [];
+			this.enabled = false;
 		}
 		
 		CommandBar.prototype.setKeepHidden = function(keepHidden){
 			if(keepHidden === true && this.bar)
-				this.bar.style.visibility = 'hidden';
+				this.bar.style.display = 'none';
+			if(keepHidden !== true && (this.heather.hasSelectionHelper() || !Util.isUndefined(this.heather.commandWidget))) return
 			if(keepHidden !== true && this.bar)
-				this.bar.style.visibility = 'visible';
+				this.bar.style.display = '';
 			this.keepHidden = keepHidden === true;
 		}	
 		
@@ -1185,70 +1236,60 @@ var Heather = (function(){
 			this.config = config || {};
 			this.heather = heather;
 			this.editor = heather.editor;
+			this.eventUnregisters = [];
 			if(this.config.partPreviewEnable !== false){
 				this.enable();
 			}
 		}
 
 		PartPreview.prototype.enable = function() {
-			if(this.enable === true) return ;
+			if(this.enabled === true) return ;
+			this.keepHidden = false;
 			var editor = this.editor;
 			this.widget = new Widget(this);
 			var me = this;
-			var changeHandler = function(cm) {
-				if(me.disable === true) return ;
+			
+			registerEvents('selectionHelperOpen','commandWidgetOpen',this.heather,function(){
+				me.setKeepHidden(true);
+			},this.eventUnregisters);
+			
+			registerEvents('selectionHelperClose','commandWidgetClose',this.heather,function(){
+				me.setKeepHidden(false);
+			},this.eventUnregisters);	
+			
+			registerEvents('editor.cursorActivity',this.heather,function(cm){
+				if(me.keepHidden === true) return ;
+				me.widget.update();
+			},this.eventUnregisters);
+			
+			registerEvents('editor.change',this.heather,function(cm){
 				if (me.changed !== true) {
 					me.changed = true;
 				}
-			}
-
-			var cursorActivityHandler = function() {
-				if(me.disable === true || me.keepHidden === true) return ;
-				me.widget.update();
-			}
-
-			var afterRenderHandler = function() {
-				if(me.disable === true || me.changed !== true) return ;
+			},this.eventUnregisters);
+			
+			registerEvents('rendered',this.heather,function(){
+				if(me.changed !== true) return ;
 				me.changed = false;
 				if(me.keepHidden !== true)
 					me.widget.update();
-			}
-			var visibleHandler = function(hidden){
-				if(hidden === true){
-					me.setKeepHidden(true);
-				} else {
-					if(heather.hasSelectionHelper()
-						|| !Util.isUndefined(heather.commandWidget)
-						|| heather.hasSyncView()){
-						return ;
-					}
-					me.setKeepHidden(false);
-				}
-			}
-			this.heather.on('selectionHelperChange',visibleHandler);
-			this.heather.on('commandWidgetChange',visibleHandler);
-			this.heather.on('syncViewChange',visibleHandler);
-			this.editor.on('cursorActivity', cursorActivityHandler);
-			this.editor.on('change', changeHandler);
-			this.heather.on('rendered', afterRenderHandler);
-			this.afterRenderHandler = afterRenderHandler;
-			this.changeHandler = changeHandler;
-			this.cursorActivityHandler = cursorActivityHandler;
-			this.visibleHandler = visibleHandler;
-			this.enable = true;
+			},this.eventUnregisters);
+	
+			registerEvents('syncViewChange',this.heather,function(hidden){
+				me.setKeepHidden(hidden)
+			},this.eventUnregisters);
+			
+			this.enabled = true;
 		}
 
 		PartPreview.prototype.disable = function() {
-			if(this.enable !== true) return ;
+			if(this.enabled !== true) return ;
 			if (this.widget) {
 				this.widget.remove();
 			}
-			this.editor.off('cursorActivity', this.cursorActivityHandler);
-			this.editor.off('change', this.changeHandler);
-			this.heather.off('rendered', this.afterRenderHandler);
-			this.heather.off('selectionHelperChange',this.visibleHandler);
-			this.heather.off('commandWidgetChange',this.visibleHandler);
-			this.heather.off('syncViewChange',this.visibleHandler);
+			unregisterEvents(this.eventUnregisters);
+			this.eventUnregisters = [];
+			this.enabled = false;
 		}
 		
 		PartPreview.prototype.hidden = function(){
@@ -1268,8 +1309,17 @@ var Heather = (function(){
 				if(this.widget){
 					this.widget.hide();
 				}
-			} else if(this.widget){
-				this.widget.update();
+			} else {
+				
+				if(this.heather.hasSelectionHelper()
+					|| !Util.isUndefined(this.heather.commandWidget)
+					|| this.heather.hasSyncView()){
+					return ;
+				}
+				
+				if(this.widget){
+					this.widget.update();
+				}
 			}
 			this.keepHidden = keepHidden;
 		}
@@ -1332,13 +1382,13 @@ var Heather = (function(){
 			}
 			
 			Widget.prototype.hide = function() {
-				this.widget.style.visibility = 'hidden';
+				this.widget.style.display = 'none';
 			}
 
 			Widget.prototype.show = function() {
 				this.updatePosition();
 				if(this.keepHidden !== true)
-					this.widget.style.visibility = 'visible';
+					this.widget.style.display = '';
 			}
 
 			Widget.prototype.remove = function() {
@@ -1364,7 +1414,7 @@ var Heather = (function(){
 				var editor = this.preview.editor;
 				var pos = editor.cursorCoords(true,'local');
 				var bar = this.preview.heather.commandBar.bar;
-				var toolbarHeight = this.preview.heather.toolbar.getHeight();
+				var toolbarHeight = this.preview.heather.top.getHeight();
 				var top = pos.top - editor.getScrollInfo().top - toolbarHeight;
 				var distance = 2*editor.defaultTextHeight()+(bar ? 5 : 0);
 				var height = (bar ? bar.clientHeight : 0) + this.widget.clientHeight;
@@ -1626,6 +1676,8 @@ var Heather = (function(){
 				})
 
                 var setLanguage = function(selected) {
+                    hideTip();
+					state.hideNext = true;
                     var lang = selected.textContent;
                     var cursor = editor.getCursor();
                     var text = editor.getLine(cursor.line);
@@ -1645,7 +1697,6 @@ var Heather = (function(){
 						editor.execCommand('goLineDown');
 					}
 					editor.focus();
-                    hideTip();
                 }
 
                 var hideTip = function() {
@@ -1685,88 +1736,84 @@ var Heather = (function(){
                 var hljsLanguages = hljs.listLanguages();
                 hljsLanguages.push('mermaid');
                 this.hideTipOnCursorChange = function(editor) {
-                    if (editor.getSelection() != '') {
+                    if (editor.somethingSelected()) {
                         hideTip();
                         return;
                     }
-                    var cursor = editor.getCursor();
-                    if (cursor.ch < 5) {
-                        hideTip();
-                        return;
-                    }
-                    if ((state.cursor || {
-                            line: -1
-                        }).line != cursor.line) {
-                        hideTip();
-                    }
+                    var context = getTipContext(editor);
+					if(!context.tip){
+						hideTip();
+					}
                 }
-                this.hideTipOnScroll = function(cm,e) {
-                    hideTip();
-                }
+				
+				var getTipContext = function(editor){
+					var cursor = editor.getCursor();
+					var text = editor.getLine(cursor.line).trimStart();
+					var subLeft = text.substring(0,cursor.ch);
+					var context = {quoteSize:0,tip:false};
+					while(subLeft.startsWith("> ")){
+						context.quoteSize ++;
+						subLeft = subLeft.substring(2);
+					}
+					if(subLeft.startsWith("``` ")){
+						var lang = text.substring(4 + context.quoteSize*2, cursor.ch).trimStart();
+						context.tip = lang != '';
+						context.lang = lang;
+					}
+					return context;
+				}
+				
                 this.tipHandler = function(editor) {
                     hideTip();
-                    if (editor.getSelection() == '') {
-                        var cursor = editor.getCursor();
-						var text = editor.getLine(cursor.line).trimStart();
-						var subLeft = text.substring(0,cursor.ch);
-						var quote = {size:0,tip:false};
-						while(subLeft.startsWith("> ")){
-							quote.size ++;
-							subLeft = subLeft.substring(2);
-						}
-						if(quote.size > 0 && subLeft.startsWith("``` ")){
-							quote.tip = true;
-						}
-                        if (quote.tip) {
-                            if (hljsTimer) {
-                                clearTimeout(hljsTimer);
-                            }
-                            hljsTimer = setTimeout(function() {
-								var lang = text.substring(4 + quote.size*2, cursor.ch).trimStart();
-								if(lang == '') return ;
-								var tips = [];
-								for (var i = 0; i < hljsLanguages.length; i++) {
-									var hljsLang = hljsLanguages[i];
-									if (hljsLang.indexOf(lang) != -1) {
-										tips.push(hljsLang);
-									}
+					if(state.hideNext === true) {
+						state.hideNext = false;
+						return ;
+					}
+                    if (!editor.somethingSelected()) {
+                        var context = getTipContext(editor);
+                        if (context.tip) {
+							var lang = context.lang;
+							var tips = [];
+							for (var i = 0; i < hljsLanguages.length; i++) {
+								var hljsLang = hljsLanguages[i];
+								if (hljsLang.indexOf(lang) != -1) {
+									tips.push(hljsLang);
 								}
-								if (tips.length > 0) {
-									state.running = true;
-									state.cursor = cursor;
-									var html = '<table style="width:100%">';
-									for (var i = 0; i < tips.length; i++) {
-										var clazz = i == 0 ? 'selected' : '';
-										html += '<tr class="' + clazz + '"><td >' + tips[i] + '</td></tr>';
-									}
-									html += '</table>';
-									var pos = editor.cursorCoords(true,'local');
-									tip.innerHTML = html;
-									var height = tip.clientHeight;
-									tip.style.top = pos.top + editor.defaultTextHeight()+'px';
-									tip.style.left = pos.left+'px';
-									tip.style.visibility = 'visible';
-									editor.addKeyMap(languageInputKeyMap);
-								} else {
-									hideTip();
+							}
+							if (tips.length > 0) {
+								state.running = true;
+								state.cursor = editor.getCursor();
+								var html = '<table style="width:100%">';
+								for (var i = 0; i < tips.length; i++) {
+									var clazz = i == 0 ? 'selected' : '';
+									html += '<tr class="' + clazz + '"><td >' + tips[i] + '</td></tr>';
 								}
-                            }, 100)
+								html += '</table>';
+								var pos = editor.cursorCoords(true,'local');
+								tip.innerHTML = html;
+								var height = tip.clientHeight;
+								tip.style.top = pos.top + editor.defaultTextHeight()+'px';
+								tip.style.left = pos.left+'px';
+								tip.style.visibility = 'visible';
+								editor.addKeyMap(languageInputKeyMap);
+							} else {
+								hideTip();
+							}
                         }
                     }
                 }
+				this.hideTip = hideTip;
                 this.editor = editor;
             }
 
             HljsTip.prototype.enable = function() {
                 this.editor.on('change', this.tipHandler);
                 this.editor.on('cursorActivity', this.hideTipOnCursorChange);
-                this.editor.on('scroll', this.hideTipOnScroll);
             }
 
             HljsTip.prototype.disable = function() {
                 this.editor.off('change', this.tipHandler);
                 this.editor.off('cursorActivity', this.hideTipOnCursorChange);
-                this.editor.off('scroll', this.hideTipOnScroll);
             }
 
             return HljsTip;
@@ -1973,43 +2020,37 @@ var Heather = (function(){
 				}
 				if(context === 'hide') return;
 				
-				var node = context.node;
-				var startLine = context.startLine;
-				var endLine = context.endLine;
-				var rowIndex = context.rowIndex;
-				var colIndex = context.colIndex;
-				
 				var div = addCommandWidget(heather);
 				
 				div.appendChild(createListCommandWidget(heather,[{
 					html : '插入列(前方)',
 					handler : function(){
-						addCol(cm,colIndex,startLine,endLine,true);
+						addCol(heather,context,true);
 					}
 				},{
 					html : '插入列(后方)',
 					handler : function(){
-						addCol(cm,colIndex,startLine,endLine,false);
+						addCol(heather,context,false);
 					}
 				},{
 					html : '删除列',
 					handler : function(){
-						delCol(cm,colIndex,startLine,endLine);
+						delCol(heather,context);
 					}
 				},{
 					html : '插入行(上方)',
 					handler : function(){
-						addRow(cm,rowIndex,startLine,endLine,true,node);
+						addRow(heather,context,true);
 					}
 				},{
 					html : '插入行(下方)',
 					handler : function(){
-						addRow(cm,rowIndex,startLine,endLine,false,node);
+						addRow(heather,context,false);
 					}
 				},{
 					html : '删除行',
 					handler : function(){
-						delRow(cm,rowIndex,startLine,endLine);
+						delRow(heather,context);
 					}
 				}]));
 				
@@ -2025,8 +2066,8 @@ var Heather = (function(){
 				if(nodes.length == 0) return 'no';
 				var node = nodes[nodes.length-1];
 				if(node.tagName !== 'TABLE') return 'no';
-				var startLine = parseInt(node.dataset.line);
-				var endLine = parseInt(node.dataset.endLine);
+				var startLine = node.startLine;
+				var endLine = node.endLine;
 				
 				var rowIndex = line - startLine;
 				if(rowIndex == 1) return 'hide';
@@ -2127,11 +2168,18 @@ var Heather = (function(){
 			return false;
 		}
 		
-		function addCol(cm,colIndex,startLine,endLine,before){
+		function addCol(heather,context,before){
+			var cm = heather.editor;
 			var line = cm.getCursor().line;
 			var array = [];
 			var lineIndex = 0;
 			var _ch = 0;
+			
+			var node = context.node;
+			var startLine = context.startLine;
+			var endLine = context.endLine;
+			var colIndex = context.colIndex;
+			
 			cm.eachLine(startLine,endLine,function(handle){
 				var index = -2;
 				var text = handle.text;
@@ -2154,10 +2202,10 @@ var Heather = (function(){
 				}
 				lineIndex++;
 			});
-			if(array.length != endLine  - startLine) return ;
+			
 			cm.setSelection({line:startLine,ch:0},{line:endLine,ch:0});
 			var newText = array.join('\n');
-			if(endLine === cm.lineCount()-1){
+			if(endLine != cm.lineCount()-1){
 				newText += '\n';
 			}
 			cm.replaceSelection(newText);
@@ -2169,7 +2217,13 @@ var Heather = (function(){
 		}
 		
 		
-		function delCol(cm,colIndex,startLine,endLine){
+		function delCol(heather,context){
+			var cm = heather.editor;
+			var node = context.node;
+			var startLine = context.startLine;
+			var endLine = context.endLine;
+			var colIndex = context.colIndex;
+			
 			var array = [];
 			var lineIndex = 0;
 			var line = cm.getCursor().line;
@@ -2198,10 +2252,9 @@ var Heather = (function(){
 				}
 				lineIndex++;
 			});
-			if(array.length != endLine  - startLine) return ;
 			cm.setSelection({line:startLine,ch:0},{line:endLine,ch:0});
 			var table = array.join('\n');
-			cm.replaceSelection(table.trim() == '' ? '' : table);
+			cm.replaceSelection((table.trim() == '' ? '' : table)+'\n');
 			cm.focus();
 			cm.setCursor({
 				line:line,
@@ -2209,7 +2262,13 @@ var Heather = (function(){
 			})
 		}
 		
-		function delRow(cm,rowIndex,startLine,endLine){
+		function delRow(heather,context){
+			var cm = heather.editor;
+			var node = context.node;
+			var startLine = context.startLine;
+			var endLine = context.endLine;	
+			var rowIndex = context.rowIndex;		
+			
 			if(rowIndex < 1) return ;
 			var array = [];
 			var lineIndex = 0;
@@ -2222,7 +2281,9 @@ var Heather = (function(){
 				lineIndex ++;
 			});
 			cm.setSelection({line:startLine,ch:0},{line:endLine,ch:0});
-			cm.replaceSelection(array.join('\n'));
+			var text = array.join('\n')+'\n';
+			cm.replaceSelection(text);
+			
 			cm.focus();
 			var line = line - 1;
 			if(line == startLine + 1){
@@ -2234,7 +2295,13 @@ var Heather = (function(){
 			})
 		}
 		
-		function addRow(cm,rowIndex,startLine,endLine,before,node){
+		function addRow(heather,context,before){
+			var cm = heather.editor;
+			var node = context.node;
+			var startLine = context.startLine;
+			var endLine = context.endLine;	
+			var rowIndex = context.rowIndex;	
+			
 			if(rowIndex == 0 && before === true) return ;
 			var lineIndex = rowIndex < 1 ? rowIndex : rowIndex+1;
 			var newLine = '';
@@ -2263,7 +2330,6 @@ var Heather = (function(){
 				if(rowIndex == 0){
 					targetLine = startLine + 1;
 				}
-				if(targetLine >= cm.lineCount()) return ;
 				cm.setSelection({line:targetLine,ch:cm.getLine(targetLine).length});
 				cm.replaceSelection('\n'+newLine);
 				cm.focus();
@@ -2362,7 +2428,7 @@ var Heather = (function(){
 		if(heather.commandWidget){
 			heather.commandWidget.remove();
 			heather.commandWidget = undefined;
-			triggerEvent(heather,'commandWidgetChange',false);
+			triggerEvent(heather,'commandWidgetClose',this);
 		}
 	}
 	
@@ -2384,7 +2450,7 @@ var Heather = (function(){
 		
 		cm.on('cursorActivity',remove);
 		heather.commandWidget = div;
-		triggerEvent(heather,'commandWidgetChange',true,div);
+		triggerEvent(heather,'commandWidgetOpen',div);
 		return div;
 	}
 	
@@ -2395,9 +2461,9 @@ var Heather = (function(){
 		div.style.maxHeight = '';
 		div.style.overflowY = '';
 		
-		var top = pos.top-cm.getScrollInfo().top-heather.getToolbar().getHeight();
+		var top = pos.top-cm.getScrollInfo().top-heather.top.getHeight();
 		var left = parseFloat(div.style.left);
-		var code = cm.getWrapperElement().querySelector('.CodeMirror-code');
+		var code = cm.display.lineDiv;
 		if(left + div.clientWidth + 5 > code.clientWidth){
 			div.style.left = '';
 			div.style.right = '5px';
@@ -2407,7 +2473,7 @@ var Heather = (function(){
 		if(top > distance+div.clientHeight){
 			div.style.top = (pos.top -  div.clientHeight)+'px';
 		} else {
-			var currentSpace = cm.getWrapperElement().clientHeight - (top + distance + heather.getToolbar().getHeight());
+			var currentSpace = cm.getWrapperElement().clientHeight - (top + distance + heather.top.getHeight());
 			if(currentSpace - div.clientHeight < 0){
 				div.style.overflowY = 'auto';
 				if(currentSpace > top){
@@ -2428,24 +2494,22 @@ var Heather = (function(){
 		var cm = heather.editor;
 		var line = cm.getCursor().line;
 		var heading = 1;
-		if(heather.node){
-			var nodes = heather.node.children;
-			for(var i=nodes.length-1;i>=0;i--){
-				var node = nodes[i];
-				var startLine = parseInt(node.dataset.line);
-				if(startLine <= line){
-					var tagName = node.tagName;
-					if(tagName.startsWith('H')){
-						var h = parseInt(tagName.substring(1));
-						if(h >= 1 && h <= 6){
-							heading = h;
-							break;
-						}
+		var nodes = heather.node.children;
+		for(var i=nodes.length-1;i>=0;i--){
+			var node = nodes[i];
+			var startLine = parseInt(node.dataset.line);
+			if(startLine <= line){
+				var tagName = node.tagName;
+				if(tagName.startsWith('H')){
+					var h = parseInt(tagName.substring(1));
+					if(h >= 1 && h <= 6){
+						heading = h;
+						break;
 					}
 				}
 			}
 		}
-		
+	
 		cm.replaceSelection("#".repeat(heading)+" "+cm.getSelection());
 		cm.focus();
 	}
@@ -2550,21 +2614,7 @@ var Heather = (function(){
 	}
 	
 	commands['code'] = function(heather){
-		var cm = heather.editor;
-		var text = cm.getSelection();
-		if (text == '') {
-			cm.replaceRange("``", cm.getCursor());
-			cm.focus();
-			var start_cursor = cm.getCursor();
-			var cursorLine = start_cursor.line;
-			var cursorCh = start_cursor.ch;
-			cm.setCursor({
-				line: cursorLine,
-				ch: cursorCh - 1
-			});
-		} else {
-			cm.replaceSelection("`" + text + "`");
-		}
+		runWrapCommand(heather,'`');
 	}
 	
 	commands['codeBlock'] = function(heather){
@@ -2603,23 +2653,7 @@ var Heather = (function(){
 	}
 	
 	commands['strikethrough'] = function(heather){
-		var cm = heather.editor;
-		var text = cm.getSelection();
-		if (text == '') {
-			cm.replaceRange("~~~~", cm.getCursor());
-			cm.focus();
-			var str = "~~";
-			var mynum = str.length;
-			var start_cursor = cm.getCursor();
-			var cursorLine = start_cursor.line;
-			var cursorCh = start_cursor.ch;
-			cm.setCursor({
-				line: cursorLine,
-				ch: cursorCh - mynum
-			});
-		} else {
-			cm.replaceSelection("~~" + text + "~~");
-		}
+		runWrapCommand(heather,'~~');
 	}
 	
 	commands['mermaid'] = function(heather){
@@ -2678,33 +2712,20 @@ var Heather = (function(){
 	}
 	
 	commands['bold'] = function(heather){
-		var cm = heather.editor;
-		var text = cm.getSelection();
-		if (text == '') {
-			cm.replaceRange("****", cm.getCursor());
-			cm.focus();
-			var str = "**";
-			var mynum = str.length;
-			var start_cursor = cm.getCursor();
-			var cursorLine = start_cursor.line;
-			var cursorCh = start_cursor.ch;
-			cm.setCursor({
-				line: cursorLine,
-				ch: cursorCh - mynum
-			});
-		} else {
-			cm.replaceSelection("**" + text + "**");
-		}
+		runWrapCommand(heather,'**');
 	}
 	
 	commands['italic'] = function(heather){
+		runWrapCommand(heather,'*');
+	}
+	
+	function runWrapCommand(heather,wrap){
 		var cm = heather.editor;
 		var text = cm.getSelection();
 		if (text == '') {
-			cm.replaceRange("**", cm.getCursor());
+			cm.replaceRange(wrap+wrap, cm.getCursor());
 			cm.focus();
-			var str = "*";
-			var mynum = str.length;
+			var mynum = wrap.length;
 			var start_cursor = cm.getCursor();
 			var cursorLine = start_cursor.line;
 			var cursorCh = start_cursor.ch;
@@ -2713,7 +2734,7 @@ var Heather = (function(){
 				ch: cursorCh - mynum
 			});
 		} else {
-			cm.replaceSelection("*" + text + "*");
+			cm.replaceSelection(wrap + text + wrap);
 		}
 	}
 	
@@ -2783,7 +2804,6 @@ var Heather = (function(){
     }
 	
 	function changeTastListStatus(heather,x,y){
-		if(heather.rendered !== true) return ;
 		var cm = heather.editor;
 		var cursor = cm.coordsChar({left:x, top:y}, 'window');
 		var nodes = heather.getNodesByLine(cursor.line);
@@ -2791,7 +2811,8 @@ var Heather = (function(){
 		var node = nodes[nodes.length - 1];
 		if(node.classList.contains('task-list-item')){
 			var lineStr = cm.getLine(cursor.line);
-			if(lineStr.substring(0,cursor.ch).replaceAll(' ','') == '-['){
+			var quoteSize = getQuoteSizeAtLine(cm,cursor.line);
+			if(lineStr.trimLeft().substring(quoteSize*2,cursor.ch).replaceAll(' ','') == '-['){
 				//need change 
 				var checkbox = node.firstChild;
 				if(checkbox != null && checkbox.type == 'checkbox'){
@@ -2807,6 +2828,7 @@ var Heather = (function(){
 							break;
 						}
 					}
+					
 					if(!Util.isUndefined(startCh) && !Util.isUndefined(endCh)){
 						cm.setSelection({line:cursor.line,ch:startCh+1},{line:cursor.line,ch:endCh});
 						if(checkbox.checked){
@@ -2842,7 +2864,7 @@ var Heather = (function(){
 					var old = oldEle.value;
 					var now = nowEle.value;
 					if (old == now) {
-						//更新属性
+						//鏇存柊灞炴€�
 						Util.cloneAttributes(f, t);
 						return false;
 					}
@@ -2887,6 +2909,22 @@ var Heather = (function(){
 		return prefix;
 	}
 	
+	function registerEvents(...args){
+		var unregisters = args[args.length - 1];
+		var heather = args[args.length - 3];
+		var handler = args[args.length - 2];
+		for(var i=0;i<args.length-3;i++){
+			unregisters.push(heather.on(args[i],handler))
+		}
+		return unregisters;
+	}
+	function unregisterEvents(unregisters){
+		for(const reg of unregisters){
+			try{
+				reg.off();
+			}catch(e){console.log(e)};
+		}
+	}	
 	return {
 		create : function(textarea,config){
 			return new Editor(textarea,config);

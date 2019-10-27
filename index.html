@@ -81,15 +81,10 @@ font-size: 16px;
 	});
 
 	
-	var selectionHelperOpen = false;
-	heather.on('selectionHelperChange',function(sc){
-		selectionHelperOpen = sc;
-	})
-	
 	
 	if(Heather.Util.mobile){
 		toolbar.addIcon('fas fa-arrows-alt heather_icon', function() {
-			if(!selectionHelperOpen){
+			if(!heather.hasSelectionHelper()){
 				heather.openSelectionHelper();
 			} else {
 				heather.closeSelectionHelper();
@@ -109,6 +104,7 @@ font-size: 16px;
 	}
 
 	heather.setFullscreen(true);
+	
 </script>
 </body>
 </html>
