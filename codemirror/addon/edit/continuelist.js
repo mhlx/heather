@@ -41,7 +41,7 @@
         cm.execCommand("newlineAndIndent");
         return;
       }
-	  var emptyQuote = line.trim() == '>';
+	  var emptyQuote = line.trimLeft().split("> ").join('') == '';
       if (emptyListRE.test(line) || emptyQuote) {
         if (!/>\s*$/.test(line) || emptyQuote) cm.replaceRange("", {
           line: pos.line, ch: 0

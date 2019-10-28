@@ -134,13 +134,13 @@ var Heather = (function(){
 		var cm = this.editor;
 		var addNode = function(node){
 			for(const dataLine of node.querySelectorAll('[data-line]')){
+				if(dataLine.hasAttribute('data-html')) continue;
 				var _startLine = parseInt(dataLine.dataset.line);
 				var _endLine = parseInt(dataLine.dataset.endLine);
 				if (_startLine <= line && _endLine > line) {
-					var clone = dataLine.cloneNode(true);
-					clone.startLine = _startLine;
-					clone.endLine = _endLine;
-					nodes.push(clone);
+					dataLine.startLine = _startLine;
+					dataLine.endLine = _endLine;
+					nodes.push(dataLine);
 					addNode(dataLine);
 					break;
 				}
@@ -492,7 +492,7 @@ var Heather = (function(){
 			checkGutterWidth();
 		}
 		
-		editor.on('change',function(cm){
+		editor.on('changes',function(cm){
 			heather.render();
 			checkGutterWidth();
 		});
@@ -570,6 +570,8 @@ var Heather = (function(){
 	}
 		
 	function initKeyMap(heather) {
+		
+		var unorderedListRE = /[*+-]\s/;
 		
 		function toggleFullscreen(){
 			heather.setFullscreen(!heather.isFullscreen());
@@ -1037,9 +1039,6 @@ var Heather = (function(){
 			div.classList.add('heather_toolbar_bar');
 			div.setAttribute('data-widget','');
 			
-			var gutterWidth = cm.getGutterElement().offsetWidth;
-			div.style.left = gutterWidth + 'px';
-			
 			heather.top.div.appendChild(div);
 			this.height = 0;
 			this.heather = heather;
@@ -1177,7 +1176,7 @@ var Heather = (function(){
 		CommandBar.prototype.setKeepHidden = function(keepHidden){
 			if(keepHidden === true && this.bar)
 				this.bar.style.display = 'none';
-			if(keepHidden !== true && (this.heather.hasSelectionHelper() || !Util.isUndefined(this.heather.commandWidget))) return
+			if(keepHidden !== true && (this.heather.hasSelectionHelper() || !Util.isUndefined(this.heather.commandWidgetState))) return
 			if(keepHidden !== true && this.bar)
 				this.bar.style.display = '';
 			this.keepHidden = keepHidden === true;
@@ -1310,13 +1309,11 @@ var Heather = (function(){
 					this.widget.hide();
 				}
 			} else {
-				
 				if(this.heather.hasSelectionHelper()
-					|| !Util.isUndefined(this.heather.commandWidget)
+					|| !Util.isUndefined(this.heather.commandWidgetState)
 					|| this.heather.hasSyncView()){
 					return ;
 				}
-				
 				if(this.widget){
 					this.widget.update();
 				}
@@ -1331,7 +1328,7 @@ var Heather = (function(){
 				var div = document.createElement('div');
 				div.classList.add('markdown-body');
 				div.classList.add('heather_part_preview');
-				div.style.visibility = 'hidden';
+				div.style.display = 'none';
 				div.setAttribute('data-widget','');
 				div.addEventListener('click',function(e){
 					if(preview.disable === true) return ;
@@ -1375,10 +1372,8 @@ var Heather = (function(){
 				var div = this.widget.firstChild.cloneNode(false);
 				div.innerHTML = html;
 				div = morphdomUpdate(this.widget.firstChild,div);
-				if(div === this.widget.firstChild){
-					this.show();
-					this.scrollContent(nodeStatus);
-				}
+				this.show();
+				this.scrollContent(nodeStatus);
 			}
 			
 			Widget.prototype.hide = function() {
@@ -1386,9 +1381,10 @@ var Heather = (function(){
 			}
 
 			Widget.prototype.show = function() {
-				this.updatePosition();
-				if(this.keepHidden !== true)
+				if(this.keepHidden !== true){
 					this.widget.style.display = '';
+					this.updatePosition();
+				}
 			}
 
 			Widget.prototype.remove = function() {
@@ -1414,8 +1410,8 @@ var Heather = (function(){
 				var editor = this.preview.editor;
 				var pos = editor.cursorCoords(true,'local');
 				var bar = this.preview.heather.commandBar.bar;
-				var toolbarHeight = this.preview.heather.top.getHeight();
-				var top = pos.top - editor.getScrollInfo().top - toolbarHeight;
+				var topHeight = this.preview.heather.top.getHeight();
+				var top = pos.top - editor.getScrollInfo().top - topHeight;
 				var distance = 2*editor.defaultTextHeight()+(bar ? 5 : 0);
 				var height = (bar ? bar.clientHeight : 0) + this.widget.clientHeight;
 				if(top > height + distance){
@@ -2308,7 +2304,7 @@ var Heather = (function(){
 			var tr = node.querySelectorAll('tr')[rowIndex];
 			var rowLine = cm.getLine(startLine+rowIndex);
 			var startSpaceLength = rowLine.length - rowLine.trimStart().length;
-			var quoteSize = getQuoteSizeAtLine(cm,startLine);
+			var quoteSize = getQuoteSize(rowLine.trimLeft());
 			newLine += quoteSize>0 ? " ".repeat(Math.max(0,startSpaceLength))+"> ".repeat(quoteSize) :  " ".repeat(startSpaceLength);
 			for(var i=0;i<tr.children.length;i++){
 				newLine += '|    ';
@@ -2343,7 +2339,6 @@ var Heather = (function(){
 		return TableHelper;
 	
 	})();
-	
 	
 	function createListCommandWidget(heather,items){
 		var ul = document.createElement('ul');
@@ -2414,20 +2409,27 @@ var Heather = (function(){
 		
 		heather.editor.addKeyMap(keyMap);
 		
+		var state = heather.commandWidgetState || {};
+		state.keyMap = keyMap;
+		heather.commandWidgetState = state;
+		
 		for(const li of ul.querySelectorAll('li')){
 			li.addEventListener('click',function(){
 				execute(this);
 			})
 		}
-		
 		return ul;
 	}
 	
 	
 	function removeCommandWidget(heather){
-		if(heather.commandWidget){
-			heather.commandWidget.remove();
-			heather.commandWidget = undefined;
+		var cws = heather.commandWidgetState
+		if(cws){
+			cws.widget.remove();
+			if(cws.keyMap){
+				heather.editor.removeKeyMap(cws.keyMap);
+			}
+			heather.commandWidgetState = undefined;
 			triggerEvent(heather,'commandWidgetClose',this);
 		}
 	}
@@ -2449,7 +2451,9 @@ var Heather = (function(){
 		}
 		
 		cm.on('cursorActivity',remove);
-		heather.commandWidget = div;
+		var cws = heather.commandWidgetState || {};
+		cws.widget = div;
+		heather.commandWidgetState = cws;
 		triggerEvent(heather,'commandWidgetOpen',div);
 		return div;
 	}
@@ -2811,8 +2815,10 @@ var Heather = (function(){
 		var node = nodes[nodes.length - 1];
 		if(node.classList.contains('task-list-item')){
 			var lineStr = cm.getLine(cursor.line);
-			var quoteSize = getQuoteSizeAtLine(cm,cursor.line);
-			if(lineStr.trimLeft().substring(quoteSize*2,cursor.ch).replaceAll(' ','') == '-['){
+			var lineLeft = lineStr.trimLeft();
+			var startBlankLength = lineStr.length - lineLeft.length;
+			var quoteSize = getQuoteSize(lineLeft);
+			if(lineLeft.substring(quoteSize*2,cursor.ch-startBlankLength).replaceAll(' ','') == '-['){
 				//need change 
 				var checkbox = node.firstChild;
 				if(checkbox != null && checkbox.type == 'checkbox'){
@@ -2876,11 +2882,6 @@ var Heather = (function(){
 		return elem;
 	}	
 	
-	function getQuoteSizeAtLine(cm,lineNumber){
-		var lineStr = cm.getLine(lineNumber);
-		return getQuoteSize(lineStr);
-	}
-	
 	function getQuoteSizeAtPoint(cm,cursor){
 		var left = cm.getLine(cursor.line).substring(0,cursor.ch).trimStart();
 		return getQuoteSize(left);
@@ -2932,6 +2933,7 @@ var Heather = (function(){
 		commands : commands,
 		lazyRes : lazyRes,
 		Util : Util,
-		defaultConfig : defaultConfig
+		defaultConfig : defaultConfig,
+		version : '2.1.2'
 	};
 })();

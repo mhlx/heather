@@ -5,12 +5,11 @@
 	margin-right: 10px;
 	margin-bottom: 5px
 }
-
-.heather_toolbar_bar {
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: 0;
+.heather_top{
+	position:absolute;
+	top:0px;
+	width:100%;
+	z-index:99;
 }
 
 .heather_toolbar_bar,
@@ -18,12 +17,12 @@
 	overflow-y: auto;
 	white-space: nowrap;
 	width: 95%;
-	position: absolute;
-	z-index: 99;
 	margin-left: 5px;
 }
 
 .heather_command_bar {
+	z-index: 99;
+	position: absolute;
 	left: 0px !important;
 }
 
@@ -83,7 +82,7 @@
 
 @media (max-width:768px) {
 	.heather_icon {
-		font-size: 24px;
+		font-size: 30px;
 	}
 }
 
