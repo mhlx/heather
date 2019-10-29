@@ -1,5 +1,22 @@
 # heather 2.0
 
+## 浏览器支持
+
+### 电脑端
+
+1. chrome
+
+### 移动端
+
+1. iOS safari
+2. andriod chrome
+
+其他浏览器没做测试，但应该能在最新版的Firefox以及chrome内核的浏览器上正常工作
+
+### 不支持的浏览器
+1. IE
+2. Edge
+
 ## 特性
 
 1. 支持mermaid图表、katex
