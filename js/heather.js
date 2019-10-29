@@ -2079,6 +2079,8 @@ var Heather = (function(){
 				var nodes = heather.getNodesByLine(line);
 				if(nodes.length == 0) return 'no';
 				var node = nodes[nodes.length-1];
+				if(node.tagName == 'P') node = nodes[nodes.length - 2];
+				if(!node) return 'no';
 				if(node.tagName !== 'TABLE') return 'no';
 				var startLine = node.startLine;
 				var endLine = node.endLine;
@@ -2127,8 +2129,10 @@ var Heather = (function(){
 				var line = cursor.line;
 				var nodes = heather.getNodesByLine(line);
 				var mappingElem;
-				if(nodes.length > 0)
+				if(nodes.length > 0){
 					mappingElem = nodes[nodes.length-1];
+					if(mappingElem.tagName == 'P') mappingElem = nodes[nodes.length-2];
+				}
 				if(mappingElem && mappingElem.tagName === 'TABLE'){
 					var startLine = parseInt(mappingElem.dataset.line);
 					var endLine = parseInt(mappingElem.dataset.endLine) - 1;
@@ -2874,15 +2878,18 @@ var Heather = (function(){
 		var nodes = heather.getNodesByLine(cursor.line);
 		if(nodes.length == 0) return ;
 		var node = nodes[nodes.length - 1];
+		if(node.tagName == 'P') node = nodes[nodes.length-2];
+		if(!node) return ;
 		if(node.classList.contains('task-list-item')){
 			var lineStr = cm.getLine(cursor.line);
 			var lineLeft = lineStr.trimLeft();
 			var startBlankLength = lineStr.length - lineLeft.length;
 			var quoteSize = getQuoteSize(lineLeft);
-			if(lineLeft.substring(quoteSize*2,cursor.ch-startBlankLength).replaceAll(' ','') == '-['){
+			var lft = lineLeft.substring(quoteSize*2,cursor.ch-startBlankLength).replaceAll(' ','');
+			if(lft == '-[' || lft == '-[x'){
 				//need change 
-				var checkbox = node.firstChild;
-				if(checkbox != null && checkbox.type == 'checkbox'){
+				var checkbox = node.querySelector('.task-list-item-checkbox');
+				if(checkbox != null){
 					var startCh,endCh;
 						
 					for(var i=0;i<lineStr.length;i++){
