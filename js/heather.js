@@ -495,7 +495,7 @@ var Heather = (function(){
 			checkGutterWidth();
 		}
 		
-		editor.on('changes',function(cm){
+		editor.on('change',function(cm){
 			heather.render();
 			checkGutterWidth();
 		});
