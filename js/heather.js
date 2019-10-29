@@ -343,7 +343,6 @@ var Heather = (function(){
 					me.editor.off(eventName,handler)
 				}
 			}
-			return ;
 		}
 		this.eventHandlers.push({
 			name : eventName,
