@@ -124,6 +124,10 @@ var Heather = (function(){
 		this.editor.setValue(value);
 	}	
 	
+	Editor.prototype.getHtmlNode = function(){
+		return this.node;
+	}
+	
 	Editor.prototype.isFileUploadEnable = function(){
 		var config = this.config.upload;
 		return !Util.isUndefined(config) && !Util.isUndefined(config.url) && !Util.isUndefined(config.uploadFinish);
@@ -388,7 +392,7 @@ var Heather = (function(){
 				registerEvents('editor.resize',this,setPadding,unregisters);
 			}
 			
-			registerEvents('editor.change','editor.touchstart','fullscreenChange',this,function(cm){
+			registerEvents('editor.change','fullscreenChange',this,function(cm){
 				scrollToMiddleByCursor(me);
 			},unregisters);
 			
@@ -557,6 +561,17 @@ var Heather = (function(){
 				}
 			}
 		});
+		
+		editor.on('optionChange',function(cm,option){
+			if(option === 'readOnly'){
+				if(cm.isReadOnly()){
+					removeCommandWidget(heather);
+					heather.commandBar.setKeepHidden(true);
+				} else {
+					heather.commandBar.setKeepHidden(false);
+				}
+			}
+		})
 
 	}
 	
@@ -570,8 +585,6 @@ var Heather = (function(){
 	}
 		
 	function initKeyMap(heather) {
-		
-		var unorderedListRE = /[*+-]\s/;
 		
 		function toggleFullscreen(){
 			heather.setFullscreen(!heather.isFullscreen());
@@ -1197,16 +1210,22 @@ var Heather = (function(){
 				heather.execCommand('italic')
 			});
 			
-			bar.addIcon('fas fa-strikethrough heather_icon', function() {
-				heather.execCommand('strikethrough');
-			})
-			
 			bar.addIcon('fas fa-link heather_icon', function() {
 				heather.execCommand('link');
 			})
 			
 			bar.addIcon('fas fa-code heather_icon', function() {
 				heather.execCommand('code');
+			})
+			
+			bar.addIcon('fas heather_icon', function() {
+				heather.execCommand('br');
+			},function(ele){
+				ele.innerHTML = 'BR'
+			})
+			
+			bar.addIcon('fas fa-strikethrough heather_icon', function() {
+				heather.execCommand('strikethrough');
 			})
 
 			bar.addIcon('fas fa-undo heather_icon', function() {
@@ -2537,9 +2556,19 @@ var Heather = (function(){
 				heather.execCommand('codeBlock');
 			}
 		},{
+			html : '无序列表',
+			handler : function(){
+				heather.execCommand('unorderedList');
+			}
+		},{
+			html : '有序列表',
+			handler : function(){
+				heather.execCommand('orderedList');
+			}
+		},{
 			html : '任务列表',
 			handler : function(){
-				heather.execCommand('tasklist');
+				heather.execCommand('taskList');
 			}
 		},{
 			html : '引用',
@@ -2611,39 +2640,27 @@ var Heather = (function(){
 		}	
 	}
 	
-	commands['tasklist'] = function(heather){
-		var cm = heather.editor;
-		cm.replaceSelection('- [ ] '+cm.getSelection());
-		cm.focus();
+	commands['taskList'] = function(heather){
+		runListCommand(heather,'taskList')
+	}
+	
+	commands['orderedList'] = function(heather){
+		runListCommand(heather,'orderedList')
+	}
+	
+	commands['unorderedList'] = function(heather){
+		runListCommand(heather,'unorderedList')
 	}
 	
 	commands['code'] = function(heather){
 		runWrapCommand(heather,'`');
 	}
 	
-	commands['codeBlock'] = function(heather){
-		var cm = heather.editor;
-		var cursor = cm.getCursor();
-		var prefix = createPrefix(cm,cursor);
-		var newText = "``` ";
-		newText += '\n';
-		newText += prefix+cm.getSelection();
-		newText += '\n'
-		newText += prefix+"```";
-		cm.replaceSelection(newText);
-		cm.focus();
-		cm.setCursor({
-			line:cursor.line+1,
-			ch : cursor.ch
-		});
-	}
-	
 	commands['link'] = function(heather){
 		var cm = heather.editor;
-		var text = cm.getSelection();
-		if (text == '') {
-			cm.replaceRange("[](https://)", cm.getCursor());
-			cm.focus();
+		cm.focus();
+		if (!cm.somethingSelected()) {
+			cm.replaceSelection("[](https://)");
 			var start_cursor = cm.getCursor();
 			var cursorLine = start_cursor.line;
 			var cursorCh = start_cursor.ch;
@@ -2652,7 +2669,7 @@ var Heather = (function(){
 				ch: cursorCh - 11
 			});
 		} else {
-			cm.replaceSelection("[" + text + "](https://)");
+			cm.replaceSelection("[" + cm.getSelection() + "](https://)");
 		}
 	}
 	
@@ -2661,58 +2678,21 @@ var Heather = (function(){
 	}
 	
 	commands['mermaid'] = function(heather){
-		var cm = heather.editor;
-		var cursor = cm.getCursor();
-		var prefix = createPrefix(cm,cursor);
-		var newText = "``` mermaid";
-		newText += '\n';
-		newText += prefix+cm.getSelection();
-		newText += '\n'
-		newText += prefix+"```";
-		cm.replaceSelection(newText);
-		cm.focus();
-		cm.setCursor({
-			line:cursor.line+1,
-			ch : cursor.ch
-		})
+		runWrapBlockCommand(heather,'``` mermaid','```');
+	}
+	
+	commands['codeBlock'] = function(heather){
+		runWrapBlockCommand(heather,'``` ','```');
 	}
 	
 	commands['mathBlock'] = function(heather){
-		var cm = heather.editor;
-		var cursor = cm.getCursor();
-		var prefix = createPrefix(cm,cursor);
-		var newText = "$$";
-		newText += '\n';
-		newText += prefix+cm.getSelection();
-		newText += '\n'
-		newText += prefix+"$$";
-		cm.replaceSelection(newText);
-		cm.focus();
-		cm.setCursor({
-			line:cursor.line+1,
-			ch : cursor.ch
-		})
+		runWrapBlockCommand(heather,'$$','$$');
 	}
 	
 	commands['quote'] = function(heather){
-		var cm = heather.editor;
-		var cursor = cm.getCursor();
-		var prefix = createPrefix(cm,cursor);
-		var text = cm.getSelection();
-		var lines = text.split('\n');
-		var newText = '';
-		for(var i=0;i<lines.length;i++){
-			var line = lines[i].trimStart();
-			if(i > 0){
-				newText += prefix + '> ' + line
-			} else {
-				newText += "> "+line;
-			}
-			if(i < lines.length - 1)
-				newText += '\n'
-		}
-		cm.replaceSelection(newText);
-		cm.focus();
+		runBlockCommand(heather,function(line,i,startBlankLength,noSelection,singleLine){
+			return '> ' + line + (noSelection || singleLine ? '' : '  ');
+		})
 	}
 	
 	commands['bold'] = function(heather){
@@ -2723,22 +2703,104 @@ var Heather = (function(){
 		runWrapCommand(heather,'*');
 	}
 	
+	commands['br'] = function(heather){
+		var cm = heather.editor;
+		cm.replaceSelection('<br>');
+		cm.focus();
+		var cursor = cm.getCursor('from');
+		cursor.ch = cursor.ch + 4;
+		cm.setCursor(cursor);
+	}
+	
+	function runListCommand(heather,type){
+		runBlockCommand(heather,function(line,index){
+			if(type == 'orderedList'){
+				return (index+1)+'. '+line;
+			}
+			if(type == 'unorderedList'){
+				return '- '+line;
+			}
+			if(type == 'taskList'){
+				return '- [ ] '+line;
+			}
+		})
+	}
+	
+	function runWrapBlockCommand(heather,start,after){
+		var last = heather.editor.getCursor('to');
+		var first = heather.editor.getCursor('from');
+		var resetCursor = false;
+		runBlockCommand(heather,function(line,i,startBlankLength,noSelection,singleLine){
+			if(noSelection){
+				resetCursor = true;
+				var blank = ' '.repeat(last.ch);
+				return start+'\n'+blank+'\n'+blank+after;
+			} else {
+				if(i == 0){
+					if(last.line - first.line == 0){
+						return start+'\n'+' '.repeat(startBlankLength) + line+'\n'+' '.repeat(startBlankLength)+after;
+					}
+					return start+'\n'+' '.repeat(startBlankLength) + line;
+				}
+				if(i == last.line - first.line)
+					return line + '\n'+' '.repeat(startBlankLength)+after;
+				return line;
+			}
+		});
+		if(resetCursor){
+			heather.editor.setCursor({
+				line:last.line+1,
+				cursor:last.ch
+			})
+		}
+	}
+
+	
+	function runBlockCommand(heather,lineHandler){
+		var cm = heather.editor;
+		cm.focus();
+		if(!cm.somethingSelected()){
+			cm.replaceSelection(lineHandler('',0,0,true,true));
+		} else {
+			var texts = cm.getSelection().split('\n');
+			var replaces = [];
+			var from = cm.getCursor('from');
+			var singleLine = from.line == cm.getCursor('to').line;
+			for(var i=0;i<texts.length;i++){
+				var text = texts[i];
+				if(i == 0){
+					var fullLine = cm.getLine(from.line);
+					var startBlankLength = fullLine.length - fullLine.trimLeft().length;
+					var firstLineStartsWithBlank = fullLine.substring(0,from.ch).trimLeft() == '';
+					if(!firstLineStartsWithBlank){
+						replaces.push("\n"+' '.repeat(startBlankLength)+lineHandler(text,i,startBlankLength,false,singleLine));
+					} else {
+						from.ch = 0;
+						replaces.push(' '.repeat(startBlankLength)+lineHandler(text.trimLeft(),i,startBlankLength,false,singleLine));
+					}
+				} else {
+					var startBlankLength = text.length - text.trimLeft().length;
+					replaces.push(' '.repeat(startBlankLength)+lineHandler(text.trimLeft(),i,startBlankLength,false,singleLine));
+				}
+			}
+			cm.replaceSelection(replaces.join('\n'))
+		}
+	}
+	
 	function runWrapCommand(heather,wrap){
 		var cm = heather.editor;
-		var text = cm.getSelection();
-		if (text == '') {
-			cm.replaceRange(wrap+wrap, cm.getCursor());
-			cm.focus();
-			var mynum = wrap.length;
+		cm.focus();
+		if(!cm.somethingSelected()){
+			cm.replaceSelection(wrap+wrap);
 			var start_cursor = cm.getCursor();
 			var cursorLine = start_cursor.line;
 			var cursorCh = start_cursor.ch;
 			cm.setCursor({
 				line: cursorLine,
-				ch: cursorCh - mynum
+				ch: cursorCh - wrap.length
 			});
 		} else {
-			cm.replaceSelection(wrap + text + wrap);
+			cm.replaceSelection(wrap + cm.getSelection() + wrap);
 		}
 	}
 	
