@@ -672,6 +672,7 @@ var Heather = (function(){
             html += '<span class="heather_selection_helper_wrap" data-arrow="goCharRight"><span class="heather_selection_helper_touch" ></span></span> ';
             html += '<span class="heather_selection_helper_wrap" data-arrow="goLineDown"><span class="heather_selection_helper_touch" ></span></span> ';
             html += '<span class="heather_selection_helper_wrap" data-arrow="goCharLeft"><span class="heather_selection_helper_touch" ></span></span> ';
+			html += '<div class="heather_selection_helper_close"><i class="fas fa-times heather_icon" style="margin:0px !important"></i></div> ';
 			
 			var div = document.createElement('div');
 			div.classList.add('heather_selection_helper');
@@ -680,12 +681,13 @@ var Heather = (function(){
 			div.innerHTML = html;
 			editor.addWidget({line:0,ch:0},div);
 			
-			
-			var pos = function(){
-				div.innerHTML = html;
+			var resize = function(){
 				var w = editor.getWrapperElement().clientWidth*0.6;
 				div.style.width = w+'px'
 				div.style.height = w+'px';
+			}
+			
+			var pos = function(){
 				div.style.left = '';
 				if(heather.isFullscreen()){
 					div.style.position = 'fixed';
@@ -703,7 +705,7 @@ var Heather = (function(){
 					div.style.top = top+'px';
 				}
 			}
-			
+			resize();
 			pos();
 			div.style.visibility = 'visible';
 			
@@ -725,35 +727,44 @@ var Heather = (function(){
 			cursorActivityHandler(editor);
 			
 			editor.setOption('readOnly','nocursor');
-			div.addEventListener('click',function(e){
-				var target = e.target;
-				while(target != this){
-					if(target.hasAttribute('data-arrow')){
-						break;
-					}
-					target = target.parentElement;
-				}
-				if(target.hasAttribute('data-arrow')){
-					var action = target.dataset.arrow;
-					if(me.end){
-						editor.setCursor(me.end);
-					}
-					editor.execCommand(action);
-					me.end = editor.getCursor();
-					
-					var cursors = me.getCursors();
-					
-					if(me.marked){
-						me.marked.clear();
-					}
-					
-					me.marked = editor.markText(cursors.start,cursors.end, {
-						className: "heather_selection_marked"
-					});
-				}
+			
+			var close = div.querySelector('.heather_selection_helper_close').firstChild;
+			close.addEventListener('click',function(){
+				heather.closeSelectionHelper();
 			});
+			var moveCursor = function(action){
+				if(me.end){
+					editor.setCursor(me.end);
+				}
+				editor.execCommand(action);
+				me.end = editor.getCursor();
+				var cursors = me.getCursors();
+				if(me.marked){
+					me.marked.clear();
+				}
+				me.marked = editor.markText(cursors.start,cursors.end, {
+					className: "heather_selection_marked"
+				});
+			}
+			
+			var showCloseTimer;
+			
+			for(const arrow of div.querySelectorAll('[data-arrow]')){
+				arrow.addEventListener('touchstart',function(){
+					moveCursor(this.dataset.arrow);
+					close.style.display = 'none';
+				})
+				arrow.addEventListener('touchend',function(){
+					if(showCloseTimer)
+						clearTimeout(showCloseTimer);
+					showCloseTimer = setTimeout(function(){
+						close.style.display = '';
+					},300)
+				})
+			}
 			
 			registerEvents('editor.cursorActivity',heather,cursorActivityHandler,eventUnregisters);
+			registerEvents('editor.resize',heather,resize,eventUnregisters);
 			registerEvents('editor.mousedown','editor.touchstart',heather,function(cm,e){
 				if(isWidget(e.target,cm)){
 					e.codemirrorIgnore  = true;
@@ -765,7 +776,6 @@ var Heather = (function(){
 					me.marked.clear();
 				}
 			},eventUnregisters);
-			registerEvents('editor.resize',heather,pos,eventUnregisters);
 			
 			this.div = div;
 			this.heather = heather;
@@ -1871,7 +1881,7 @@ var Heather = (function(){
 			formData.append(this.name, this.file, fileName);
             var xhr = new XMLHttpRequest();
             var bar = document.createElement("div");
-            bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="fas fa-times middle-icon" style="position: absolute;top: 0;right: 0;"><i></div>'
+            bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="fas fa-times heather_icon" style="position: absolute;top: 0;right: 0;"><i></div>'
             bar.querySelector('i').addEventListener('click', function() {
                 xhr.abort();
             });

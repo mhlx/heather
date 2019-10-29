@@ -235,3 +235,9 @@
 .heather_selection_helper_touch:hover {
   background: tomato;
 }
+.heather_selection_helper_close{
+	position:absolute;
+	top: calc(50% - 15px);
+    left: calc(50% - 10.3px);
+	opacity:0.7;
+}
