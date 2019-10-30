@@ -685,10 +685,6 @@ var Heather = (function(){
 				var w = editor.getWrapperElement().clientWidth*0.6;
 				div.style.width = w+'px'
 				div.style.height = w+'px';
-			}
-			
-			var pos = function(){
-				div.style.left = '';
 				if(heather.isFullscreen()){
 					div.style.position = 'fixed';
 					div.style.top = '';
@@ -696,7 +692,13 @@ var Heather = (function(){
 				} else {
 					div.style.position = 'absolute';
 					div.style.bottom = '';
-					
+				}
+			}
+			
+			var pos = function(){
+				div.style.left = '';
+				if(!heather.isFullscreen()){
+					var w = editor.getWrapperElement().clientWidth*0.6;
 					var top = editor.cursorCoords(false,'local').top+editor.defaultTextHeight();
 					var h = editor.getScrollInfo().height;
 					if(top + w > h){
