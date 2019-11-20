@@ -102,7 +102,7 @@ var Heather = (function(){
 		this.gutterWidth = this.editor.getGutterElement().offsetWidth;
 		this.node = document.createElement('body');
 		this.top = new Top(this);
-		this.markdownParser = new MarkdownParser(config.markdownParser);
+		this.markdownParser = new MarkdownParser(config.markdownParser,this);
 		this.toolbar = new Toolbar(this,config);
 		this.commandBar = new CommandBar(this,config);
 		this.tooltip = new Tooltip(this.editor,config);
@@ -1483,7 +1483,7 @@ var Heather = (function(){
 	//markdown render that with line numbers
 	var MarkdownParser = (function(){
 		
-		function MarkdownParser(config){
+		function MarkdownParser(config,heather){
 			config = config||{};
 			if(!config.highlight){
 				config.highlight = function(str, lang) {
@@ -1500,7 +1500,7 @@ var Heather = (function(){
                 }
 			}
 			var md = window.markdownit(config);
-			addLineNumberAttribute(md);
+			addLineNumberAttribute(md,heather);
 			if(config.callback)
 				config.callback(md);
 			this.md = md;
@@ -1510,7 +1510,7 @@ var Heather = (function(){
 			return this.md.render(markdown);
 		}
 		
-		function addLineNumberAttribute(md){
+		function addLineNumberAttribute(md,heather){
 			var injectLineNumbers = function(tokens, idx, options, env, slf) {
 				var line;
 				if (tokens[idx].map) {
@@ -1533,7 +1533,14 @@ var Heather = (function(){
 			addFenceLineNumber(md);
 			addHtmlBlockLineNumber(md);
 			addCodeBlockLineNumber(md);
-			addMathBlockLineNumber(md);
+			LazyLoader.eventHandlers.push({
+				name : 'katex',
+				handler:function(){
+					addMathBlockLineNumber(md);
+					heather.render();
+				}
+			})
+			
 		}
 		
 		function addMathBlockLineNumber(md){
@@ -1871,6 +1878,7 @@ var Heather = (function(){
             this.fileUploadFinish = config.uploadFinish;
             this.heather = heather;
 			this.fileNameGen = config.fileNameGen;
+			this.withCredentials = config.withCredentials === true;
         }
 
         FileUpload.prototype.start = function() {
@@ -1882,8 +1890,16 @@ var Heather = (function(){
 				fileName = this.fileNameGen(this.file) || this.file.name;
 			formData.append(this.name, this.file, fileName);
             var xhr = new XMLHttpRequest();
+			if(this.withCredentials === true)
+				xhr.withCredentials = true;
             var bar = document.createElement("div");
-            bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="fas fa-times heather_icon" style="position: absolute;top: 0;right: 0;"><i></div>'
+			var scrollInfo = editor.getScrollInfo();
+			var scrollbarWidth = 0;
+			if(scrollInfo.height > scrollInfo.clientHeight){
+				var scroller = editor.getScrollerElement();
+				scrollbarWidth = scroller.offsetWidth - scroller.clientWidth;
+			}
+            bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="fas fa-times heather_icon" style="position: absolute;top: 0;right: '+scrollbarWidth+'px;"><i></div>'
             bar.querySelector('i').addEventListener('click', function() {
                 xhr.abort();
             });
@@ -1975,6 +1991,19 @@ var Heather = (function(){
 		
         var katexLoading = false;
         var katexLoaded = false;
+		var eventHandlers = [];
+		
+		function triggerEvent(name,... args){
+			for(var i=0;i<eventHandlers.length;i++){
+				var eh = eventHandlers[i];
+				if(eh.name === name){
+					try{
+						var handler = eh.handler;
+						handler.apply(this,args);
+					}catch(e){}
+				}
+			}	
+		}
 
         function loadKatex(callback) {
             if (katexLoaded) {
@@ -1991,6 +2020,7 @@ var Heather = (function(){
             document.head.appendChild(link);
 
             loadScript(lazyRes.katex_js, function() {
+				triggerEvent('katex')
                 katexLoaded = true;
                 if (callback) callback();
             })
@@ -2007,6 +2037,7 @@ var Heather = (function(){
             if (mermaidLoading) return;
             mermaidLoading = true;
             loadScript(lazyRes.mermaid_js, function() {
+				triggerEvent('mermaid')
                 mermaidLoaded = true;
                 if (callback) callback();
             })
@@ -2025,7 +2056,8 @@ var Heather = (function(){
 
         return {
             loadKatex: loadKatex,
-            loadMermaid: loadMermaid
+            loadMermaid: loadMermaid,
+			eventHandlers : eventHandlers
         }
     })();
 	
@@ -2841,7 +2873,6 @@ var Heather = (function(){
 					blocks.push(elem);
 				}
 			}
-			
 			for (var i = 0; i < blocks.length; i++) {
 				var block = blocks[i];
 				var expression = block.textContent;
@@ -3014,6 +3045,6 @@ var Heather = (function(){
 		lazyRes : lazyRes,
 		Util : Util,
 		defaultConfig : defaultConfig,
-		version : '2.1.2'
+		version : '2.1.2.2'
 	};
 })();
