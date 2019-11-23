@@ -178,19 +178,22 @@ var Heather = (function(){
 			div.classList.add('heather_preview');
 			div.innerHTML = this.node.innerHTML;
 			
-			var close = document.createElement('div');
-			close.classList.add('heather_preview_close');
-			close.innerHTML = '<i class="fas fa-eye-slash heather_icon"></i>';
-			div.appendChild(close);
-			
-			div.addEventListener('scroll',function(){
-				close.style.top = (this.scrollTop+10)+'px';
-			});
-			
 			var me = this;
-			close.addEventListener('click',function(){
-				me.setPreview(false);
-			})
+			if(this.config.disablePreviewCloseBtn !== true){
+				var close = document.createElement('div');
+				close.classList.add('heather_preview_close');
+				close.innerHTML = '<i class="fas fa-eye-slash heather_icon"></i>';
+				div.appendChild(close);
+				
+				div.addEventListener('scroll',function(){
+					close.style.top = (this.scrollTop+10)+'px';
+				});
+				
+				close.addEventListener('click',function(){
+					me.setPreview(false);
+				})
+			}
+			
 			
 			elem.after(div);
 			renderKatexAndMermaid(div);
