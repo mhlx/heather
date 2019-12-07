@@ -76,8 +76,8 @@
 
 .heather_preview_close {
 	position: absolute;
-	right: 30px;
-	top: 10px;
+	right: 5px;
+	top: 5px;
 }
 
 @media (max-width:768px) {

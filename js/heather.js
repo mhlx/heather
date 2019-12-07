@@ -116,6 +116,7 @@ var Heather = (function(){
 		}
 	}
 	
+	
 	Editor.prototype.getValue = function(){
 		return this.editor.getValue();
 	}
@@ -466,19 +467,32 @@ var Heather = (function(){
 	
 	function scrollToMiddleByCursor(heather,cursor){
 		var cm = heather.editor;
-		cm.operation(function(){
-			if(cm.somethingSelected()) return ;
-			var height = cm.getWrapperElement().clientHeight/2;
-			var pos = cm.cursorCoords(cursor || true,'local');
-			var space = pos.top - height + heather.top.getHeight();
-			if(Util.ios && heather.isFullscreen()){
-				//ios will scroll screen when focused
-				window.scrollTo(0,0);
-			}
-			cm.scrollTo(null, space);
+		if(cm.somethingSelected()) return ;
+		var height = cm.getWrapperElement().clientHeight/2;
+		var pos = cm.cursorCoords(cursor || true,'local');
+		var space = pos.top - height + heather.top.getHeight();
+		if(Util.ios && heather.isFullscreen()){
+			//ios will scroll screen when focused
+			window.scrollTo(0,0);
+		}
+		if(Util.mobile){
+			cm.scrollTo(null,space);
 			heather.commandBar.rePosition();
 			heather.partPreview.rePosition();
-		})
+		} else {
+			if(heather.scrollToMiddleTimer){
+				clearTimeout(heather.scrollToMiddleTimer);
+			}
+			heather.scrollToMiddleTimer = setTimeout(function(){
+				cm.display.scroller.scrollTo({
+					top : space,
+					behavior: 'smooth'
+				})
+				heather.commandBar.rePosition();
+				heather.partPreview.rePosition();
+				heather.scrollToMiddleTimer = undefined;
+			},200)
+		}
 	}
 	
 	function handleDefaultEditorEvent(heather){
@@ -3048,6 +3062,6 @@ var Heather = (function(){
 		lazyRes : lazyRes,
 		Util : Util,
 		defaultConfig : defaultConfig,
-		version : '2.1.2.2'
+		version : '2.1.2.3'
 	};
 })();
