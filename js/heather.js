@@ -78,10 +78,7 @@ var Heather = (function() {
             lineNumbers: true,
             dragDrop: true,
             extraKeys: {
-                'Enter': 'newlineAndIndentContinueMarkdownList',
-                "Ctrl-Q": function(cm) {
-                    cm.foldCode(cm.getCursor());
-                }
+                'Enter': 'newlineAndIndentContinueMarkdownList'
             },
             callback: function(cm) {}
         },
@@ -201,6 +198,10 @@ var Heather = (function() {
         addNode(this.node);
         return nodes;
     }
+	
+	Editor.prototype.fold = function(pos){
+		this.editor.foldCode(pos);
+	}
 
     Editor.prototype.isPreview = function() {
         return !Util.isUndefined(this.previewState);
@@ -668,6 +669,10 @@ var Heather = (function() {
         function indentLess() {
             heather.editor.execCommand('indentLess');
         }
+		
+		function fold(){
+			heather.fold(heather.editor.getCursor());
+		}
 
         var keyMap = Util.mac ? {
             "Cmd-B": 'bold',
@@ -676,6 +681,7 @@ var Heather = (function() {
             "Cmd-/": 'commands',
             "Cmd-Enter": toggleFullscreen,
             "Cmd-P": togglePreview,
+            "Cmd-Q": fold,
             "Tab": indentMore,
             "Shift-Tab": indentLess
         } : {
@@ -685,6 +691,7 @@ var Heather = (function() {
             "Alt-/": 'commands',
             "Ctrl-Enter": toggleFullscreen,
             "Ctrl-P": togglePreview,
+            "Ctrl-Q": fold,
             "Tab": indentMore,
             "Shift-Tab": indentLess
         }
