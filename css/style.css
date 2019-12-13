@@ -241,3 +241,6 @@
     left: calc(50% - 10.3px);
 	opacity:0.7;
 }
+.heather_sync_view table th{
+	word-break:keep-all;
+}
