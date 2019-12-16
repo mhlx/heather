@@ -7,7 +7,7 @@ var Heather = (function() {
     }
 
     var Util = (function() {
-
+        var parser = new DOMParser();
         var platform = navigator.platform;
         var userAgent = navigator.userAgent;
         var edge = /Edge\/(\d+)/.exec(userAgent);
@@ -37,12 +37,9 @@ var Heather = (function() {
 
         return {
             parseHTML: function(html) {
-                return new DOMParser().parseFromString(html, "text/html");
+                return parser.parseFromString(html, "text/html").body;
             },
             isUndefined: isUndefined,
-            getDefault: function(o, dft) {
-                return isUndefined ? dft : o;
-            },
             cloneAttributes: cloneAttributes,
             mobile: mobile,
             chrome: chrome,
@@ -73,7 +70,6 @@ var Heather = (function() {
             }
         },
         commandBarEnable: Util.mobile,
-        partPreviewEnable: !Util.mobile,
         editor: {
             lineNumbers: true,
             dragDrop: true,
@@ -82,10 +78,10 @@ var Heather = (function() {
             },
             callback: function(cm) {}
         },
-        autoRenderMill: 300,
-        renderSelected: false,
+        refreshDisplayMill: 300,
         tooltipEnable: true,
-        focused: true
+        focused: true,
+        asyncNodeUpdateMill: 50
     }
 
 
@@ -141,7 +137,7 @@ var Heather = (function() {
     function Editor(textarea, config) {
         config = Object.assign({}, defaultConfig, config);
         this.eventHandlers = [];
-        this.editor = createEditor(textarea, config);
+        this.editor = createEditor(textarea, config.editor);
         this.editor.heather = this;
         this.gutterWidth = this.editor.getGutterElement().offsetWidth;
         this.node = document.createElement('body');
@@ -150,9 +146,9 @@ var Heather = (function() {
         this.toolbar = new Toolbar(this, config);
         this.commandBar = new CommandBar(this, config);
         this.tooltip = new Tooltip(this.editor, config);
-        this.partPreview = new PartPreview(this, config);
         this.config = config;
         initKeyMap(this);
+        this.nodeUpdate = new NodeUpdate(this);
         handleDefaultEditorEvent(this);
         this.tableHelper = new TableHelper(this);
         if (config.focused === true) {
@@ -170,7 +166,7 @@ var Heather = (function() {
     }
 
     Editor.prototype.getHtmlNode = function() {
-        return this.node;
+        return this.node ? this.node.cloneNode(true) : undefined;
     }
 
     Editor.prototype.isFileUploadEnable = function() {
@@ -178,12 +174,12 @@ var Heather = (function() {
         return !Util.isUndefined(config) && !Util.isUndefined(config.url) && !Util.isUndefined(config.uploadFinish);
     }
 
-    Editor.prototype.getNodesByLine = function(line) {
+    Editor.prototype.getNodesByLine = function(line, includePlainHtmlNode) {
         var nodes = [];
         var cm = this.editor;
         var addNode = function(node) {
             for (const dataLine of node.querySelectorAll('[data-line]')) {
-                if (dataLine.hasAttribute('data-html')) continue;
+                if (dataLine.hasAttribute('data-html') && includePlainHtmlNode !== true) continue;
                 var _startLine = parseInt(dataLine.dataset.line);
                 var _endLine = parseInt(dataLine.dataset.endLine);
                 if (_startLine <= line && _endLine > line) {
@@ -198,10 +194,10 @@ var Heather = (function() {
         addNode(this.node);
         return nodes;
     }
-	
-	Editor.prototype.fold = function(pos){
-		this.editor.foldCode(pos);
-	}
+
+    Editor.prototype.fold = function(pos) {
+        this.editor.foldCode(pos);
+    }
 
     Editor.prototype.isPreview = function() {
         return !Util.isUndefined(this.previewState);
@@ -294,12 +290,12 @@ var Heather = (function() {
 
             this.editor.getRootNode().appendChild(div);
 
-            var mill = me.config.autoRenderMill;
+            var mill = me.config.refreshDisplayMill;
 
             var renderedHandler = function(value, html) {
-                if (me.renderTimeout)
-                    clearTimeout(me.renderTimeout);
-                me.renderTimeout = setTimeout(function() {
+                if (me.displayTimeout)
+                    clearTimeout(me.displayTimeout);
+                me.displayTimeout = setTimeout(function() {
                     var node = container.cloneNode(false);
                     node.innerHTML = html;
                     morphdomUpdate(container, node, me.config);
@@ -381,7 +377,6 @@ var Heather = (function() {
         }
         CodeMirror.signal(this.editor, "resize", this.editor);
         this.commandBar.rePosition();
-        this.partPreview.rePosition();
         triggerEvent(this, 'fullscreenChange', fullscreen === true);
     }
 
@@ -508,7 +503,7 @@ var Heather = (function() {
 
     Editor.prototype.render = function() {
         var value = this.editor.getValue();
-        var node = Util.parseHTML(this.markdownParser.render(value)).body;
+        var node = Util.parseHTML(this.markdownParser.render(value));
         triggerEvent(this, 'rendered', value, node.innerHTML);
         this.node = node;
     }
@@ -528,7 +523,6 @@ var Heather = (function() {
         if (Util.mobile) {
             cm.scrollTo(null, space);
             heather.commandBar.rePosition();
-            heather.partPreview.rePosition();
         } else {
             var minHeight = height / 2;
             if (space - cm.getScrollInfo().top <= minHeight) return;
@@ -536,12 +530,22 @@ var Heather = (function() {
                 clearTimeout(heather.scrollToMiddleTimer);
             }
             heather.scrollToMiddleTimer = setTimeout(function() {
-                cm.display.scroller.scrollTo({
+                var scroller = cm.display.scroller;
+                scroller.scrollTo({
                     top: space,
                     behavior: 'smooth'
                 })
+                var scrollTimeout;
+                var scrollHandler = function() {
+                    clearTimeout(scrollTimeout);
+                    scrollTimeout = setTimeout(function() {
+                        scroller.removeEventListener('scroll', scrollHandler);
+                        posCommandWidget(heather);
+                        heather.commandBar.rePosition();
+                    }, 50);
+                }
+                scroller.addEventListener('scroll', scrollHandler);
                 heather.commandBar.rePosition();
-                heather.partPreview.rePosition();
                 heather.scrollToMiddleTimer = undefined;
             }, 200)
         }
@@ -560,14 +564,12 @@ var Heather = (function() {
         }
 
         if (editor.getValue() != '') {
-            heather.render();
-            checkGutterWidth();
+            heather.nodeUpdate.update();
         }
 
-        editor.on('change', function(cm) {
-            heather.render();
+        editor.on('patchDisplay', function() {
             checkGutterWidth();
-        });
+        })
 
         //change task list status
         editor.on('mousedown', function(cm, e) {
@@ -669,10 +671,10 @@ var Heather = (function() {
         function indentLess() {
             heather.editor.execCommand('indentLess');
         }
-		
-		function fold(){
-			heather.fold(heather.editor.getCursor());
-		}
+
+        function fold() {
+            heather.fold(heather.editor.getCursor());
+        }
 
         var keyMap = Util.mac ? {
             "Cmd-B": 'bold',
@@ -712,7 +714,7 @@ var Heather = (function() {
     }
 
     function createEditor(textarea, config) {
-        config = config.editor || {};
+        config = config || {};
         config.styleActiveLine = true;
         config.inputStyle = 'textarea';
         config.mode = {
@@ -1214,7 +1216,8 @@ var Heather = (function() {
             this.cm = heather.editor;
             this.heather = heather;
             this.eventUnregisters = [];
-            if (config.commandBarEnable !== false)
+            this.config = config;
+            if (this.config.commandBarEnable !== false)
                 this.enable();
         }
 
@@ -1352,254 +1355,21 @@ var Heather = (function() {
         return CommandBar;
     })();
 
-    var PartPreview = (function() {
-
-        function PartPreview(heather, config) {
-            this.config = config || {};
-            this.heather = heather;
-            this.editor = heather.editor;
-            this.eventUnregisters = [];
-            if (this.config.partPreviewEnable !== false) {
-                this.enable();
-            }
-        }
-
-        PartPreview.prototype.enable = function() {
-            if (this.enabled === true) return;
-            this.keepHidden = false;
-            var editor = this.editor;
-            this.widget = new Widget(this);
-            var me = this;
-
-            registerEvents('selectionHelperOpen', 'commandWidgetOpen', this.heather, function() {
-                me.setKeepHidden(true);
-            }, this.eventUnregisters);
-
-            registerEvents('selectionHelperClose', 'commandWidgetClose', this.heather, function() {
-                me.setKeepHidden(false);
-            }, this.eventUnregisters);
-
-            registerEvents('editor.cursorActivity', this.heather, function(cm) {
-                if (me.keepHidden === true) return;
-                me.widget.update();
-            }, this.eventUnregisters);
-
-            registerEvents('editor.change', this.heather, function(cm) {
-                if (me.changed !== true) {
-                    me.changed = true;
-                }
-            }, this.eventUnregisters);
-
-            registerEvents('rendered', this.heather, function() {
-                if (me.changed !== true) return;
-                me.changed = false;
-                if (me.keepHidden !== true)
-                    me.widget.update();
-            }, this.eventUnregisters);
-
-            registerEvents('syncViewChange', this.heather, function(hidden) {
-                me.setKeepHidden(hidden)
-            }, this.eventUnregisters);
-
-            this.enabled = true;
-        }
-
-        PartPreview.prototype.disable = function() {
-            if (this.enabled !== true) return;
-            if (this.widget) {
-                this.widget.remove();
-            }
-            unregisterEvents(this.eventUnregisters);
-            this.eventUnregisters = [];
-            this.enabled = false;
-        }
-
-        PartPreview.prototype.hidden = function() {
-            if (this.widget) {
-                this.widget.hide();
-            }
-        }
-
-        PartPreview.prototype.rePosition = function() {
-            if (this.widget && this.keepHidden !== true) {
-                this.widget.update();
-            }
-        }
-
-        PartPreview.prototype.setKeepHidden = function(keepHidden) {
-            if (keepHidden === true) {
-                if (this.widget) {
-                    this.widget.hide();
-                }
-            } else {
-                if (this.heather.hasSelectionHelper() ||
-                    !Util.isUndefined(this.heather.commandWidgetState) ||
-                    this.heather.hasSyncView()) {
-                    return;
-                }
-                if (this.widget) {
-                    this.widget.update();
-                }
-            }
-            this.keepHidden = keepHidden;
-        }
-
-        var Widget = (function() {
-
-            var Widget = function(preview) {
-
-                var div = document.createElement('div');
-                div.classList.add('markdown-body');
-                div.classList.add('heather_part_preview');
-                div.style.display = 'none';
-                div.setAttribute('data-widget', '');
-                div.addEventListener('click', function(e) {
-                    if (preview.disable === true) return;
-                    var cursor = preview.editor.coordsChar({
-                        left: e.clientX,
-                        top: e.clientY
-                    }, 'window');
-                    preview.editor.focus();
-                    preview.editor.setCursor(cursor);
-                });
-
-                div.appendChild(document.createElement('div'));
-
-                this.preview = preview;
-                this.widget = div;
-
-                this.preview.editor.addWidget({
-                    line: 0,
-                    ch: 0
-                }, this.widget);
-            }
-
-            Widget.prototype.update = function() {
-                var editor = this.preview.editor;
-
-                var html;
-                if (!editor.somethingSelected()) {
-                    var nodeStatus = getNodeStatus(this.preview.heather);
-                    if (nodeStatus == null) {
-                        this.hide();
-                        return;
-                    };
-                    html = nodeStatus.node.outerHTML;
-                } else if (this.preview.config.renderSelected === true) {
-                    html = Util.parseHTML(this.preview.heather.markdownParser.render(editor.getSelection())).body.innerHTML;
-                }
-
-                if (!html) {
-                    this.hide();
-                    return;
-                };
-
-                var me = this;
-
-                var div = this.widget.firstChild.cloneNode(false);
-                div.innerHTML = html;
-                div = morphdomUpdate(this.widget.firstChild, div);
-                this.show();
-                this.scrollContent(nodeStatus);
-            }
-
-            Widget.prototype.hide = function() {
-                this.widget.style.display = 'none';
-            }
-
-            Widget.prototype.show = function() {
-                if (this.keepHidden !== true) {
-                    this.widget.style.display = '';
-                    this.updatePosition();
-                }
-            }
-
-            Widget.prototype.remove = function() {
-                this.widget.remove();
-            }
-
-            Widget.prototype.scrollContent = function(nodeStatus) {
-                if (nodeStatus == null) return;
-                var rootNode = this.widget.firstChild;
-                var editor = this.preview.editor;
-                var line = editor.getCursor().line;
-                var startTop = editor.cursorCoords({
-                    line: nodeStatus.startLine,
-                    ch: 0
-                }, 'local').top;
-                var endLine = Math.min(editor.lineCount() - 1, nodeStatus.endLine);
-                var endTop = editor.cursorCoords({
-                    line: endLine,
-                    ch: editor.getLine(endLine).length
-                }, 'local').top;
-                var currentTop = editor.cursorCoords(editor.getCursor(), 'local').top;
-                var markdownHeight = endTop - startTop;
-                var p = (Math.max(currentTop - startTop - 50, 0)) / markdownHeight;
-                var h = rootNode.clientHeight * p;
-                this.widget.scrollTop = h;
-            }
-
-            Widget.prototype.updatePosition = function() {
-                var editor = this.preview.editor;
-                var pos = editor.cursorCoords(true, 'local');
-                var bar = this.preview.heather.commandBar.bar;
-                var topHeight = this.preview.heather.top.getHeight();
-                var top = pos.top - editor.getScrollInfo().top - topHeight;
-                var distance = 2 * editor.defaultTextHeight() + (bar ? 5 : 0);
-                var height = (bar ? bar.clientHeight : 0) + this.widget.clientHeight;
-                if (top > height + distance) {
-                    this.widget.style.top = (pos.top - distance - height) + 'px';
-                } else {
-                    if (bar) {
-                        if (pos.top - bar.offsetTop - bar.clientHeight < 0) {
-                            this.widget.style.top = (pos.top + distance + bar.clientHeight) + 'px';
-                            return;
-                        }
-                    }
-                    this.widget.style.top = (pos.top + distance) + 'px';
-                }
-            }
-
-            var getNodeStatus = function(heather) {
-                var line = heather.editor.getCursor().line;
-                if (heather.editor.getLine(line) == '') {
-                    line = line - 1;
-                }
-                if (line < 0)
-                    return null;
-                var nodes = heather.getNodesByLine(line);
-                if (nodes.length == 0) return null;
-                var node = nodes[0];
-                return {
-                    node: node,
-                    endLine: node.endLine,
-                    startLine: node.startLine,
-                };
-            }
-
-            return Widget;
-        })();
-
-        return PartPreview;
-    })();
-
     //markdown render that with line numbers
     var MarkdownParser = (function() {
 
         function MarkdownParser(config, heather) {
             config = config || {};
-            if (!config.highlight) {
-                config.highlight = function(str, lang) {
-                    if (lang == 'mermaid') {
-                        return createUnparsedMermaidElement(str).outerHTML;
-                    }
-                    if (lang && hljs.getLanguage(lang)) {
-                        try {
-                            return '<pre class="hljs"><code class="language-' + lang + '">' +
-                                hljs.highlight(lang, str, true).value +
-                                '</code></pre>';
-                        } catch (__) {}
-                    }
+            config.highlight = function(str, lang) {
+                if (lang == 'mermaid') {
+                    return createUnparsedMermaidElement(str).outerHTML;
+                }
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return '<pre class="hljs"><code class="language-' + lang + '">' +
+                            hljs.highlight(lang, str, true).value +
+                            '</code></pre>';
+                    } catch (__) {}
                 }
             }
             var md = window.markdownit(config);
@@ -2218,7 +1988,7 @@ var Heather = (function() {
                     }
                 }]));
 
-                posCommandWidget(heather, div);
+                posCommandWidget(heather);
             }
 
 
@@ -2241,8 +2011,7 @@ var Heather = (function() {
 
                 var lineStr = cm.getLine(cursor.line);
                 var lineLeft = lineStr.substring(0, cursor.ch);
-                var lineRight = lineStr.substring(cursor.ch + 1);
-
+                var lineRight = lineStr.substring(cursor.ch);
                 var colIndex = -1;
 
                 for (var i = 0; i < lineLeft.length; i++) {
@@ -2657,7 +2426,11 @@ var Heather = (function() {
         return div;
     }
 
-    function posCommandWidget(heather, div) {
+    function posCommandWidget(heather) {
+        if (!heather.commandWidgetState) {
+            return;
+        }
+        var div = heather.commandWidgetState.widget;
         var cm = heather.editor;
         var pos = cm.cursorCoords(true, 'local');
 
@@ -2766,7 +2539,7 @@ var Heather = (function() {
                 heather.execCommand('mermaid');
             }
         }]));
-        posCommandWidget(heather, div);
+        posCommandWidget(heather);
     }
 
     commands['table'] = function(heather) {
@@ -2988,51 +2761,56 @@ var Heather = (function() {
     }
 
     function renderKatexAndMermaid(element, config) {
-        LazyLoader.loadKatex(function() {
-            var inlines = element.querySelectorAll(".katex-inline");
-            for (var i = 0; i < inlines.length; i++) {
-                var inline = inlines[i];
-                var expression = inline.textContent;
-                var result = parseKatex(expression, false);
-                var div = document.createElement('div');
-                div.innerHTML = result;
-                var child = div.firstChild;
-                child.setAttribute('data-inline-katex', '');
-                inline.outerHTML = child.outerHTML;
-            }
-            var blocks = [];
-
-            if (element.hasAttribute('data-block-katex')) {
-                blocks.push(element);
-            } else {
-                for (const elem of element.querySelectorAll(".katex-block")) {
-                    blocks.push(elem);
-                }
-            }
-            for (var i = 0; i < blocks.length; i++) {
-                var block = blocks[i];
-                var expression = block.textContent;
-                var result = parseKatex(expression, true);
-                var div = document.createElement('div');
-                div.innerHTML = result;
-                var child = div.firstChild;
-                child.setAttribute('data-block-katex', '');
-                block.innerHTML = child.outerHTML;
-            }
-        })
-        LazyLoader.loadMermaid(function() {
-            var mermaidElems = element.querySelectorAll('.mermaid');
-            for (const mermaidElem of mermaidElems) {
-                if (!mermaidElem.hasAttribute("data-processed")) {
-                    try {
-                        mermaid.parse(mermaidElem.textContent);
-                        mermaid.init({}, mermaidElem);
-                    } catch (e) {
-                        mermaidElem.innerHTML = '<pre>' + e.str + '</pre>'
-                    }
-                }
-            }
-        });
+		var inlines = element.querySelectorAll(".katex-inline");
+		var blocks = [];
+		if (element.hasAttribute('data-block-katex')) {
+			blocks.push(element);
+		} else {
+			for (const elem of element.querySelectorAll(".katex-block")) {
+				blocks.push(elem);
+			}
+		}
+		
+		if(inlines.length > 0 || blocks.length > 0){
+			LazyLoader.loadKatex(function() {
+				for (var i = 0; i < inlines.length; i++) {
+					var inline = inlines[i];
+					var expression = inline.textContent;
+					var result = parseKatex(expression, false);
+					var div = document.createElement('div');
+					div.innerHTML = result;
+					var child = div.firstChild;
+					child.setAttribute('data-inline-katex', '');
+					inline.outerHTML = child.outerHTML;
+				}
+				for (var i = 0; i < blocks.length; i++) {
+					var block = blocks[i];
+					var expression = block.textContent;
+					var result = parseKatex(expression, true);
+					var div = document.createElement('div');
+					div.innerHTML = result;
+					var child = div.firstChild;
+					child.setAttribute('data-block-katex', '');
+					block.innerHTML = child.outerHTML;
+				}
+			});
+		}
+      
+		var mermaidElems = element.querySelectorAll('.mermaid');
+		if(mermaidElems.length > 0){
+			LazyLoader.loadMermaid(function() {
+				for (const mermaidElem of mermaidElems) {
+					if (!mermaidElem.hasAttribute("data-processed")) {
+						try {
+							mermaid.parse(mermaidElem.textContent);
+							mermaid.init({}, mermaidElem);
+						} catch (e) {
+							mermaidElem.innerHTML = '<pre>' + e.str + '</pre>'
+						}
+					}
+				}
+			});
+		}
     }
 
     function parseKatex(expression, displayMode) {
@@ -3185,6 +2963,56 @@ var Heather = (function() {
             }
         }
     }
+
+    var NodeUpdate = function() {
+
+        function NodeUpdate(heather) {
+            this.heather = heather;
+            this.sync = true;
+            var me = this;
+
+            var editor = heather.editor;
+            var change = false;
+
+            editor.on('change', function() {
+                change = true;
+            })
+
+            editor.on('update', function(cm) {
+                if (change) {
+                    change = false;
+                    me.update();
+                }
+            })
+        }
+
+        NodeUpdate.prototype.update = function() {
+            var heather = this.heather;
+            var mill = heather.config.asyncNodeUpdateMill;
+            if (this.sync) {
+                this.sync = doUpdate(heather) <= mill;
+            } else {
+                if (heather.displayTimeout)
+                    clearTimeout(heather.displayTimeout);
+                if (heather.renderTimeout) {
+                    clearTimeout(heather.renderTimeout);
+                    heather.renderTimeout = undefined;
+                }
+                var me = this;
+                heather.renderTimeout = setTimeout(function() {
+                    me.sync = doUpdate(heather) <= mill;
+                }, 0);
+            }
+        }
+
+        function doUpdate(heather) {
+            var start = performance.now();
+            heather.render();
+            return performance.now() - start;
+        }
+
+        return NodeUpdate;
+    }();
 
     return {
         create: function(textarea, config) {
