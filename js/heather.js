@@ -1,5 +1,6 @@
 var Heather = (function() {
-
+	
+	var mermaidId = 0;
     var lazyRes = {
         mermaid_js: "js/mermaid.min.js",
         katex_css: "katex/katex.min.css",
@@ -221,9 +222,11 @@ var Heather = (function() {
             var div = document.createElement('div');
             div.classList.add('markdown-body');
             div.classList.add('heather_preview');
-            div.innerHTML = this.node.innerHTML;
 
             var me = this;
+            elem.after(div);
+            div.innerHTML = this.node.innerHTML;
+			
             if (this.config.disablePreviewCloseBtn !== true) {
                 var close = document.createElement('div');
                 close.classList.add('heather_preview_close');
@@ -238,10 +241,7 @@ var Heather = (function() {
                     me.setPreview(false);
                 })
             }
-
-
-            elem.after(div);
-            renderKatexAndMermaid(div);
+            afterDisplay(div);
             this.previewState = {
                 element: div,
                 cursor: me.editor.getCursor()
@@ -289,27 +289,57 @@ var Heather = (function() {
             div.appendChild(container);
 
             this.editor.getRootNode().appendChild(div);
-
             var mill = me.config.refreshDisplayMill;
+            var sync = new Sync(this.editor, div);
+			
+			var updateDisplay = function(){
+				var html;
+				var part = me.nodeUpdate.isAsync();
+				part= false;
+				if(part){
+					html = '';
+					var viewport = me.editor.getViewport();
+					//part render
+					for(const child of me.node.children){
+						var ls = parseInt(child.dataset.line);
+						if(ls >= viewport.from && ls <= viewport.to){
+							html += child.outerHTML;
+						}
+					} 
+				} else {
+					//full render
+                   html = me.node.innerHTML;
+				}
+				container.style.display = 'none';
+				container.innerHTML = html;
+				container.style.display = ''
+				var viewport = me.editor.getViewport();
+				//part render
+				for(const child of container.children){
+					var ls = parseInt(child.dataset.line);
+					var end = parseInt(child.dataset.endLine);
+					if(ls >= viewport.from && ls <= viewport.to){
+						afterDisplay(child);
+					}
+				} 
+				sync.doSync();
+				return part;
+			}
 
-            var renderedHandler = function(value, html) {
-                if (me.displayTimeout)
-                    clearTimeout(me.displayTimeout);
-                me.displayTimeout = setTimeout(function() {
-                    var node = container.cloneNode(false);
-                    node.innerHTML = html;
-                    morphdomUpdate(container, node, me.config);
-                }, mill)
-            }
             this.render();
-            renderedHandler(null, this.node.innerHTML);
-
+			updateDisplay();
 
             var unregisters = [];
-            registerEvents('rendered', this, renderedHandler, unregisters);
-
-            var sync = new Sync(this.editor, div);
-
+            registerEvents('rendered', this, updateDisplay, unregisters);
+            registerEvents('editor.viewportChange', this, function(cm,start,end){
+				//part render
+				for(const child of container.children){
+					var ls = parseInt(child.dataset.line);
+					if(ls >= start && ls <= end){
+						afterDisplay(child);
+					}
+				} 
+			}, unregisters);
             registerEvents('editor.scroll', this, function() {
                 sync.doSync();
             }, unregisters);
@@ -504,8 +534,8 @@ var Heather = (function() {
     Editor.prototype.render = function() {
         var value = this.editor.getValue();
         var node = Util.parseHTML(this.markdownParser.render(value));
-        triggerEvent(this, 'rendered', value, node.innerHTML);
         this.node = node;
+        triggerEvent(this, 'rendered', value, this.node.innerHTML);
     }
 
     function scrollToMiddleByCursor(heather, cursor) {
@@ -567,7 +597,7 @@ var Heather = (function() {
             heather.nodeUpdate.update();
         }
 
-        editor.on('patchDisplay', function() {
+        editor.on('update', function() {
             checkGutterWidth();
         })
 
@@ -1366,16 +1396,14 @@ var Heather = (function() {
                 }
                 if (lang && hljs.getLanguage(lang)) {
                     try {
-                        return '<pre class="hljs"><code class="language-' + lang + '">' +
-                            hljs.highlight(lang, str, true).value +
-                            '</code></pre>';
+                        return '<pre class="hljs"><code class="language-' + lang + '"></code><textarea style="display:none !important">'+str+'</textarea></pre>';
                     } catch (__) {}
                 }
             }
             var md = window.markdownit(config);
-            addLineNumberAttribute(md, heather);
             if (config.callback)
                 config.callback(md);
+            addLineNumberAttribute(md, heather);
             this.md = md;
         }
 
@@ -1406,14 +1434,7 @@ var Heather = (function() {
             addFenceLineNumber(md);
             addHtmlBlockLineNumber(md);
             addCodeBlockLineNumber(md);
-            LazyLoader.eventHandlers.push({
-                name: 'katex',
-                handler: function() {
-                    addMathBlockLineNumber(md);
-                    heather.render();
-                }
-            })
-
+			addMathBlockLineNumber(md);
         }
 
         function addMathBlockLineNumber(md) {
@@ -1425,7 +1446,7 @@ var Heather = (function() {
                 if (addLine) {
                     return "<div class='katex-block line' data-line='" + token.map[0] + "' data-end-line='" + token.map[1] + "'>" + latex + "</div>";
                 } else {
-                    return renderKatexBlock(latex, options);
+                    return "<span class='katex-block'>"+latex+"</span>";
                 }
             }
         }
@@ -1463,7 +1484,7 @@ var Heather = (function() {
                 } else {
                     return content;
                 }
-            };
+            }
         }
 
 
@@ -1867,26 +1888,18 @@ var Heather = (function() {
 
         var katexLoading = false;
         var katexLoaded = false;
-        var eventHandlers = [];
-
-        function triggerEvent(name, ...args) {
-            for (var i = 0; i < eventHandlers.length; i++) {
-                var eh = eventHandlers[i];
-                if (eh.name === name) {
-                    try {
-                        var handler = eh.handler;
-                        handler.apply(this, args);
-                    } catch (e) {}
-                }
-            }
-        }
+		
+		var katexCallbacks = [];
 
         function loadKatex(callback) {
             if (katexLoaded) {
                 if (callback) callback();
                 return;
             }
-            if (katexLoading) return;
+            if (katexLoading){
+				katexCallbacks.push(callback);
+				return;
+			}
             katexLoading = true;
 
             var link = document.createElement('link');
@@ -1896,31 +1909,49 @@ var Heather = (function() {
             document.head.appendChild(link);
 
             loadScript(lazyRes.katex_js, function() {
-                triggerEvent('katex')
                 katexLoaded = true;
                 if (callback) callback();
+				try{
+					for(const cb of katexCallbacks){
+						cb();
+					}
+				} finally {
+					katexCallbacks = [];
+				}
             })
         }
 
         var mermaidLoading = false;
         var mermaidLoaded = false;
+		var mermaidCallbacks = [];
 
         function loadMermaid(callback) {
             if (mermaidLoaded) {
                 if (callback) callback();
                 return;
             }
-            if (mermaidLoading) return;
+            if (mermaidLoading) {
+				mermaidCallbacks.push(callback);
+				return ;
+			}
             mermaidLoading = true;
             loadScript(lazyRes.mermaid_js, function() {
-                triggerEvent('mermaid')
+				mermaid.initialize({startOnLoad:false});
                 mermaidLoaded = true;
                 if (callback) callback();
+				try{
+					for(const cb of mermaidCallbacks){
+						cb();
+					}
+				} finally {
+					mermaidCallbacks = [];
+				}
             })
         }
 
         function loadScript(src, callback, relative) {
             var script = document.createElement('script');
+			script.async = true;
             script.src = src;
             if (callback !== null) {
                 script.onload = function() { // Other browsers
@@ -1932,8 +1963,7 @@ var Heather = (function() {
 
         return {
             loadKatex: loadKatex,
-            loadMermaid: loadMermaid,
-            eventHandlers: eventHandlers
+            loadMermaid: loadMermaid
         }
     })();
 
@@ -2759,22 +2789,32 @@ var Heather = (function() {
             cm.replaceSelection(wrap + cm.getSelection() + wrap);
         }
     }
-
-    function renderKatexAndMermaid(element, config) {
-		var inlines = element.querySelectorAll(".katex-inline");
-		var blocks = [];
-		if (element.hasAttribute('data-block-katex')) {
-			blocks.push(element);
-		} else {
-			for (const elem of element.querySelectorAll(".katex-block")) {
-				blocks.push(elem);
+    function afterDisplay(element) {
+		var pres = element.matches('pre.hljs') ? [element] : element.querySelectorAll('pre.hljs');
+		for(const pre of pres){
+			if(pre.hasAttribute('data-processed')) continue;
+			var code = pre.firstElementChild;
+			var className = code.className || '';
+			if(code.className.startsWith('language-')){
+				var textarea = code.nextElementSibling;
+				if(textarea){
+					var language = className.substring(9).trim();
+					var html = hljs.highlight(language, textarea.value, true).value;
+					code.innerHTML = html;
+					textarea.remove();
+				}
 			}
+			pre.setAttribute('data-processed','');
 		}
+		
+		var inlines = element.querySelectorAll(".katex-inline");
+		var blocks = element.matches('.katex-block') ? [element] : element.querySelectorAll(".katex-block");
 		
 		if(inlines.length > 0 || blocks.length > 0){
 			LazyLoader.loadKatex(function() {
 				for (var i = 0; i < inlines.length; i++) {
 					var inline = inlines[i];
+					if(inline.hasAttribute('data-inline-katex')) continue;
 					var expression = inline.textContent;
 					var result = parseKatex(expression, false);
 					var div = document.createElement('div');
@@ -2785,30 +2825,35 @@ var Heather = (function() {
 				}
 				for (var i = 0; i < blocks.length; i++) {
 					var block = blocks[i];
+					if(block.hasAttribute('data-block-katex')) continue;
 					var expression = block.textContent;
 					var result = parseKatex(expression, true);
 					var div = document.createElement('div');
 					div.innerHTML = result;
 					var child = div.firstChild;
-					child.setAttribute('data-block-katex', '');
 					block.innerHTML = child.outerHTML;
+					block.setAttribute('data-block-katex', '');
 				}
 			});
 		}
       
-		var mermaidElems = element.querySelectorAll('.mermaid');
+		var mermaidElems = element.classList.contains('mermaid') ? [element] :  element.querySelectorAll('.mermaid');
 		if(mermaidElems.length > 0){
 			LazyLoader.loadMermaid(function() {
 				for (const mermaidElem of mermaidElems) {
-					if (!mermaidElem.hasAttribute("data-processed")) {
-						try {
-							mermaid.parse(mermaidElem.textContent);
-							mermaid.init({}, mermaidElem);
-						} catch (e) {
-							mermaidElem.innerHTML = '<pre>' + e.str + '</pre>'
-						}
+					if(mermaidElem.hasAttribute('data-processed')) continue;
+					try {
+						mermaid.parse(mermaidElem.textContent);
+						var graph = mermaid.mermaidAPI.render('mermaid_'+mermaidId++, mermaidElem.nextElementSibling.value);
+						mermaidElem.innerHTML = graph
+					} catch (e) {
+						mermaidElem.removeAttribute('data-mermaid-id');
+						mermaidElem.innerHTML = '<pre>' + e.str + '</pre>'
 					}
+					mermaidElem.nextElementSibling.remove();
+					mermaidElem.setAttribute('data-processed','');
 				}
+				
 			});
 		}
     }
@@ -2891,31 +2936,6 @@ var Heather = (function() {
         return div;
     }
 
-    function morphdomUpdate(target, source, config) {
-        var elem = morphdom(target, source, {
-            onBeforeElUpdated: function(f, t) {
-                if (f.classList.contains('mermaid-block') &&
-                    t.classList.contains('mermaid-block')) {
-                    var oldEle = f.getElementsByClassName('mermaid-source')[0];
-                    var nowEle = t.getElementsByClassName('mermaid-source')[0];
-                    if (Util.isUndefined(oldEle) || Util.isUndefined(nowEle)) {
-                        return true;
-                    }
-                    var old = oldEle.value;
-                    var now = nowEle.value;
-                    if (old == now) {
-                        //鏇存柊灞炴€�
-                        Util.cloneAttributes(f, t);
-                        return false;
-                    }
-                }
-                return true;
-            }
-        });
-        renderKatexAndMermaid(elem);
-        return elem;
-    }
-
     function getQuoteSizeAtPoint(cm, cursor) {
         var left = cm.getLine(cursor.line).substring(0, cursor.ch).trimStart();
         return getQuoteSize(left);
@@ -2985,6 +3005,10 @@ var Heather = (function() {
                 }
             })
         }
+		
+		NodeUpdate.prototype.isAsync = function(){
+			return !this.sync;
+		}
 
         NodeUpdate.prototype.update = function() {
             var heather = this.heather;
@@ -2992,8 +3016,6 @@ var Heather = (function() {
             if (this.sync) {
                 this.sync = doUpdate(heather) <= mill;
             } else {
-                if (heather.displayTimeout)
-                    clearTimeout(heather.displayTimeout);
                 if (heather.renderTimeout) {
                     clearTimeout(heather.renderTimeout);
                     heather.renderTimeout = undefined;
@@ -3022,6 +3044,6 @@ var Heather = (function() {
         lazyRes: lazyRes,
         Util: Util,
         defaultConfig: defaultConfig,
-        version: '2.1.3'
+        version: '2.1.4'
     };
 })();
