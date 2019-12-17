@@ -48,8 +48,9 @@
 
 .heather_preview_close {
 	position: absolute;
-	right: 5px;
+	right: 10px;
 	top: 5px;
+	z-index:999
 }
 
 @media (max-width:768px) {

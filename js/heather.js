@@ -148,8 +148,11 @@ var Heather = (function() {
         this.commandBar = new CommandBar(this, config);
         this.tooltip = new Tooltip(this.editor, config);
         this.config = config;
-        initKeyMap(this);
+		this.syncView = new SyncView(this);
+		this.view = new View(this);
+		this.focusedMode = new FocusedMode(this);
         this.nodeUpdate = new NodeUpdate(this);
+        initKeyMap(this);
         handleDefaultEditorEvent(this);
         this.tableHelper = new TableHelper(this);
         if (config.focused === true) {
@@ -201,7 +204,7 @@ var Heather = (function() {
     }
 
     Editor.prototype.isPreview = function() {
-        return !Util.isUndefined(this.previewState);
+        return this.view.isEnable;
     }
 
     Editor.prototype.execCommand = function(name) {
@@ -213,48 +216,10 @@ var Heather = (function() {
     }
 
     Editor.prototype.setPreview = function(preview) {
-        if (preview === true && this.previewState) return;
-        if (preview !== true && !this.previewState) return;
-        if (preview === true) {
-
-            var elem = this.editor.getScrollerElement();
-            this.editor.setOption('readOnly', 'nocursor');
-            var div = document.createElement('div');
-            div.classList.add('markdown-body');
-            div.classList.add('heather_preview');
-
-            var me = this;
-            elem.after(div);
-            div.innerHTML = this.node.innerHTML;
-			
-            if (this.config.disablePreviewCloseBtn !== true) {
-                var close = document.createElement('div');
-                close.classList.add('heather_preview_close');
-                close.innerHTML = '<i class="fas fa-eye-slash heather_icon"></i>';
-                div.appendChild(close);
-
-                div.addEventListener('scroll', function() {
-                    close.style.top = (this.scrollTop + 10) + 'px';
-                });
-
-                close.addEventListener('click', function() {
-                    me.setPreview(false);
-                })
-            }
-            afterDisplay(div);
-            this.previewState = {
-                element: div,
-                cursor: me.editor.getCursor()
-            }
-        } else {
-            this.previewState.element.remove();
-            this.editor.setOption('readOnly', false);
-            this.editor.refresh();
-            this.editor.focus();
-            this.editor.setCursor(this.previewState.cursor);
-            this.previewState = undefined;
-        }
-        triggerEvent(this, 'previewChange', preview === true);
+        if(preview === true)
+			this.view.enable();
+		else
+			this.view.disable();
     }
 
     Editor.prototype.getToolbar = function() {
@@ -266,149 +231,28 @@ var Heather = (function() {
     }
 
     Editor.prototype.isFullscreen = function() {
-        return !Util.isUndefined(this.fullscreenState);
+        return this.editor.getOption('fullScreen') === true;
     }
-
+	
+    Editor.prototype.setFullscreen = function(enable) {
+       this.editor.setOption('fullScreen',enable);
+    }
+	
     Editor.prototype.hasSyncView = function() {
-        return !Util.isUndefined(this.syncViewState);
+        return this.syncView.isEnable;
     }
 
     Editor.prototype.setSyncView = function(syncView) {
-        if (syncView === true && this.syncViewState) return;
-        if (syncView !== true && !this.syncViewState) return;
-        var wrap = this.editor.getWrapperElement();
-        if (syncView === true) {
-            var me = this;
-            wrap.classList.add('heather_sync_view_editor');
-
-            var div = document.createElement('div');
-            div.classList.add('heather_sync_view');
-            div.classList.add('markdown-body');
-            var container = document.createElement('div');
-            container.classList.add('heather_sync_view_container');
-            div.appendChild(container);
-
-            this.editor.getRootNode().appendChild(div);
-            var mill = me.config.refreshDisplayMill;
-            var sync = new Sync(this.editor, div);
-			
-			var updateDisplay = function(){
-				var html;
-				var part = me.nodeUpdate.isAsync();
-				part= false;
-				if(part){
-					html = '';
-					var viewport = me.editor.getViewport();
-					//part render
-					for(const child of me.node.children){
-						var ls = parseInt(child.dataset.line);
-						if(ls >= viewport.from && ls <= viewport.to){
-							html += child.outerHTML;
-						}
-					} 
-				} else {
-					//full render
-                   html = me.node.innerHTML;
-				}
-				container.style.display = 'none';
-				container.innerHTML = html;
-				container.style.display = ''
-				var viewport = me.editor.getViewport();
-				//part render
-				for(const child of container.children){
-					var ls = parseInt(child.dataset.line);
-					var end = parseInt(child.dataset.endLine);
-					if(ls >= viewport.from && ls <= viewport.to){
-						afterDisplay(child);
-					}
-				} 
-				sync.doSync();
-				return part;
-			}
-
-            this.render();
-			updateDisplay();
-
-            var unregisters = [];
-            registerEvents('rendered', this, updateDisplay, unregisters);
-            registerEvents('editor.viewportChange', this, function(cm,start,end){
-				//part render
-				for(const child of container.children){
-					var ls = parseInt(child.dataset.line);
-					if(ls >= start && ls <= end){
-						afterDisplay(child);
-					}
-				} 
-			}, unregisters);
-            registerEvents('editor.scroll', this, function() {
-                sync.doSync();
-            }, unregisters);
-
-            var fullscreenChangeHandler = function(fs) {
-                if (fs) {
-                    div.style.position = 'fixed';
-                } else {
-                    div.style.position = 'absolute';
-                }
-            }
-            fullscreenChangeHandler(this.isFullscreen());
-            var previewChangeHandler = function(preview) {
-                if (preview) {
-                    wrap.classList.remove('heather_sync_view_editor');
-                    div.style.display = 'none';
-                } else {
-                    wrap.classList.add('heather_sync_view_editor');
-                    div.style.display = '';
-                }
-            }
-            previewChangeHandler(this.isPreview());
-
-            var focusedHeightChangeHandler = function(h) {
-                div.querySelector('.heather_sync_view_container').style['paddingBottom'] = h + 'px';
-            }
-
-            if (this.isFocused()) {
-                var h = parseFloat(this.editor.display.mover.style.paddingBottom);
-                if (!isNaN(h)) {
-                    focusedHeightChangeHandler(h);
-                }
-            }
-
-            registerEvents('fullscreenChange', this, fullscreenChangeHandler, unregisters);
-            registerEvents('previewChange', this, previewChangeHandler, unregisters);
-            registerEvents('focusedHeightChange', this, focusedHeightChangeHandler, unregisters);
-
-            this.syncViewState = {
-                view: div,
-                unregisters: unregisters
-            }
-
-        } else {
-            this.syncViewState.view.remove();
-            unregisterEvents(this.syncViewState.unregisters);
-            this.syncViewState = undefined;
-            wrap.classList.remove('heather_sync_view_editor');
-        }
-        triggerEvent(this, 'syncViewChange', syncView === true);
-        CodeMirror.signal(this.editor, "resize", this.editor);
+       if(syncView === true){
+		   this.syncView.enable();
+	   } else {
+		   this.syncView.disable();
+	   }
     }
-
-    Editor.prototype.setFullscreen = function(fullscreen) {
-        if (fullscreen === true && this.editor.getOption('fullScreen')) return;
-        if (fullscreen !== true && !this.editor.getOption('fullScreen')) return;
-        if (fullscreen === true) {
-            this.editor.setOption("fullScreen", true);
-            this.fullscreenState = {
-
-            };
-        } else {
-            this.editor.setOption("fullScreen", false);
-            this.fullscreenState = undefined;
-        }
-        CodeMirror.signal(this.editor, "resize", this.editor);
-        this.commandBar.rePosition();
-        triggerEvent(this, 'fullscreenChange', fullscreen === true);
-    }
+	
+	Editor.prototype.setSyncDisplayMode = function(mode){
+		this.syncView.setDisplayMode(mode);
+	}
 
     Editor.prototype.on = function(eventName, handler) {
         var me = this;
@@ -416,6 +260,7 @@ var Heather = (function() {
             eventName = eventName.substring(eventName.indexOf('.') + 1);
             this.editor.on(eventName, handler);
             return {
+				name : "editor."+eventName,
                 off: function() {
                     me.editor.off(eventName, handler)
                 }
@@ -426,6 +271,7 @@ var Heather = (function() {
             handler: handler
         });
         return {
+			name : eventName,
             off: function() {
                 me.off(eventName, handler)
             }
@@ -447,46 +293,15 @@ var Heather = (function() {
         }
     }
 
-
     Editor.prototype.setFocused = function(focus) {
-        if (this.focusedState && focus === true) return;
-        if (!this.focusedState && focus !== true) return;
-        if (focus === true) {
-            var me = this;
-
-            var setPadding = function(cm) {
-                var wrapper = cm.getWrapperElement();
-                var height = wrapper.clientHeight / 2;
-                cm.display.mover.style.paddingBottom = height + 'px';
-                cm.refresh();
-                triggerEvent(me, 'focusedHeightChange', height);
-            }
-            var unregisters = [];
-
-            if (!Util.android) {
-                setPadding(this.editor);
-                registerEvents('editor.resize', this, setPadding, unregisters);
-            }
-
-            registerEvents('editor.change', 'fullscreenChange', this, function(cm) {
-                scrollToMiddleByCursor(me);
-            }, unregisters);
-
-            this.focusedState = {
-                unregisters: unregisters
-            }
-            triggerEvent(this, 'focusedChange', true);
-        } else {
-            unregisterEvents(this.focusedState.unregisters);
-            this.focusedState = undefined;
-            this.editor.display.mover.style.paddingBottom = '';
-            triggerEvent(this, 'focusedChange', false);
-            triggerEvent(this, 'focusedHeightChange', 0);
-        }
+		if(focus === true)
+			this.focusedMode.enable();
+		else
+			this.focusedMode.disable();
     }
 
     Editor.prototype.isFocused = function() {
-        return !Util.isUndefined(this.focusedState);
+       return this.focusedMode.isEnable;
     }
 
     Editor.prototype.openSelectionHelper = function() {
@@ -532,53 +347,11 @@ var Heather = (function() {
     }
 
     Editor.prototype.render = function() {
+		var start = performance.now();
         var value = this.editor.getValue();
         var node = Util.parseHTML(this.markdownParser.render(value));
         this.node = node;
         triggerEvent(this, 'rendered', value, this.node.innerHTML);
-    }
-
-    function scrollToMiddleByCursor(heather, cursor) {
-        var cm = heather.editor;
-        if (cm.somethingSelected()) return;
-        var height = cm.getWrapperElement().clientHeight / 2;
-
-        var pos = cm.cursorCoords(cursor || true, 'local');
-        var space = pos.top - height + heather.top.getHeight();
-
-        if (Util.ios && heather.isFullscreen()) {
-            //ios will scroll screen when focused
-            window.scrollTo(0, 0);
-        }
-        if (Util.mobile) {
-            cm.scrollTo(null, space);
-            heather.commandBar.rePosition();
-        } else {
-            var minHeight = height / 2;
-            if (space - cm.getScrollInfo().top <= minHeight) return;
-            if (heather.scrollToMiddleTimer) {
-                clearTimeout(heather.scrollToMiddleTimer);
-            }
-            heather.scrollToMiddleTimer = setTimeout(function() {
-                var scroller = cm.display.scroller;
-                scroller.scrollTo({
-                    top: space,
-                    behavior: 'smooth'
-                })
-                var scrollTimeout;
-                var scrollHandler = function() {
-                    clearTimeout(scrollTimeout);
-                    scrollTimeout = setTimeout(function() {
-                        scroller.removeEventListener('scroll', scrollHandler);
-                        posCommandWidget(heather);
-                        heather.commandBar.rePosition();
-                    }, 50);
-                }
-                scroller.addEventListener('scroll', scrollHandler);
-                heather.commandBar.rePosition();
-                heather.scrollToMiddleTimer = undefined;
-            }, 200)
-        }
     }
 
     function handleDefaultEditorEvent(heather) {
@@ -671,6 +444,11 @@ var Heather = (function() {
                     heather.commandBar.setKeepHidden(false);
                 }
             }
+			if (option === 'fullScreen') {
+				CodeMirror.signal(cm, "resize", cm);
+				heather.commandBar.rePosition();
+				triggerEvent(heather, 'fullscreenChange', cm.getOption(option) === true);
+			}
         })
 
     }
@@ -812,6 +590,7 @@ var Heather = (function() {
                     div.style.position = 'absolute';
                     div.style.bottom = '';
                 }
+				pos();
             }
 
             var pos = function() {
@@ -1395,9 +1174,7 @@ var Heather = (function() {
                     return createUnparsedMermaidElement(str).outerHTML;
                 }
                 if (lang && hljs.getLanguage(lang)) {
-                    try {
-                        return '<pre class="hljs"><code class="language-' + lang + '"></code><textarea style="display:none !important">'+str+'</textarea></pre>';
-                    } catch (__) {}
+                    return '<pre class="hljs"><code class="language-' + lang + '"></code><textarea style="display:none !important">'+str+'</textarea></pre>';                  
                 }
             }
             var md = window.markdownit(config);
@@ -1888,8 +1665,10 @@ var Heather = (function() {
 
         var katexLoading = false;
         var katexLoaded = false;
-		
+        var mermaidLoading = false;
+        var mermaidLoaded = false;
 		var katexCallbacks = [];
+		var mermaidCallbacks = [];
 
         function loadKatex(callback) {
             if (katexLoaded) {
@@ -1908,22 +1687,20 @@ var Heather = (function() {
             link.setAttribute('href', lazyRes.katex_css);
             document.head.appendChild(link);
 
-            loadScript(lazyRes.katex_js, function() {
-                katexLoaded = true;
+			loadScript(lazyRes.katex_js).then(function(){
+				katexLoaded = true;
                 if (callback) callback();
 				try{
 					for(const cb of katexCallbacks){
-						cb();
+						try{
+							cb();
+						}catch(e){}
 					}
 				} finally {
 					katexCallbacks = [];
 				}
-            })
+			});
         }
-
-        var mermaidLoading = false;
-        var mermaidLoaded = false;
-		var mermaidCallbacks = [];
 
         function loadMermaid(callback) {
             if (mermaidLoaded) {
@@ -1935,31 +1712,42 @@ var Heather = (function() {
 				return ;
 			}
             mermaidLoading = true;
-            loadScript(lazyRes.mermaid_js, function() {
-				mermaid.initialize({startOnLoad:false});
+			loadScript(lazyRes.mermaid_js).then(function(){
+				var config = {
+					startOnLoad:false,
+					flowchart:{
+						useMaxWidth:true
+					},
+					sequence:{
+						useMaxWidth:true
+					}
+				};
+				mermaid.initialize(config);
                 mermaidLoaded = true;
                 if (callback) callback();
 				try{
 					for(const cb of mermaidCallbacks){
-						cb();
+						try{
+							cb();
+						}catch(e){}
 					}
 				} finally {
 					mermaidCallbacks = [];
 				}
-            })
+			});
         }
 
-        function loadScript(src, callback, relative) {
-            var script = document.createElement('script');
-			script.async = true;
-            script.src = src;
-            if (callback !== null) {
-                script.onload = function() { // Other browsers
-                    callback();
-                };
-            }
-            document.body.appendChild(script);
-        }
+		var loadScript = function(uri){
+			  return new Promise((resolve, reject) => {
+				var tag = document.createElement('script');
+				tag.src = uri;
+				tag.async = true;
+				tag.onload = () => {
+				  resolve();
+				};
+				document.body.appendChild(tag);
+			});
+		}
 
         return {
             loadKatex: loadKatex,
@@ -3020,6 +2808,7 @@ var Heather = (function() {
                     clearTimeout(heather.renderTimeout);
                     heather.renderTimeout = undefined;
                 }
+				heather.syncView.preventIncomingRefresh();
                 var me = this;
                 heather.renderTimeout = setTimeout(function() {
                     me.sync = doUpdate(heather) <= mill;
@@ -3035,6 +2824,364 @@ var Heather = (function() {
 
         return NodeUpdate;
     }();
+	
+	
+	
+	var SyncView = (function(){
+		function SyncView(heather){
+			this.partDisplay = false;
+			this.isEnable = false;
+			this.editor = heather.editor;
+			this.heather = heather;
+			this.unregisters = [];
+			this.refreshDisplayMill = heather.config.refreshDisplayMill;
+		}
+		
+		SyncView.prototype.enable = function(){
+			if(this.isEnable) return ;
+			this.isEnable = true;
+			var wrapper = this.editor.getWrapperElement();
+			wrapper.classList.add('heather_sync_view_editor');
+			
+			var div = document.createElement('div');
+            div.classList.add('heather_sync_view');
+            div.classList.add('markdown-body');
+            var container = document.createElement('div');
+            container.classList.add('heather_sync_view_container');
+            div.appendChild(container);
+			this.container = container;
+			this.editor.getRootNode().appendChild(div);
+			this.sync = new Sync(this.editor, div);
+			if(this.partDisplay){
+				setPartDisplay(this);
+			} else {
+				setFullDisplay(this);
+			}
+			var me = this;
+            registerEvents('editor.scroll', this.heather, function() {
+                me.sync.doSync();
+            }, this.unregisters);
+			
+			var fullscreenChangeHandler = function(fs) {
+                if (fs) {
+                    div.style.position = 'fixed';
+                } else {
+                    div.style.position = 'absolute';
+                }
+            }
+            fullscreenChangeHandler(this.heather.isFullscreen());
+			
+            var previewChangeHandler = function(preview) {
+                if (preview) {
+                    wrapper.classList.remove('heather_sync_view_editor');
+                    div.style.display = 'none';
+                } else {
+                    wrapper.classList.add('heather_sync_view_editor');
+                    div.style.display = '';
+                }
+            }
+            previewChangeHandler(this.heather.isPreview());
+
+            var focusedHeightChangeHandler = function(h) {
+                div.querySelector('.heather_sync_view_container').style['paddingBottom'] = h + 'px';
+            }
+
+            if (this.heather.isFocused()) {
+                var h = parseFloat(this.editor.display.mover.style.paddingBottom);
+                if (!isNaN(h)) {
+                    focusedHeightChangeHandler(h);
+                }
+            }
+            registerEvents('fullscreenChange', this.heather, fullscreenChangeHandler, this.unregisters);
+            registerEvents('previewChange', this.heather, previewChangeHandler, this.unregisters);
+            registerEvents('focusedHeightChange', this.heather, focusedHeightChangeHandler, this.unregisters);
+			this.view = div;
+			triggerEvent(this.heather, 'syncViewChange', true);
+			CodeMirror.signal(this.editor, "resize", this.editor);
+		}
+		
+		SyncView.prototype.preventIncomingRefresh = function(){
+			if(this.isEnable && this.refreshDisplayTimer && !this.partDisplay) clearTimeout(this.refreshDisplayTimer);
+		}
+		
+		SyncView.prototype.disable = function(){
+			if(!this.isEnable) return ;
+			this.isEnable = false;
+			this.view.remove();
+            unregisterEvents(this.unregisters);
+            this.editor.getWrapperElement().classList.remove('heather_sync_view_editor');
+			if(this.refreshDisplayTimer) clearTimeout(this.refreshDisplayTimer);
+			triggerEvent(this.heather, 'syncViewChange', false);
+			CodeMirror.signal(this.editor, "resize", this.editor);
+		}
+		
+		SyncView.prototype.setDisplayMode = function(mode){
+			if(mode === 'part')
+				setPartDisplay(this);
+			else
+				setFullDisplay(this);
+		}
+		
+		function setPartDisplay(view){
+			view.preventIncomingRefresh();
+			if(!view.enable){view.partDisplay = true;return}
+			for(var i=view.unregisters.length-1;i>=0;i--){
+				var unreg = view.unregisters[i];
+				if(unreg.name === 'rendered' || unreg.name == 'editor.viewportChange'){
+					unreg.off();
+					view.unregisters.splice(i,1);
+				}
+			}
+			registerEvents('rendered', view.heather, function(){
+				var html = '';
+				var viewport = view.editor.getViewport();
+				//part render
+				for(const child of view.heather.node.children){
+					var ls = parseInt(child.dataset.line);
+					if(ls >= viewport.from && ls <= viewport.to){
+						html += child.outerHTML;
+					}
+					if(ls > viewport.to){
+						break;
+					}
+				} 
+				view.container.innerHTML = html;
+				afterDisplay(view.container); 
+				view.sync.doSync();
+			}, view.unregisters);
+			 
+			registerEvents('editor.viewportChange', view.heather, function(cm,start,end){
+				var html = '';
+				for(const child of view.heather.node.children){
+					var ls = parseInt(child.dataset.line);
+					if(ls >= start && ls <= end){
+						html += child.outerHTML;
+					}
+					if(ls > end){
+						break;
+					}
+				} 
+				var node = view.container.cloneNode(true);
+				node.innerHTML = html;
+				morphdom(view.container, node);
+				afterDisplay(view.container);
+				view.sync.doSync();		
+				
+			 }, view.unregisters);
+			view.heather.render();
+		}
+		
+		function setFullDisplay(view){
+			if(!view.enable){view.partDisplay = false;return}
+			for(var i=view.unregisters.length-1;i>=0;i--){
+				var unreg = view.unregisters[i];
+				if(unreg.name === 'rendered' || unreg.name == 'editor.viewportChange'){
+					unreg.off();
+					view.unregisters.splice(i,1);
+				}
+			}
+			
+			registerEvents('rendered', view.heather, function(){
+				if(view.refreshDisplayTimer) clearTimeout(view.refreshDisplayTimer);
+				view.refreshDisplayTimer = setTimeout(function(){
+					var node = view.container.cloneNode(true);
+					node.innerHTML = view.heather.node.innerHTML;
+					morphdom(view.container, node);
+					var viewport = view.editor.getViewport();
+					for(const child of view.container.children){
+						var ls = parseInt(child.dataset.line);
+						if(ls >= viewport.from && ls <= viewport.to){
+							afterDisplay(child);
+						}
+						if(ls > viewport.to){
+							break;
+						}
+					} 
+					view.sync.doSync();
+				},view.refreshDisplayMill);
+				
+			}, view.unregisters);
+			 
+			registerEvents('editor.viewportChange', view.heather, function(cm,start,end){
+				for(const child of view.container.children){
+					var ls = parseInt(child.dataset.line);
+					if(ls >= start && ls <= end){
+						afterDisplay(child);
+					}
+					if(ls > end){
+						break;
+					}
+				} 
+				view.sync.doSync();
+			 }, view.unregisters);
+			 view.heather.render();
+		}
+			
+		return SyncView;
+	})();
+	
+	
+	var View = (function(){
+		function View(heather){
+			this.isEnable = false;
+			this.editor = heather.editor;
+			this.heather = heather;
+		}
+		
+		View.prototype.enable = function(){
+			if(this.isEnable) return ;
+			this.isEnable = true;
+			var elem = this.editor.getScrollerElement();
+            this.editor.setOption('readOnly', 'nocursor');
+            var div = document.createElement('div');
+			var container = document.createElement('div');
+            container.classList.add('markdown-body');
+            container.classList.add('heather_preview');
+			
+           
+			
+			var me = this;
+            if (this.heather.config.disablePreviewCloseBtn !== true) {
+                var close = document.createElement('div');
+                close.classList.add('heather_preview_close');
+                close.innerHTML = '<i class="fas fa-eye-slash heather_icon"></i>';
+                div.appendChild(close);
+
+
+                close.addEventListener('click', function() {
+                   me.disable();
+                })
+            }
+			
+			div.appendChild(container);
+			elem.after(div);
+            container.innerHTML = this.heather.node.innerHTML;
+			container.addEventListener('scroll',function(){
+				for(const element of this.children){
+					if(isElementInViewport(element)){
+						afterDisplay(element);
+					}
+				}
+			});
+			
+			this.view = div;
+			this.cursor = this.editor.getCursor();
+			triggerEvent(this.heather, 'previewChange', true);
+		}
+		
+		View.prototype.disable = function(){
+			if(!this.isEnable) return ;
+			this.isEnable = false;
+			this.view.remove();
+            this.editor.setOption('readOnly', false);
+            this.editor.refresh();
+            this.editor.focus();
+            this.editor.setCursor(this.cursor);
+			triggerEvent(this.heather, 'previewChange', false);
+		}
+		
+		function isElementInViewport (el) {
+			var rect = el.getBoundingClientRect();
+
+			return (
+				rect.top >= 0 &&
+				rect.left >= 0 &&
+				rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) && 
+				rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+			);
+		}
+		
+		return View;
+	})();
+	
+	
+	var FocusedMode = (function(){
+		function FocusedMode(heather){
+			this.isEnable = false;
+			this.editor = heather.editor;
+			this.unregisters = [];
+			this.heather = heather;
+		}
+		
+		FocusedMode.prototype.enable = function(){
+			if(this.isEnable) return;
+			this.isEnable = true;
+			
+			var me = this;
+			var setPadding = function(cm) {
+                var wrapper = cm.getWrapperElement();
+                var height = wrapper.clientHeight / 2;
+                cm.display.mover.style.paddingBottom = height + 'px';
+                cm.refresh();
+                triggerEvent(me.heather, 'focusedHeightChange', height);
+            }
+
+            if (!Util.android) {
+                setPadding(this.editor);
+                registerEvents('editor.resize', this.heather, setPadding, this.unregisters);
+            }
+
+            registerEvents('editor.change', 'fullscreenChange', this.heather, function(cm) {
+                scrollToMiddleByCursor(me.heather);
+            }, this.unregisters);
+
+            triggerEvent(this.heather, 'focusedChange', true);
+		}
+		
+		FocusedMode.prototype.disable = function(){
+			if(!this.isEnable) return;
+			this.isEnable = false;
+			unregisterEvents(this.unregisters);
+            this.editor.display.mover.style.paddingBottom = '';
+            triggerEvent(this.heather, 'focusedChange', false);
+            triggerEvent(this.heather, 'focusedHeightChange', 0);
+		}
+		
+		
+		function scrollToMiddleByCursor(heather, cursor) {
+			var cm = heather.editor;
+			if (cm.somethingSelected()) return;
+			var height = cm.getWrapperElement().clientHeight / 2;
+
+			var pos = cm.cursorCoords(cursor || true, 'local');
+			var space = pos.top - height + heather.top.getHeight();
+
+			if (Util.ios && heather.isFullscreen()) {
+				//ios will scroll screen when focused
+				window.scrollTo(0, 0);
+			}
+			if (Util.mobile) {
+				cm.scrollTo(null, space);
+				heather.commandBar.rePosition();
+			} else {
+				var minHeight = height / 2;
+				if (space - cm.getScrollInfo().top <= minHeight) return;
+				if (heather.scrollToMiddleTimer) {
+					clearTimeout(heather.scrollToMiddleTimer);
+				}
+				heather.scrollToMiddleTimer = setTimeout(function() {
+					var scroller = cm.display.scroller;
+					scroller.scrollTo({
+						top: space,
+						behavior: 'smooth'
+					})
+					var scrollTimeout;
+					var scrollHandler = function() {
+						clearTimeout(scrollTimeout);
+						scrollTimeout = setTimeout(function() {
+							scroller.removeEventListener('scroll', scrollHandler);
+							posCommandWidget(heather);
+							heather.commandBar.rePosition();
+						}, 50);
+					}
+					scroller.addEventListener('scroll', scrollHandler);
+					heather.commandBar.rePosition();
+					heather.scrollToMiddleTimer = undefined;
+				}, 200)
+			}
+		}
+		return FocusedMode;
+	})();
 
     return {
         create: function(textarea, config) {
