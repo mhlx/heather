@@ -15,8 +15,9 @@
 <link rel="stylesheet" href="codemirror/addon/display/fullscreen.css">
 <link rel="stylesheet" href="codemirror/addon/fold/foldgutter.css" />
 <link rel="stylesheet" href="css/markdown.css">
-<link rel="stylesheet" href="fontawesome-free/css/all.min.css">
 <link rel="stylesheet" href="css/style.css">
+
+
 <style>
 .cm-header-1{
 	font-size:2rem
@@ -36,12 +37,15 @@
 .cm-header-6{
 	font-size:0.75rem
 }
+.heather_svg_fullscreen{
+	background-image:url(svg/fullscreen.svg)
+}
+.heather_svg_cursor{
+	background-image:url(svg/cursor.svg)
+}
 </style>
 </head>
 <body>
-
-
-
 <textarea id="editor" style="display:none"></textarea>
 <script src="codemirror/lib/codemirror.js"></script>
 <script src="codemirror//addon/mode/overlay.js"></script>
@@ -62,6 +66,7 @@
 <script src="js/markdown-it-task-lists.min.js"></script>
 <script src="js/markdown-it-katex.min.js"></script>
 <script src="js/markdownItAnchor.umd.js"></script>
+<script src="js/morphdom-umd.min.js"></script>
 <script src="js/heather.js"></script>
 <script>
 	var config = {
@@ -88,27 +93,23 @@
 		})
 	}
 	
-	
-	
 	var toolbar = heather.getToolbar();
-	toolbar.addIcon('fa fa-expand heather_icon',function(elem){
+	
+	toolbar.addElement(Heather.Util.createBarIcon('fullscreen',function(elem){
 		heather.setFullscreen(!heather.isFullscreen());
-	});
-	toolbar.addIcon('fas fa-eye heather_icon', function() {
+	}));
+	toolbar.addElement(Heather.Util.createBarIcon('eye',function(elem){
 		heather.setPreview(true);
-	});
-
-	
-	
+	}));
 	if(Heather.Util.mobile){
-		toolbar.addIcon('fas fa-arrows-alt heather_icon', function() {
+		toolbar.addElement(Heather.Util.createBarIcon('cursor',function(elem){
 			if(!heather.hasSelectionHelper()){
 				heather.openSelectionHelper();
 			} else {
 				heather.closeSelectionHelper();
 			}
-		});
-	}
+		}));
+	} 
 	
 	var storage = localStorage;
 	

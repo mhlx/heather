@@ -16,6 +16,7 @@ var Heather = (function() {
         var android = /Android/.test(userAgent);
         var mac = ios || /Mac/.test(platform);
         var chrome = !edge && /Chrome\//.test(userAgent)
+		var firefox = !edge && /Firefox\//.test(userAgent)
         var mobile = ios || android || /webOS|BlackBerry|Opera Mini|Opera Mobi|IEMobile/i.test(userAgent);
         var headingTagNames = ["H1", "H2", "H3", "H4", "H5", "H6"];
 
@@ -48,9 +49,21 @@ var Heather = (function() {
             android: android,
             ios: ios,
             edge: edge,
+			firefox:firefox,
             isHeading: function(element) {
                 return element.nodeType == 1 && headingTagNames.includes(element.tagName);
-            }
+            },
+			createBarIcon : function(clazz,handler){
+				var label = document.createElement('label');
+				label.classList.add('heather_svg_'+clazz);
+				label.classList.add('heather_svg_icon');
+				label.addEventListener('click',function(e){
+					e.preventDefault();
+					e.stopPropagation();
+					handler.call();
+				})
+				return label;
+			}
         }
 
     })();
@@ -70,7 +83,7 @@ var Heather = (function() {
                     md.use(window.markdownItAnchor);
             }
         },
-        commandBarEnable: Util.mobile,
+        //commandBarEnable: Util.mobile,
         editor: {
             lineNumbers: true,
             dragDrop: true,
@@ -79,10 +92,9 @@ var Heather = (function() {
             },
             callback: function(cm) {}
         },
-        refreshDisplayMill: 300,
         tooltipEnable: true,
         focused: true,
-        asyncNodeUpdateMill: 50
+		nodeUpdateMill: 300,
     }
 
 
@@ -140,7 +152,6 @@ var Heather = (function() {
         this.eventHandlers = [];
         this.editor = createEditor(textarea, config.editor);
         this.editor.heather = this;
-        this.gutterWidth = this.editor.getGutterElement().offsetWidth;
         this.node = document.createElement('body');
         this.top = new Top(this);
         this.markdownParser = new MarkdownParser(config.markdownParser, this);
@@ -170,7 +181,8 @@ var Heather = (function() {
     }
 
     Editor.prototype.getHtmlNode = function() {
-        return this.node ? this.node.cloneNode(true) : undefined;
+		this.nodeUpdate.update(true);
+		return this.node.cloneNode(true);
     }
 
     Editor.prototype.isFileUploadEnable = function() {
@@ -195,6 +207,7 @@ var Heather = (function() {
                 }
             }
         }
+		this.nodeUpdate.update(true);
         addNode(this.node);
         return nodes;
     }
@@ -208,11 +221,16 @@ var Heather = (function() {
     }
 
     Editor.prototype.execCommand = function(name) {
-        var handler = commands[name];
-        if (!Util.isUndefined(handler)) {
-            this.editor.ignoreNextFocusout = true;
-            handler(this);
-        }
+		if(name.startsWith("editor.")) {
+            name = name.substring(name.indexOf('.') + 1);
+			this.editor.execCommand(name);
+        } else {
+			var handler = commands[name];
+			if (!Util.isUndefined(handler)) {
+				this.editor.ignoreNextFocusout = true;
+				handler(this);
+			}
+		}
     }
 
     Editor.prototype.setPreview = function(preview) {
@@ -357,22 +375,10 @@ var Heather = (function() {
     function handleDefaultEditorEvent(heather) {
 
         var editor = heather.editor;
-
-        function checkGutterWidth() {
-            var gutterWidth = editor.getGutterElement().offsetWidth;
-            if (heather.gutterWidth !== gutterWidth) {
-                triggerEvent(heather, 'gutterWidthChange', gutterWidth);
-                heather.gutterWidth = gutterWidth;
-            }
-        }
-
         if (editor.getValue() != '') {
             heather.nodeUpdate.update();
         }
 
-        editor.on('update', function() {
-            checkGutterWidth();
-        })
 
         //change task list status
         editor.on('mousedown', function(cm, e) {
@@ -472,14 +478,6 @@ var Heather = (function() {
             heather.setPreview(!heather.isPreview());
         }
 
-        function indentMore() {
-            heather.editor.execCommand('indentMore');
-        }
-
-        function indentLess() {
-            heather.editor.execCommand('indentLess');
-        }
-
         function fold() {
             heather.fold(heather.editor.getCursor());
         }
@@ -491,9 +489,7 @@ var Heather = (function() {
             "Cmd-/": 'commands',
             "Cmd-Enter": toggleFullscreen,
             "Cmd-P": togglePreview,
-            "Cmd-Q": fold,
-            "Tab": indentMore,
-            "Shift-Tab": indentLess
+            "Cmd-Q": fold
         } : {
             "Ctrl-B": 'bold',
             "Ctrl-I": 'italic',
@@ -501,9 +497,7 @@ var Heather = (function() {
             "Alt-/": 'commands',
             "Ctrl-Enter": toggleFullscreen,
             "Ctrl-P": togglePreview,
-            "Ctrl-Q": fold,
-            "Tab": indentMore,
-            "Shift-Tab": indentLess
+            "Ctrl-Q": fold
         }
 
         heather.addKeyMap(keyMap);
@@ -551,6 +545,12 @@ var Heather = (function() {
             return info;
         }
         editor.doc.mode.fold = 'heather';
+		
+		if(Util.firefox){
+			var textarea = editor.getInputField();
+			textarea.style.width = "1000px";
+		}
+		
         return editor;
     }
 
@@ -566,7 +566,7 @@ var Heather = (function() {
             html += '<span class="heather_selection_helper_wrap" data-arrow="goCharRight"><span class="heather_selection_helper_touch" ></span></span> ';
             html += '<span class="heather_selection_helper_wrap" data-arrow="goLineDown"><span class="heather_selection_helper_touch" ></span></span> ';
             html += '<span class="heather_selection_helper_wrap" data-arrow="goCharLeft"><span class="heather_selection_helper_touch" ></span></span> ';
-            html += '<div class="heather_selection_helper_close"><i class="fas fa-times heather_icon" style="margin:0px !important"></i></div> ';
+            html += '<div class="heather_selection_helper_close"></div> ';
 
             var div = document.createElement('div');
             div.classList.add('heather_selection_helper');
@@ -628,7 +628,7 @@ var Heather = (function() {
 
             editor.setOption('readOnly', 'nocursor');
 
-            var close = div.querySelector('.heather_selection_helper_close').firstChild;
+            var close = div.querySelector('.heather_selection_helper_close');
             close.addEventListener('click', function() {
                 heather.closeSelectionHelper();
             });
@@ -806,7 +806,6 @@ var Heather = (function() {
             this.keepHidden = false;
         }
 
-
         Bar.prototype.hide = function() {
             this.element.style.visibility = 'hidden';
             this.hidden = true;
@@ -838,44 +837,10 @@ var Heather = (function() {
             this.hidden = false;
         }
 
-        Bar.prototype.addItem = function(item) {
-            insertItem(this, item, this.items.length);
-        }
-
         Bar.prototype.clear = function() {
             this.element.innerHTML = '';
         }
-
-        function createElement(icon, handler) {
-            var i = document.createElement('i');
-            i.setAttribute('class', icon);
-            i.setAttribute('style', 'cursor: pointer;margin-right:20px');
-            if (handler) {
-                var defaultEvent = 'click';
-                var isFunction = typeof handler === "function";
-                var event = isFunction ? defaultEvent : (handler.event || defaultEvent);
-
-                i.addEventListener(event, function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    if (isFunction) {
-                        handler(i);
-                    } else {
-                        handler.handler(i);
-                    }
-
-                })
-            }
-            return i;
-        }
-
-        Bar.prototype.insertIcon = function(clazz, handler, index, callback) {
-            var newIcon = createElement(clazz, handler);
-            if (callback) callback(newIcon);
-            this.insertElement(newIcon, index);
-        }
-
+		
         Bar.prototype.insertElement = function(element, index) {
             var toolbar = this.element;
             if (index >= this.length()) {
@@ -891,10 +856,6 @@ var Heather = (function() {
 
         Bar.prototype.addElement = function(element) {
             this.insertElement(element, this.length());
-        }
-
-        Bar.prototype.addIcon = function(clazz, handler, callback) {
-            this.insertIcon(clazz, handler, this.length(), callback);
         }
 
         Bar.prototype.removeElement = function(deleteChecker) {
@@ -915,18 +876,32 @@ var Heather = (function() {
         function Top(heather) {
             var div = document.createElement('div');
             div.classList.add('heather_top');
-            div.style.left = heather.gutterWidth + 'px';
+            div.style.left = heather.editor.getGutterElement().offsetWidth + 'px';
             heather.editor.getWrapperElement().append(div);
             this.div = div;
             this.components = [];
             this.cm = heather.editor;
             this.cachedHeight = 0;
             var me = this;
-            heather.on('editor.resize', function() {
-                me.calcMarginTop();
+			
+			var resize = function(cm){
+				var gutterWidth = cm.getGutterElement().offsetWidth;
+				me.div.style.left = gutterWidth + 'px';
+				var scrollInfo = cm.getScrollInfo();
+				var scrollbarWidth = 0;
+				if (scrollInfo.height > scrollInfo.clientHeight) {
+					var scroller = cm.getScrollerElement();
+					scrollbarWidth = scroller.offsetWidth - scroller.clientWidth;
+				}
+				me.div.style.width = (cm.getWrapperElement().offsetWidth-gutterWidth-scrollbarWidth)+'px';
+			}
+			
+            heather.on('editor.resize', function(cm) {
+                resize(cm);me.calcMarginTop();
             });
-            heather.on('gutterWidthChange', function(w) {
-                div.style.left = w + 'px';
+
+            heather.on('editor.update', function(cm) {
+				resize(cm);
             })
         }
 
@@ -986,16 +961,6 @@ var Heather = (function() {
             this.heather.top.calcMarginTop();
         }
 
-        Toolbar.prototype.addIcon = function(icon, handler, callback) {
-            this.bar.addIcon(icon, handler, callback);
-            this.heather.top.calcMarginTop();
-        }
-
-        Toolbar.prototype.insertIcon = function(clazz, handler, index, callback) {
-            this.bar.addIcon(clazz, handler, index, callback);
-            this.heather.top.calcMarginTop();
-        }
-
         Toolbar.prototype.removeElement = function(deleteChecker) {
             this.bar.removeElement(deleteChecker);
             this.heather.top.calcMarginTop();
@@ -1036,14 +1001,14 @@ var Heather = (function() {
             }
             var cm = this.cm;
             var pos = cm.cursorCoords(true, 'local');
-            this.bar.style.visibility = 'visible';
+            this.bar.getElement().style.visibility = 'visible';
             var toolbarHeight = this.heather.top.getHeight();
             var top = pos.top - cm.getScrollInfo().top - toolbarHeight;
             var distance = 2 * cm.defaultTextHeight();
-            if (top > distance + this.bar.clientHeight) {
-                this.bar.style.top = (pos.top - distance - this.bar.clientHeight) + 'px';
+            if (top > distance + this.bar.getElement().clientHeight) {
+                this.bar.getElement().style.top = (pos.top - distance - this.bar.getElement().clientHeight) + 'px';
             } else {
-                this.bar.style.top = (pos.top + distance) + 'px';
+                this.bar.getElement().style.top = (pos.top + distance) + 'px';
             }
         }
 
@@ -1061,11 +1026,11 @@ var Heather = (function() {
                 }
                 if (!me.bar) {
                     me.bar = createBar(cm, me.heather);
-                    me.bar.setAttribute('data-widget', '');
+                    me.bar.getElement().setAttribute('data-widget', '');
                     cm.addWidget({
                         line: 0,
                         ch: 0
-                    }, me.bar);
+                    }, me.bar.getElement());
                 }
                 me.rePosition();
             }
@@ -1084,6 +1049,18 @@ var Heather = (function() {
             registerEvents('selectionHelperClose', 'commandWidgetClose', this.heather, function() {
                 me.setKeepHidden(false);
             }, this.eventUnregisters);
+			
+			registerEvents('editor.update','editor.resize',this.heather,function(){
+				if(!me.bar) return ;
+				var cm = me.cm;
+				var scrollInfo = cm.getScrollInfo();
+				var scrollbarWidth = 0;
+				if (scrollInfo.height > scrollInfo.clientHeight) {
+					var scroller = cm.getScrollerElement();
+					scrollbarWidth = scroller.offsetWidth - scroller.clientWidth;
+				}
+				me.bar.getElement().style.width = (cm.getWrapperElement().clientWidth-cm.getGutterElement().offsetWidth-scrollbarWidth)+'px';
+			},this.eventUnregisters)
 
             this.enabled = true;
         }
@@ -1101,54 +1078,45 @@ var Heather = (function() {
 
         CommandBar.prototype.setKeepHidden = function(keepHidden) {
             if (keepHidden === true && this.bar)
-                this.bar.style.display = 'none';
+                this.bar.getElement().style.display = 'none';
             if (keepHidden !== true && (this.heather.hasSelectionHelper() || !Util.isUndefined(this.heather.commandWidgetState))) return
             if (keepHidden !== true && this.bar)
-                this.bar.style.display = '';
+                this.bar.getElement().style.display = '';
             this.keepHidden = keepHidden === true;
         }
-
+		
         function createBar(cm, heather) {
             var div = document.createElement('div');
             div.classList.add('heather_command_bar')
             var bar = new Bar(div);
-            bar.addIcon('fas fa-bars heather_icon', function() {
-                heather.execCommand('commands')
-            });
-            bar.addIcon('fas fa-bold heather_icon', function() {
-                heather.execCommand('bold')
-            });
+			
+            bar.addElement(Util.createBarIcon('command',function(){
+				heather.execCommand('commands');
+			}));
+			
+			bar.addElement(Util.createBarIcon('bold',function(){
+				heather.execCommand('bold');
+			}));
+			
+			bar.addElement(Util.createBarIcon('italic',function(){
+				heather.execCommand('italic');
+			}));
+			
+            bar.addElement(Util.createBarIcon('link',function(){
+				heather.execCommand('link');
+			}));
+			
+            bar.addElement(Util.createBarIcon('code',function(){
+				heather.execCommand('code');
+			}));
 
-            bar.addIcon('fas fa-italic heather_icon', function() {
-                heather.execCommand('italic')
-            });
+			bar.addElement(Util.createBarIcon('undo',function(){
+				heather.execCommand('editor.undo');
+			}));
 
-            bar.addIcon('fas fa-link heather_icon', function() {
-                heather.execCommand('link');
-            })
-
-            bar.addIcon('fas fa-code heather_icon', function() {
-                heather.execCommand('code');
-            })
-
-            bar.addIcon('fas heather_icon', function() {
-                heather.execCommand('br');
-            }, function(ele) {
-                ele.innerHTML = 'BR'
-            })
-
-            bar.addIcon('fas fa-strikethrough heather_icon', function() {
-                heather.execCommand('strikethrough');
-            })
-
-            bar.addIcon('fas fa-undo heather_icon', function() {
-                heather.editor.execCommand('undo');
-            })
-
-            bar.addIcon('fas fa-redo heather_icon', function() {
-                heather.editor.execCommand('redo');
-            })
-
+            bar.addElement(Util.createBarIcon('redo',function(){
+				heather.execCommand('editor.redo');
+			}));
 
             div.addEventListener('click', function(e) {
                 var cursor = cm.coordsChar({
@@ -1158,7 +1126,7 @@ var Heather = (function() {
                 cm.focus();
                 cm.setCursor(cursor);
             });
-            return div;
+            return bar;
         }
 
         return CommandBar;
@@ -1452,18 +1420,15 @@ var Heather = (function() {
 
                 var getTipContext = function(editor) {
                     var cursor = editor.getCursor();
-                    var text = editor.getLine(cursor.line).trimStart();
-                    var subLeft = text.substring(0, cursor.ch);
+                    var text = editor.getLine(cursor.line);
+					var quote = getStartQuote(text);
+                    var subLeft = text.substring(quote.length).trimLeft();
                     var context = {
-                        quoteSize: 0,
-                        tip: false
-                    };
-                    while (subLeft.startsWith("> ")) {
-                        context.quoteSize++;
-                        subLeft = subLeft.substring(2);
+                        tip: false,
+						quote : quote
                     }
                     if (subLeft.startsWith("``` ")) {
-                        var lang = text.substring(4 + context.quoteSize * 2, cursor.ch).trimStart();
+                        var lang = subLeft.substring(4).trimLeft();
                         context.tip = lang != '';
                         context.lang = lang;
                     }
@@ -1573,15 +1538,18 @@ var Heather = (function() {
                 var scroller = editor.getScrollerElement();
                 scrollbarWidth = scroller.offsetWidth - scroller.clientWidth;
             }
-            bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="fas fa-times heather_icon" style="position: absolute;top: 0;right: ' + scrollbarWidth + 'px;"><i></div>'
-            bar.querySelector('i').addEventListener('click', function() {
+            bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="heather_upload_stop_icon" style="position: absolute;top: 0;right: ' + scrollbarWidth + 'px;"><i></div>'
+           
+			bar.querySelector('i').addEventListener('click', function() {
                 xhr.abort();
             });
             var widget = editor.addLineWidget(editor.getCursor().line, bar, {
                 coverGutter: false,
                 noHScroll: true
             })
-            xhr.upload.addEventListener("progress", function(e) {
+			var marginTop = Math.max(bar.querySelector('.heather_progressbar').clientHeight - bar.querySelector('.heather_upload_stop_icon').clientHeight,0)/2;
+            bar.querySelector('.heather_upload_stop_icon').style.marginTop = marginTop+'px';
+			xhr.upload.addEventListener("progress", function(e) {
                 if (e.lengthComputable) {
                     var percentComplete = parseInt(e.loaded * 100 / e.total) + "";
                     var pb = bar.querySelector('.heather_progressbar').firstChild;
@@ -1814,6 +1782,17 @@ var Heather = (function() {
                 if (cm.somethingSelected()) return 'no';
                 var cursor = cm.getCursor();
                 var line = cursor.line;
+				
+				var state = cm.getStateAfter(line,true);
+				if(state.overlay.codeBlock){
+					 return 'no';
+				}
+				var lineStr = cm.getLine(line);
+				lineStr = lineStr.substring(getStartQuote(lineStr).length).trim();
+				if(!lineStr.startsWith('|') || !lineStr.endsWith('|') || lineStr.length <= 1){
+					return 'no';
+				}
+				
                 var nodes = heather.getNodesByLine(line);
                 if (nodes.length == 0) return 'no';
                 var node = nodes[nodes.length - 1];
@@ -1852,7 +1831,7 @@ var Heather = (function() {
             var keyMap = {
                 'Tab': function(cm) {
                     if (!tab(heather))
-                        heather.editor.execCommand('indentMore');
+                        heather.execCommand('editor.indentMore');
                 }
             }
 
@@ -1864,6 +1843,15 @@ var Heather = (function() {
             if (!editor.somethingSelected()) {
                 var cursor = editor.getCursor();
                 var line = cursor.line;
+				var state = editor.getStateAfter(line,true);
+				if(state.overlay.codeBlock){
+					 return false;
+				}
+				var lineStr = editor.getLine(line);
+				lineStr = lineStr.substring(getStartQuote(lineStr).length).trim();
+				if(!lineStr.startsWith('|') || !lineStr.endsWith('|') || lineStr.length <= 1){
+					return false;
+				}
                 var nodes = heather.getNodesByLine(line);
                 var mappingElem;
                 if (nodes.length > 0) {
@@ -1969,7 +1957,7 @@ var Heather = (function() {
                 ch: 0
             });
             var newText = array.join('\n');
-            if (endLine != cm.lineCount() - 1) {
+            if (endLine-1 != cm.lastLine()) {
                 newText += '\n';
             }
             cm.replaceSelection(newText);
@@ -2084,14 +2072,14 @@ var Heather = (function() {
             var tr = node.querySelectorAll('tr')[rowIndex];
             var rowLine = cm.getLine(startLine + rowIndex);
             var startSpaceLength = rowLine.length - rowLine.trimStart().length;
-            var quoteSize = getQuoteSize(rowLine.trimLeft());
-            newLine += quoteSize > 0 ? " ".repeat(Math.max(0, startSpaceLength)) + "> ".repeat(quoteSize) : " ".repeat(startSpaceLength);
+            var quote = getStartQuote(rowLine);
+            newLine += quote;
             for (var i = 0; i < tr.children.length; i++) {
                 newLine += '|    ';
                 if (i == tr.children.length - 1)
                     newLine += '|';
             }
-            var newCh = startSpaceLength + 3 + quoteSize * 2;
+            var newCh = 3 + quote.length;
             var targetLine = startLine + lineIndex;
             if (before === true) {
                 if (targetLine >= cm.lineCount()) return;
@@ -2542,6 +2530,7 @@ var Heather = (function() {
             var singleLine = from.line == cm.getCursor('to').line;
             for (var i = 0; i < texts.length; i++) {
                 var text = texts[i];
+				console.log(text);
                 if (i == 0) {
                     var fullLine = cm.getLine(from.line);
                     var startBlankLength = fullLine.length - fullLine.trimLeft().length;
@@ -2668,51 +2657,57 @@ var Heather = (function() {
             left: x,
             top: y
         }, 'window');
+		var state = heather.editor.getStateAfter(cursor.line,true);
+		if(state.overlay.codeBlock){
+			 return false;
+		}
+		var lineHandle = cm.getLineHandle(cursor.line);
+		var lineStr = lineHandle.text;
+		var quote = getStartQuote(lineStr);
+		var lineLeft = lineStr.substring(quote.length).trimLeft();
+        var lft = lineLeft.substring(0, cursor.ch - (lineStr.length - lineLeft.length)).replaceAll(' ', '');
+		if (lft != '-[' && lft != '-[x') {
+			return ;
+		}
+		
         var nodes = heather.getNodesByLine(cursor.line);
         if (nodes.length == 0) return;
         var node = nodes[nodes.length - 1];
         if (node.tagName == 'P') node = nodes[nodes.length - 2];
         if (!node) return;
         if (node.classList.contains('task-list-item')) {
-            var lineStr = cm.getLine(cursor.line);
-            var lineLeft = lineStr.trimLeft();
-            var startBlankLength = lineStr.length - lineLeft.length;
-            var quoteSize = getQuoteSize(lineLeft);
-            var lft = lineLeft.substring(quoteSize * 2, cursor.ch - startBlankLength).replaceAll(' ', '');
-            if (lft == '-[' || lft == '-[x') {
-                //need change 
-                var checkbox = node.querySelector('.task-list-item-checkbox');
-                if (checkbox != null) {
-                    var startCh, endCh;
+			//need change 
+			var checkbox = node.querySelector('.task-list-item-checkbox');
+			if (checkbox != null) {
+				var startCh, endCh;
 
-                    for (var i = 0; i < lineStr.length; i++) {
-                        var ch = lineStr.charAt(i);
-                        if (ch == '[') {
-                            startCh = i;
-                        }
-                        if (ch == ']') {
-                            endCh = i;
-                            break;
-                        }
-                    }
+				for (var i = 0; i < lineStr.length; i++) {
+					var ch = lineStr.charAt(i);
+					if (ch == '[') {
+						startCh = i;
+					}
+					if (ch == ']') {
+						endCh = i;
+						break;
+					}
+				}
 
-                    if (!Util.isUndefined(startCh) && !Util.isUndefined(endCh)) {
-                        cm.setSelection({
-                            line: cursor.line,
-                            ch: startCh + 1
-                        }, {
-                            line: cursor.line,
-                            ch: endCh
-                        });
-                        if (checkbox.checked) {
-                            cm.replaceSelection(" ");
-                        } else {
-                            cm.replaceSelection("x");
-                        }
-                    }
+				if (!Util.isUndefined(startCh) && !Util.isUndefined(endCh)) {
+					cm.setSelection({
+						line: cursor.line,
+						ch: startCh + 1
+					}, {
+						line: cursor.line,
+						ch: endCh
+					});
+					if (checkbox.checked) {
+						cm.replaceSelection(" ");
+					} else {
+						cm.replaceSelection("x");
+					}
+				}
 
-                }
-            }
+			}
         }
     }
 
@@ -2723,33 +2718,34 @@ var Heather = (function() {
         div.querySelector('.mermaid').innerHTML = expression;
         return div;
     }
-
-    function getQuoteSizeAtPoint(cm, cursor) {
-        var left = cm.getLine(cursor.line).substring(0, cursor.ch).trimStart();
-        return getQuoteSize(left);
-    }
-
-    function getQuoteSize(str) {
-        //> => 1
-        //> > => 2
-        //> 1 > 1 => 1
-        var size = 0;
-        while (str.startsWith("> ")) {
-            size++;
-            str = str.substring(2);
-        }
-        return size;
-    }
+	
+	function getStartQuote(str){
+		var newStr = str.trimLeft();
+		if(str.length - newStr.length > 4){
+			return "";
+		}
+		var quote = ' '.repeat(str.length - newStr.length);
+		while (newStr.startsWith(">")) {
+			quote += '>';
+			newStr = newStr.substring(1);
+			var trimed = newStr.trimLeft();
+			var blankLength = newStr.length - trimed.length;
+			if(blankLength > 4){
+				quote += " ".repeat(4);
+				return quote;
+			}
+			quote += " ".repeat(blankLength);
+			newStr = trimed;
+		}
+		if(quote.indexOf('>') != -1){
+			return quote;
+		}
+		return '';
+	}
 
     function createPrefix(cm, cursor) {
-        var prefix;
-        var size = getQuoteSizeAtPoint(cm, cursor);
-        if (size > 0) {
-            prefix = " ".repeat(Math.max(cursor.ch - 2 * size, 0)) + "> ".repeat(size);
-        } else {
-            prefix = " ".repeat(cursor.ch);
-        }
-        return prefix;
+		var quote = cm.getLine(cursor.line);
+		return " ".repeat(Math.max(cursor.ch - quote.length, 0)) + quote;
     }
 
     function registerEvents(...args) {
@@ -2776,50 +2772,34 @@ var Heather = (function() {
 
         function NodeUpdate(heather) {
             this.heather = heather;
-            this.sync = true;
             var me = this;
-
             var editor = heather.editor;
-            var change = false;
+            this.change = false;
 
             editor.on('change', function() {
-                change = true;
-            })
-
-            editor.on('update', function(cm) {
-                if (change) {
-                    change = false;
-                    me.update();
-                }
+                me.change = true;
             })
         }
-		
-		NodeUpdate.prototype.isAsync = function(){
-			return !this.sync;
-		}
 
-        NodeUpdate.prototype.update = function() {
+        NodeUpdate.prototype.update = function(immediate) {
             var heather = this.heather;
-            var mill = heather.config.asyncNodeUpdateMill;
-            if (this.sync) {
-                this.sync = doUpdate(heather) <= mill;
-            } else {
-                if (heather.renderTimeout) {
-                    clearTimeout(heather.renderTimeout);
-                    heather.renderTimeout = undefined;
-                }
-				heather.syncView.preventIncomingRefresh();
-                var me = this;
-                heather.renderTimeout = setTimeout(function() {
-                    me.sync = doUpdate(heather) <= mill;
-                }, 0);
-            }
-        }
-
-        function doUpdate(heather) {
-            var start = performance.now();
-            heather.render();
-            return performance.now() - start;
+			if(heather.node && !this.change){
+				return ;
+			}
+            if (this.nodeUpdateTimer) {
+				clearTimeout(this.nodeUpdateTimer);
+				this.nodeUpdateTimer = undefined;
+			}
+			if(immediate === true){
+				heather.render();
+				this.change = false;
+			} else {
+				var me = this;
+				this.nodeUpdateTimer = setTimeout(function() {
+					heather.render();
+					me.change = false;
+				}, heather.config.nodeUpdateMill);
+			}
         }
 
         return NodeUpdate;
@@ -2861,6 +2841,15 @@ var Heather = (function() {
             registerEvents('editor.scroll', this.heather, function() {
                 me.sync.doSync();
             }, this.unregisters);
+            registerEvents('editor.update', this.heather, function() {
+				if(me.updateTimer)
+					clearTimeout(me.updateTimer);
+				me.updateTimer = setTimeout(function(){
+					if(!me.editor.display.input.composing){
+						me.heather.nodeUpdate.update();
+					}
+				},10)
+            }, this.unregisters);
 			
 			var fullscreenChangeHandler = function(fs) {
                 if (fs) {
@@ -2900,17 +2889,12 @@ var Heather = (function() {
 			CodeMirror.signal(this.editor, "resize", this.editor);
 		}
 		
-		SyncView.prototype.preventIncomingRefresh = function(){
-			if(this.isEnable && this.refreshDisplayTimer && !this.partDisplay) clearTimeout(this.refreshDisplayTimer);
-		}
-		
 		SyncView.prototype.disable = function(){
 			if(!this.isEnable) return ;
 			this.isEnable = false;
 			this.view.remove();
             unregisterEvents(this.unregisters);
             this.editor.getWrapperElement().classList.remove('heather_sync_view_editor');
-			if(this.refreshDisplayTimer) clearTimeout(this.refreshDisplayTimer);
 			triggerEvent(this.heather, 'syncViewChange', false);
 			CodeMirror.signal(this.editor, "resize", this.editor);
 		}
@@ -2923,8 +2907,8 @@ var Heather = (function() {
 		}
 		
 		function setPartDisplay(view){
-			view.preventIncomingRefresh();
-			if(!view.enable){view.partDisplay = true;return}
+			view.partDisplay = true;
+			if(!view.enable) return;
 			for(var i=view.unregisters.length-1;i>=0;i--){
 				var unreg = view.unregisters[i];
 				if(unreg.name === 'rendered' || unreg.name == 'editor.viewportChange'){
@@ -2972,7 +2956,8 @@ var Heather = (function() {
 		}
 		
 		function setFullDisplay(view){
-			if(!view.enable){view.partDisplay = false;return}
+			view.partDisplay = false
+			if(!view.enable) return;
 			for(var i=view.unregisters.length-1;i>=0;i--){
 				var unreg = view.unregisters[i];
 				if(unreg.name === 'rendered' || unreg.name == 'editor.viewportChange'){
@@ -2982,24 +2967,20 @@ var Heather = (function() {
 			}
 			
 			registerEvents('rendered', view.heather, function(){
-				if(view.refreshDisplayTimer) clearTimeout(view.refreshDisplayTimer);
-				view.refreshDisplayTimer = setTimeout(function(){
-					var node = view.container.cloneNode(true);
-					node.innerHTML = view.heather.node.innerHTML;
-					morphdom(view.container, node);
-					var viewport = view.editor.getViewport();
-					for(const child of view.container.children){
-						var ls = parseInt(child.dataset.line);
-						if(ls >= viewport.from && ls <= viewport.to){
-							afterDisplay(child);
-						}
-						if(ls > viewport.to){
-							break;
-						}
-					} 
-					view.sync.doSync();
-				},view.refreshDisplayMill);
-				
+				var node = view.container.cloneNode(true);
+				node.innerHTML = view.heather.node.innerHTML;
+				morphdom(view.container, node);
+				var viewport = view.editor.getViewport();
+				for(const child of view.container.children){
+					var ls = parseInt(child.dataset.line);
+					if(ls >= viewport.from && ls <= viewport.to){
+						afterDisplay(child);
+					}
+					if(ls > viewport.to){
+						break;
+					}
+				} 
+				view.sync.doSync();
 			}, view.unregisters);
 			 
 			registerEvents('editor.viewportChange', view.heather, function(cm,start,end){
@@ -3037,17 +3018,13 @@ var Heather = (function() {
 			var container = document.createElement('div');
             container.classList.add('markdown-body');
             container.classList.add('heather_preview');
-			
            
 			
 			var me = this;
             if (this.heather.config.disablePreviewCloseBtn !== true) {
                 var close = document.createElement('div');
                 close.classList.add('heather_preview_close');
-                close.innerHTML = '<i class="fas fa-eye-slash heather_icon"></i>';
                 div.appendChild(close);
-
-
                 close.addEventListener('click', function() {
                    me.disable();
                 })
@@ -3055,6 +3032,7 @@ var Heather = (function() {
 			
 			div.appendChild(container);
 			elem.after(div);
+			this.heather.nodeUpdate.update(true);
             container.innerHTML = this.heather.node.innerHTML;
 			container.addEventListener('scroll',function(){
 				for(const element of this.children){

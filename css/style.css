@@ -1,10 +1,4 @@
-.heather_icon {
-	margin-top: 5px;
-	cursor: pointer;
-	font-size: 16px;
-	margin-right: 10px;
-	margin-bottom: 5px
-}
+
 .heather_top{
 	position:absolute;
 	top:0px;
@@ -16,14 +10,20 @@
 .heather_command_bar {
 	overflow-y: auto;
 	white-space: nowrap;
-	width: 95%;
-	margin-left: 5px;
+}
+
+.heather_toolbar_bar{
+	padding:5px;
 }
 
 .heather_command_bar {
 	z-index: 99;
 	position: absolute;
 	left: 0px !important;
+}
+
+.heather_command_bar :first-child {
+  margin-left:5px;
 }
 
 .heather_hljs_tip .selected {
@@ -50,13 +50,13 @@
 	position: absolute;
 	right: 10px;
 	top: 5px;
-	z-index:999
-}
-
-@media (max-width:768px) {
-	.heather_icon {
-		font-size: 30px;
-	}
+	z-index:999;
+	width:24px;
+	height:24px;
+	background-repeat:no-repeat;
+	background-image:url(../svg/eye_close.svg);
+	cursor:pointer;
+	background-size: 24px 24px;
 }
 
 .heather_progressbar {
@@ -205,9 +205,14 @@
 }
 .heather_selection_helper_close{
 	position:absolute;
-	top: calc(50% - 15px);
-    left: calc(50% - 10.3px);
+	top: calc(50% - 12px);
+    left: calc(50% - 11px);
 	opacity:0.7;
+	width:24px;
+	height:24px;
+	background-repeat:no-repeat;
+	background-image:url(../svg/delete.svg);
+	background-size: 24px 24px;
 }
 .heather_sync_view table th{
 	word-break:keep-all;
@@ -217,4 +222,77 @@
 .heather_preview video {
 	max-width: 200px;
 	height: auto;
+}
+
+.heather_svg_icon{
+	width:24px;
+	height:24px;
+	background-repeat:no-repeat;
+	margin-right:10px;
+	cursor:pointer;
+	display:inline-block;
+	background-size: 24px 24px;
+}
+
+.heather_upload_stop_icon{
+	width:18px;
+	height:18px;
+	background-repeat:no-repeat;
+	background-image:url(../svg/delete.svg);
+	background-size: 18px 18px;
+}
+
+@media (min-width:768px) {
+	.heather_svg_icon{
+		width:16px;
+		height:16px;
+		background-size: 16px 16px;
+	}
+}
+
+
+.heather_svg_command{
+	background-image:url(../svg/command.svg)
+}
+.heather_svg_link{
+	background-image:url(../svg/link.svg)
+}
+.heather_svg_code{
+	background-image:url(../svg/code.svg)
+}
+.heather_svg_undo{
+	background-image:url(../svg/undo.svg)
+}
+.heather_svg_redo{
+	background-image:url(../svg/redo.svg)
+}
+.heather_svg_eye_close{
+	background-image:url(../svg/eye_close.svg)
+}
+.heather_svg_eye{
+	background-image:url(../svg/eye.svg)
+}
+.heather_svg_file{
+	background-image:url(../svg/file.svg)
+}
+.heather_svg_save{
+	background-image:url(../svg/save.svg)
+}
+.heather_svg_cursor{
+	background-image:url(../svg/cursor.svg)
+}
+.heather_svg_delete{
+	background-image:url(../svg/delete.svg)
+}
+.heather_svg_fullscreen{
+	background-image:url(../svg/fullscreen.svg)
+}
+.heather_svg_italic{
+	background-image:url(../svg/italic.svg)
+}
+.heather_svg_bold{
+	background-image:url(../svg/bold.svg)
+}
+.heather_svg_return{
+	background-image:url(../svg/return.svg)
 }
