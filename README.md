@@ -1,6 +1,4 @@
-# heather 2.x
 
-## 现在处于维护模式
 
 ## 浏览器支持
 
@@ -18,6 +16,10 @@
 ### 不支持的浏览器
 1. IE
 2. Edge
+
+## 文档
+
+https://www.qyh.me/document/heather/2.x.md
 
 ## 特性
 
