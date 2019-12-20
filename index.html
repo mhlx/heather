@@ -37,12 +37,6 @@
 .cm-header-6{
 	font-size:0.75rem
 }
-.heather_svg_fullscreen{
-	background-image:url(svg/fullscreen.svg)
-}
-.heather_svg_cursor{
-	background-image:url(svg/cursor.svg)
-}
 </style>
 </head>
 <body>
@@ -69,6 +63,13 @@
 <script src="js/morphdom-umd.min.js"></script>
 <script src="js/heather.js"></script>
 <script>
+
+var localStorageSupport = false;
+try{
+localStorageSupport = window.localStorage;
+}catch(e){}
+localStorageSupport = localStorageSupport !== false;
+
 	var config = {
 		upload:{
 			url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
@@ -109,19 +110,21 @@
 				heather.closeSelectionHelper();
 			}
 		}));
-	} 
+	};
 	
-	var storage = localStorage;
-	
-	heather.on('rendered',function(value){
-		storage.setItem('markdown',value);
-	});
-	
-	var old = storage.getItem('markdown');
-	if(old != null){
-		heather.setValue(old);
+	if(localStorageSupport){
+		var timer;
+		heather.on('editor.change',function(cm){
+			clearTimeout(timer);
+			timer = setTimeout(function(){
+				localStorage.setItem('markdown',cm.getValue());
+			},500)
+		});
+		var old = window.localStorage.getItem('markdown');
+		if(old != null){
+			heather.setValue(old);
+		}
 	}
-
 	heather.setFullscreen(true);
 </script>
 </body>

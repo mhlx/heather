@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport"
+	content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="description" content="Heather is an online Markdown Editor">
+<meta name="keywords" content="Markdown, Heather, Editor, CodeMirror, Github, Open Source">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<link rel="stylesheet" href="highlight/styles/github.css">
+<link rel="stylesheet" href="codemirror/lib/codemirror.css">
+<link rel="stylesheet" href="codemirror/addon/dialog/dialog.css">
+<link rel="stylesheet" href="codemirror/addon/display/fullscreen.css">
+<link rel="stylesheet" href="codemirror/addon/fold/foldgutter.css" />
+<link rel="stylesheet" href="css/markdown.css">
+<link rel="stylesheet" href="css/style.css">
+
+
+<style>
+.cm-header-1{
+	font-size:2rem
+}
+.cm-header-2{
+	font-size:1.5rem
+}
+.cm-header-3{
+	font-size:1.17rem
+}
+.cm-header-4{
+	font-size:1rem
+}
+.cm-header-5{
+	font-size:0.83rem
+}
+.cm-header-6{
+	font-size:0.75rem
+}
+</style>
+</head>
+<body>
+<h2>基础</h2>
+<textarea id="editor1" style="display:none"></textarea>
+<h2>同步预览</h2>
+<textarea id="editor2" style="display:none"></textarea>
+<h2>自定义工具条</h2>
+<textarea id="editor3" style="display:none"></textarea>
+<h2>关闭行号</h2>
+<textarea id="editor4" style="display:none"></textarea>
+<h2>自定义尺寸</h2>
+<textarea id="editor5" style="display:none"></textarea>
+<h2>文件上传</h2>
+<textarea id="editor6" style="display:none"></textarea>
+<h2>预览</h2>
+<textarea id="editor7" style="display:none"></textarea>
+<h2>全屏模式</h2>
+<textarea id="editor8" style="display:none"></textarea>
+<h2>取值赋值</h2>
+<textarea id="editor9" style="display:none"></textarea>
+<script src="codemirror/lib/codemirror.js"></script>
+<script src="codemirror//addon/mode/overlay.js"></script>
+<script src="codemirror/mode/markdown/markdown.js"></script>
+<script src="codemirror/mode/gfm/gfm.js"></script>
+<script src="codemirror/addon/selection/mark-selection.js"></script>
+<script src="codemirror/addon/selection/active-line.js"></script>
+<script src="codemirror/addon/edit/continuelist.js"></script>
+<script src="codemirror/addon/dialog/dialog.js"></script>
+<script src="codemirror/addon/search/searchcursor.js"></script>
+<script src="codemirror/addon/search/search.js"></script>
+<script src="codemirror/addon/search/jump-to-line.js"></script>
+<script src="codemirror/addon/display/fullscreen.js"></script>
+<script src="codemirror/addon/fold/foldcode.js"></script>
+<script src="codemirror/addon/fold/foldgutter.js"></script>
+<script src="highlight/highlight.pack.js"></script>
+<script src="js/markdown-it.min.js"></script>
+<script src="js/markdown-it-task-lists.min.js"></script>
+<script src="js/markdown-it-katex.min.js"></script>
+<script src="js/markdownItAnchor.umd.js"></script>
+<script src="js/morphdom-umd.min.js"></script>
+<script src="js/heather.js"></script>
+<script>
+
+	var localStorageSupport = false;
+	try{
+	localStorageSupport = window.localStorage;
+	}catch(e){}
+	localStorageSupport = localStorageSupport !== false;
+	
+	var util = Heather.Util;
+	
+	Heather.create(document.getElementById("editor1"));
+	
+	var editor2 = Heather.create(document.getElementById("editor2"));
+	var syncView = false;
+	editor2.on('syncViewChange',function(sv){
+		syncView = sv;
+	})
+	editor2.getToolbar().addElement(util.createBarIcon('book',function(){
+		editor2.setSyncView(!syncView);
+	}));
+	editor2.setSyncView(true);
+	
+	var editor3 = Heather.create(document.getElementById("editor3"));
+	var toolbar= editor3.getToolbar();
+	toolbar.addElement(util.createBarIcon('save',function(){
+		alert('save');
+	}))
+	editor3.getCommandBar().getBarHelper().clear();
+	editor3.getCommandBar().enable();
+	editor3.getCommandBar().getBarHelper().addElement(util.createBarIcon('command',function(){
+		editor3.execCommand('commands');
+	}))
+	editor3.getCommandBar().getBarHelper().addElement(util.createBarIcon('delete',function(){
+		editor3.getCommandBar().disable();
+	}))
+	
+	var editor4 = Heather.create(document.getElementById("editor4"),{editor:{lineNumber:false}});
+	
+	var editor5 = Heather.create(document.getElementById("editor5"),{focused:false});
+	editor5.editor.getWrapperElement().style.backgroundColor = 'green';
+	editor5.editor.setSize(300,150);
+	
+	var editor6 = Heather.create(document.getElementById("editor6"),{
+		upload:{
+			url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
+			uploadFinish:function(resp){
+				return {
+					type : 'image',
+					url : 'https://www.qyh.me/image/dog/B4A2CC92-54B4-456F-89FA-A4B18822D065.jpeg/64'
+				};
+			},
+			beforeUpload:function(upload,file){
+				return true;
+			}
+		}
+	});
+	
+	var uploadIcon = util.createBarIcon('upload');
+	var input = document.createElement('input');
+	input.type = 'file';
+	input.style.display = 'none';
+	uploadIcon.appendChild(input);
+	input.addEventListener('change',function(){
+		if(this.files.length > 0)
+			editor6.upload(this.files[0]);
+	})
+	editor6.getToolbar().addElement(uploadIcon);
+	
+	
+	var editor7 = Heather.create(document.getElementById("editor7"));
+	editor7.getToolbar().addElement(util.createBarIcon('eye',function(){
+		editor7.setPreview(true)
+	}))
+	
+	var fullscreen = false;
+	var editor8 = Heather.create(document.getElementById("editor8"));
+	editor8.on('fullscreenChange',function(fs){
+		fullscreen = fs;
+	});
+	editor8.getToolbar().addElement(util.createBarIcon('fullscreen',function(){
+		editor8.setFullscreen(!fullscreen);
+	}))
+	
+	
+	var editor9 = Heather.create(document.getElementById("editor9"));
+	var btn = document.createElement('button');
+	btn.textContent = '取值';
+	btn.setAttribute('style','margin-right:10px')
+	btn.addEventListener('click',function(){
+		alert(editor9.getValue())
+	})
+	var btn1 = document.createElement('button');
+	btn1.textContent = '获取HTML';
+	btn1.addEventListener('click',function(){
+		var node = editor9.getHtmlNode();
+		node.querySelectorAll('[data-line]').forEach(node=>{
+			node.removeAttribute('data-line');
+			node.classList.remove('line');
+			if(node.className.trim() == '')
+				node.removeAttribute('class')
+			node.removeAttribute('data-end-line');
+		});
+		console.warn('这个html是被处理过的，最好获取markdown后自己转化下')
+		alert(node.innerHTML);
+	})
+	editor9.getToolbar().addElement(btn);
+	editor9.getToolbar().addElement(btn1);
+	editor9.setValue('# Hello World');
+</script>
+</body>
+</html>

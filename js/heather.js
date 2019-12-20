@@ -57,11 +57,13 @@ var Heather = (function() {
 				var label = document.createElement('label');
 				label.classList.add('heather_svg_'+clazz);
 				label.classList.add('heather_svg_icon');
-				label.addEventListener('click',function(e){
-					e.preventDefault();
-					e.stopPropagation();
-					handler.call();
-				})
+				if(handler){
+					label.addEventListener('click',function(e){
+						e.preventDefault();
+						e.stopPropagation();
+						handler.call(label,null);
+					})
+				}
 				return label;
 			}
         }
@@ -83,7 +85,7 @@ var Heather = (function() {
                     md.use(window.markdownItAnchor);
             }
         },
-        //commandBarEnable: Util.mobile,
+        commandBarEnable: Util.mobile,
         editor: {
             lineNumbers: true,
             dragDrop: true,
@@ -94,7 +96,7 @@ var Heather = (function() {
         },
         tooltipEnable: true,
         focused: true,
-		nodeUpdateMill: 300,
+		nodeUpdateMill: 300
     }
 
 
@@ -106,6 +108,14 @@ var Heather = (function() {
     String.prototype.splice = function(start, delCount, newSubStr) {
         return this.slice(0, start) + newSubStr + this.slice(start + Math.abs(delCount));
     }
+	
+	var setSize = CodeMirror.prototype.setSize;
+	CodeMirror.prototype.setSize = function(width,height){
+		setSize.call(this,width,height);
+		if(this.heather && this.width){
+			this.getRootNode().style.width = width + 'px';
+		}
+	}
 
     CodeMirror.registerHelper("fold", "heather", function(cm, start) {
         var heather = cm.heather;
@@ -157,7 +167,7 @@ var Heather = (function() {
         this.markdownParser = new MarkdownParser(config.markdownParser, this);
         this.toolbar = new Toolbar(this, config);
         this.commandBar = new CommandBar(this, config);
-        this.tooltip = new Tooltip(this.editor, config);
+        this.tooltip = new Tooltip(this, config);
         this.config = config;
 		this.syncView = new SyncView(this);
 		this.view = new View(this);
@@ -371,6 +381,14 @@ var Heather = (function() {
         this.node = node;
         triggerEvent(this, 'rendered', value, this.node.innerHTML);
     }
+	
+	
+	Editor.prototype.upload = function(file){
+		if(!this.isFileUploadEnable()){
+			return ;
+		}
+		new FileUpload(file, this, this.config.upload).start();
+	}
 
     function handleDefaultEditorEvent(heather) {
 
@@ -378,7 +396,6 @@ var Heather = (function() {
         if (editor.getValue() != '') {
             heather.nodeUpdate.update();
         }
-
 
         //change task list status
         editor.on('mousedown', function(cm, e) {
@@ -405,7 +422,7 @@ var Heather = (function() {
             var clipboardData, pastedData;
             clipboardData = evt.clipboardData || window.clipboardData;
             var files = clipboardData.files;
-            if (files.length > 0 && heather.isFileUploadEnable()) {
+            if (files && files.length > 0 && heather.isFileUploadEnable()) {
                 var f = files[0];
                 var type = f.type;
                 if (type.indexOf('image/') == -1) {
@@ -451,8 +468,7 @@ var Heather = (function() {
                 }
             }
 			if (option === 'fullScreen') {
-				CodeMirror.signal(cm, "resize", cm);
-				heather.commandBar.rePosition();
+				CodeMirror.signal(cm, "update", cm);
 				triggerEvent(heather, 'fullscreenChange', cm.getOption(option) === true);
 			}
         })
@@ -489,7 +505,8 @@ var Heather = (function() {
             "Cmd-/": 'commands',
             "Cmd-Enter": toggleFullscreen,
             "Cmd-P": togglePreview,
-            "Cmd-Q": fold
+            "Cmd-Q": fold,
+			"Shift-Tab": 'editor.indentLess'
         } : {
             "Ctrl-B": 'bold',
             "Ctrl-I": 'italic',
@@ -497,7 +514,8 @@ var Heather = (function() {
             "Alt-/": 'commands',
             "Ctrl-Enter": toggleFullscreen,
             "Ctrl-P": togglePreview,
-            "Ctrl-Q": fold
+            "Ctrl-Q": fold,
+			"Shift-Tab": 'editor.indentLess'
         }
 
         heather.addKeyMap(keyMap);
@@ -570,7 +588,7 @@ var Heather = (function() {
 
             var div = document.createElement('div');
             div.classList.add('heather_selection_helper');
-            div.style.visibility = 'hidden';
+            div.style.display = 'none';
             div.setAttribute('data-widget', '');
             div.innerHTML = html;
             editor.addWidget({
@@ -579,7 +597,7 @@ var Heather = (function() {
             }, div);
 
             var resize = function() {
-                var w = editor.getWrapperElement().clientWidth * 0.6;
+                var w = editor.getWrapperElement().offsetWidth * 0.6;
                 div.style.width = w + 'px'
                 div.style.height = w + 'px';
                 if (heather.isFullscreen()) {
@@ -596,8 +614,9 @@ var Heather = (function() {
             var pos = function() {
                 div.style.left = '';
                 if (!heather.isFullscreen()) {
-                    var w = editor.getWrapperElement().clientWidth * 0.6;
-                    var top = editor.cursorCoords(false, 'local').top + editor.defaultTextHeight();
+                    var w = editor.getWrapperElement().offsetWidth * 0.6;
+					var cursor = editor.getCursor();
+                    var top = editor.cursorCoords(cursor, 'local').top + editor.defaultTextHeight();
                     var h = editor.getScrollInfo().height;
                     if (top + w > h) {
                         top = h - w;
@@ -606,8 +625,7 @@ var Heather = (function() {
                 }
             }
             resize();
-            pos();
-            div.style.visibility = 'visible';
+            div.style.display = '';
 
             this.start = editor.getCursor(true);
             this.end = editor.getCursor(false);
@@ -655,8 +673,9 @@ var Heather = (function() {
                     close.style.display = 'none';
                 })
                 arrow.addEventListener('touchend', function() {
-                    if (showCloseTimer)
+                    if (showCloseTimer){
                         clearTimeout(showCloseTimer);
+					}
                     showCloseTimer = setTimeout(function() {
                         close.style.display = '';
                     }, 300)
@@ -664,7 +683,7 @@ var Heather = (function() {
             }
 
             registerEvents('editor.cursorActivity', heather, cursorActivityHandler, eventUnregisters);
-            registerEvents('editor.resize', heather, resize, eventUnregisters);
+            registerEvents('editor.update', heather, resize, eventUnregisters);
             registerEvents('editor.mousedown', 'editor.touchstart', heather, function(cm, e) {
                 if (isWidget(e.target, cm)) {
                     e.codemirrorIgnore = true;
@@ -789,7 +808,7 @@ var Heather = (function() {
             }
             var pos = nextPosition - lastPosition;
             if (!Util.isUndefined(last) && !Util.isUndefined(next) && last === next) {
-                pos = last.clientHeight;
+                pos = last.offsetHeight;
             }
             var scrollTop = lastPosition + pos * editorScroll.percentage;
             this.scrollElement.scrollTop = scrollTop;
@@ -803,40 +822,28 @@ var Heather = (function() {
         function Bar(element) {
             element.setAttribute('data-toolbar', '');
             this.element = element;
-            this.keepHidden = false;
         }
 
-        Bar.prototype.hide = function() {
-            this.element.style.visibility = 'hidden';
-            this.hidden = true;
-        }
         Bar.prototype.getElement = function() {
             return this.element;
         }
+		
         Bar.prototype.remove = function() {
             this.element.remove();
         }
 
         Bar.prototype.height = function() {
-            return this.element.offsetHeight;
+            return this.length() == 0 ? 0 : this.element.offsetHeight;
         }
 
         Bar.prototype.width = function() {
-            return this.element.clientWidth;
+            return this.element.offsetWidth;
         }
 
         Bar.prototype.length = function() {
             return this.element.childNodes.length;
         }
-
-        Bar.prototype.show = function() {
-            if (this.keepHidden) {
-                return;
-            }
-            this.element.style.visibility = 'visible';
-            this.hidden = false;
-        }
-
+		
         Bar.prototype.clear = function() {
             this.element.innerHTML = '';
         }
@@ -887,21 +894,12 @@ var Heather = (function() {
 			var resize = function(cm){
 				var gutterWidth = cm.getGutterElement().offsetWidth;
 				me.div.style.left = gutterWidth + 'px';
-				var scrollInfo = cm.getScrollInfo();
-				var scrollbarWidth = 0;
-				if (scrollInfo.height > scrollInfo.clientHeight) {
-					var scroller = cm.getScrollerElement();
-					scrollbarWidth = scroller.offsetWidth - scroller.clientWidth;
-				}
-				me.div.style.width = (cm.getWrapperElement().offsetWidth-gutterWidth-scrollbarWidth)+'px';
+				me.div.style.width = getEditorEditableWidth(cm)+'px';
 			}
 			
-            heather.on('editor.resize', function(cm) {
-                resize(cm);me.calcMarginTop();
-            });
-
             heather.on('editor.update', function(cm) {
 				resize(cm);
+				me.calcMarginTop();
             })
         }
 
@@ -917,7 +915,12 @@ var Heather = (function() {
             if (h !== this.cachedHeight) {
                 this.cachedHeight = h;
                 this.cm.display.lineDiv.style.marginTop = h + 'px';
-                CodeMirror.signal(this.cm, "resize", this.cm);
+				if(h == 0){
+					this.div.style.display = 'none';
+				} else {
+					this.div.style.display = '';
+				}
+				CodeMirror.signal(this.cm, "update", this.cm);
             }
         }
 
@@ -991,56 +994,24 @@ var Heather = (function() {
             this.heather = heather;
             this.eventUnregisters = [];
             this.config = config;
+			this.bar = createBar(this.cm, this.heather);
+			this.bar.getElement().setAttribute('data-widget', '');
+			this.bar.getElement().style.display = 'none';
+			this.cm.addWidget({
+				line: 0,
+				ch: 0
+			}, this.bar.getElement());
             if (this.config.commandBarEnable !== false)
                 this.enable();
         }
 
-        CommandBar.prototype.rePosition = function() {
-            if (!this.bar || this.keepHidden === true) {
-                return;
-            }
-            var cm = this.cm;
-            var pos = cm.cursorCoords(true, 'local');
-            this.bar.getElement().style.visibility = 'visible';
-            var toolbarHeight = this.heather.top.getHeight();
-            var top = pos.top - cm.getScrollInfo().top - toolbarHeight;
-            var distance = 2 * cm.defaultTextHeight();
-            if (top > distance + this.bar.getElement().clientHeight) {
-                this.bar.getElement().style.top = (pos.top - distance - this.bar.getElement().clientHeight) + 'px';
-            } else {
-                this.bar.getElement().style.top = (pos.top + distance) + 'px';
-            }
-        }
-
         CommandBar.prototype.getBarHelper = function() {
-            return this.bar;
+			return this.bar;
         }
 
         CommandBar.prototype.enable = function() {
             if (this.enabled === true) return;
             var me = this;
-            var cursorActivityListener = function(cm) {
-                if (me.ignoreNextActivity === true) {
-                    me.ignoreNextActivity = false;
-                    return;
-                }
-                if (!me.bar) {
-                    me.bar = createBar(cm, me.heather);
-                    me.bar.getElement().setAttribute('data-widget', '');
-                    cm.addWidget({
-                        line: 0,
-                        ch: 0
-                    }, me.bar.getElement());
-                }
-                me.rePosition();
-            }
-            cursorActivityListener(this.cm);
-
-            registerEvents('editor.cursorActivity', this.heather, cursorActivityListener, this.eventUnregisters);
-            registerEvents('editor.resize', this.heather, function() {
-                me.rePosition();
-                me.ignoreNextActivity = true;
-            }, this.eventUnregisters);
 
             registerEvents('selectionHelperOpen', 'commandWidgetOpen', this.heather, function() {
                 me.setKeepHidden(true);
@@ -1050,16 +1021,22 @@ var Heather = (function() {
                 me.setKeepHidden(false);
             }, this.eventUnregisters);
 			
-			registerEvents('editor.update','editor.resize',this.heather,function(){
-				if(!me.bar) return ;
-				var cm = me.cm;
-				var scrollInfo = cm.getScrollInfo();
-				var scrollbarWidth = 0;
-				if (scrollInfo.height > scrollInfo.clientHeight) {
-					var scroller = cm.getScrollerElement();
-					scrollbarWidth = scroller.offsetWidth - scroller.clientWidth;
+			registerEvents('editor.update','editor.cursorActivity',this.heather,function(cm){
+				if (me.enabled !== true || me.keepHidden === true) {
+					return;
 				}
-				me.bar.getElement().style.width = (cm.getWrapperElement().clientWidth-cm.getGutterElement().offsetWidth-scrollbarWidth)+'px';
+				var pos = cm.cursorCoords(true, 'local');
+				me.bar.getElement().style.display = '';
+				var toolbarHeight = me.heather.top.getHeight();
+				var top = pos.top - cm.getScrollInfo().top - toolbarHeight;
+				var cursor = cm.getCursor();
+				var distance = cm.defaultTextHeight();
+				if (top > distance + me.bar.getElement().offsetHeight) {
+					me.bar.getElement().style.top = (pos.top - distance - me.bar.getElement().offsetHeight) + 'px';
+				} else {
+					me.bar.getElement().style.top = (pos.bottom + distance) + 'px';
+				}
+				me.bar.getElement().style.width = getEditorEditableWidth(cm)+'px';
 			},this.eventUnregisters)
 
             this.enabled = true;
@@ -1067,10 +1044,7 @@ var Heather = (function() {
 
         CommandBar.prototype.disable = function() {
             if (this.enabled !== true) return;
-            if (this.bar) {
-                this.bar.remove();
-                this.bar = undefined;
-            }
+			this.bar.getElement().style.display = 'none';
             unregisterEvents(this.eventUnregisters);
             this.eventUnregisters = [];
             this.enabled = false;
@@ -1108,6 +1082,11 @@ var Heather = (function() {
 			
             bar.addElement(Util.createBarIcon('code',function(){
 				heather.execCommand('code');
+			}));
+
+
+			bar.addElement(Util.createBarIcon('strike',function(){
+				heather.execCommand('strike');
 			}));
 
 			bar.addElement(Util.createBarIcon('undo',function(){
@@ -1329,9 +1308,11 @@ var Heather = (function() {
 
         var HljsTip = (function() {
 
-            function HljsTip(editor) {
+            function HljsTip(heather) {
+				var editor = heather.editor;
                 var tip = document.createElement('div');
                 tip.classList.add('heather_hljs_tip');
+				tip.style.display = 'none';
                 editor.addWidget({
                     line: 0,
                     ch: 0
@@ -1353,7 +1334,7 @@ var Heather = (function() {
                     var lang = selected.textContent;
                     var cursor = editor.getCursor();
                     var text = editor.getLine(cursor.line);
-                    var startSpaceLength = text.length - text.trimStart().length;
+                    var startSpaceLength = text.length - text.trimLeft().length;
                     var index = text.indexOf('``` ');
                     editor.setSelection({
                         line: cursor.line,
@@ -1372,7 +1353,7 @@ var Heather = (function() {
                 }
 
                 var hideTip = function() {
-                    tip.style.visibility = 'hidden';
+                    tip.style.display = 'none';
                     editor.removeKeyMap(languageInputKeyMap);
                     state.running = false;
                     state.cursor = undefined;
@@ -1380,25 +1361,25 @@ var Heather = (function() {
 
                 var languageInputKeyMap = {
                     'Up': function() {
-                        var current = tip.querySelector('.selected');
+                        var current = tip.querySelector('.active');
                         var prev = current.previousElementSibling;
                         if (prev != null) {
-                            current.classList.remove('selected');
-                            prev.classList.add('selected');
+                            current.classList.remove('active');
+                            prev.classList.add('active');
                             tip.scrollTop = prev.offsetTop;
                         }
                     },
                     'Down': function() {
-                        var current = tip.querySelector('.selected');
+                        var current = tip.querySelector('.active');
                         var next = current.nextElementSibling;
                         if (next != null) {
-                            current.classList.remove('selected');
-                            next.classList.add('selected');
+                            current.classList.remove('active');
+                            next.classList.add('active');
                             tip.scrollTop = next.offsetTop;
                         }
                     },
                     'Enter': function(editor) {
-                        setLanguage(tip.querySelector('.selected'));
+                        setLanguage(tip.querySelector('.active'));
                     },
                     'Esc': function(editor) {
                         hideTip();
@@ -1422,19 +1403,20 @@ var Heather = (function() {
                     var cursor = editor.getCursor();
                     var text = editor.getLine(cursor.line);
 					var quote = getStartQuote(text);
-                    var subLeft = text.substring(quote.length).trimLeft();
+					if(cursor.ch < quote.length + 4) return {tip:false};
+                    var chLeft = text.substring(0,cursor.ch).substring(quote.length).trimLeft();
                     var context = {
                         tip: false,
 						quote : quote
                     }
-                    if (subLeft.startsWith("``` ")) {
-                        var lang = subLeft.substring(4).trimLeft();
+                    if (chLeft.startsWith("``` ")) {
+                        var lang = text.substring(quote.length).trimLeft().substring(4).trimLeft();
                         context.tip = lang != '';
                         context.lang = lang;
                     }
                     return context;
                 }
-
+				
                 this.tipHandler = function(editor) {
                     hideTip();
                     if (state.hideNext === true) {
@@ -1455,18 +1437,20 @@ var Heather = (function() {
                             if (tips.length > 0) {
                                 state.running = true;
                                 state.cursor = editor.getCursor();
-                                var html = '<table style="width:100%">';
+                                var html = '<ul class="heather_command_list">';
                                 for (var i = 0; i < tips.length; i++) {
-                                    var clazz = i == 0 ? 'selected' : '';
-                                    html += '<tr class="' + clazz + '"><td >' + tips[i] + '</td></tr>';
+                                    var clazz = i == 0 ? 'active' : '';
+                                    html += '<li class="' + clazz + '" style="cursor:pointer">' + tips[i] + '</li>';
                                 }
-                                html += '</table>';
-                                var pos = editor.cursorCoords(true, 'local');
+                                html += '</ul>';
                                 tip.innerHTML = html;
-                                var height = tip.clientHeight;
-                                tip.style.top = pos.top + editor.defaultTextHeight() + 'px';
-                                tip.style.left = pos.left + 'px';
-                                tip.style.visibility = 'visible';
+								tip.querySelectorAll('li').forEach(ele=>{
+									ele.addEventListener('click',function(){
+										setLanguage(this);
+									})
+								});
+								tip.style.display = '';
+								posBox(heather,tip);
                                 editor.addKeyMap(languageInputKeyMap);
                             } else {
                                 hideTip();
@@ -1476,23 +1460,28 @@ var Heather = (function() {
                 }
                 this.hideTip = hideTip;
                 this.editor = editor;
+				this.rePosHandler = function(){
+					posBox(heather,tip);
+				}
             }
 
             HljsTip.prototype.enable = function() {
-                this.editor.on('change', this.tipHandler);
                 this.editor.on('cursorActivity', this.hideTipOnCursorChange);
+                this.editor.on('change', this.tipHandler);
+                this.editor.on('update', this.rePosHandler);
             }
 
             HljsTip.prototype.disable = function() {
-                this.editor.off('change', this.tipHandler);
                 this.editor.off('cursorActivity', this.hideTipOnCursorChange);
+                this.editor.off('change', this.tipHandler);
+                this.editor.off('update', this.rePosHandler);
             }
 
             return HljsTip;
         })();
 
-        function Tooltip(editor, config) {
-            this.hljsTip = new HljsTip(editor);
+        function Tooltip(heather, config) {
+            this.hljsTip = new HljsTip(heather);
             if (config.tooltipEnable !== false)
                 this.enable();
         }
@@ -1534,9 +1523,9 @@ var Heather = (function() {
             var bar = document.createElement("div");
             var scrollInfo = editor.getScrollInfo();
             var scrollbarWidth = 0;
-            if (scrollInfo.height > scrollInfo.clientHeight) {
+            if (scrollInfo.height > scrollInfo.offsetHeight) {
                 var scroller = editor.getScrollerElement();
-                scrollbarWidth = scroller.offsetWidth - scroller.clientWidth;
+                scrollbarWidth = scroller.offsetWidth - scroller.offsetWidth;
             }
             bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="heather_upload_stop_icon" style="position: absolute;top: 0;right: ' + scrollbarWidth + 'px;"><i></div>'
            
@@ -1547,7 +1536,7 @@ var Heather = (function() {
                 coverGutter: false,
                 noHScroll: true
             })
-			var marginTop = Math.max(bar.querySelector('.heather_progressbar').clientHeight - bar.querySelector('.heather_upload_stop_icon').clientHeight,0)/2;
+			var marginTop = Math.max(bar.querySelector('.heather_progressbar').offsetHeight - bar.querySelector('.heather_upload_stop_icon').offsetHeight,0)/2;
             bar.querySelector('.heather_upload_stop_icon').style.marginTop = marginTop+'px';
 			xhr.upload.addEventListener("progress", function(e) {
                 if (e.lengthComputable) {
@@ -1773,8 +1762,7 @@ var Heather = (function() {
                         delRow(heather, context);
                     }
                 }]));
-
-                posCommandWidget(heather);
+				CodeMirror.signal(cm,'update',cm);
             }
 
 
@@ -2071,7 +2059,7 @@ var Heather = (function() {
             var newLine = '';
             var tr = node.querySelectorAll('tr')[rowIndex];
             var rowLine = cm.getLine(startLine + rowIndex);
-            var startSpaceLength = rowLine.length - rowLine.trimStart().length;
+            var startSpaceLength = rowLine.length - rowLine.trimLeft().length;
             var quote = getStartQuote(rowLine);
             newLine += quote;
             for (var i = 0; i < tr.children.length; i++) {
@@ -2199,6 +2187,7 @@ var Heather = (function() {
     function removeCommandWidget(heather) {
         var cws = heather.commandWidgetState
         if (cws) {
+			heather.off('editor.update',cws.posHandler);
             cws.widget.remove();
             if (cws.keyMap) {
                 heather.editor.removeKeyMap(cws.keyMap);
@@ -2223,53 +2212,18 @@ var Heather = (function() {
             removeCommandWidget(heather);
             cm.off('cursorActivity', remove);
         }
+		
 
         cm.on('cursorActivity', remove);
         var cws = heather.commandWidgetState || {};
         cws.widget = div;
+		cws.posHandler = function(){
+			posBox(heather,div);
+		}
+		cm.on('update',cws.posHandler)
         heather.commandWidgetState = cws;
         triggerEvent(heather, 'commandWidgetOpen', div);
         return div;
-    }
-
-    function posCommandWidget(heather) {
-        if (!heather.commandWidgetState) {
-            return;
-        }
-        var div = heather.commandWidgetState.widget;
-        var cm = heather.editor;
-        var pos = cm.cursorCoords(true, 'local');
-
-        div.style.maxHeight = '';
-        div.style.overflowY = '';
-
-        var top = pos.top - cm.getScrollInfo().top - heather.top.getHeight();
-        var left = parseFloat(div.style.left);
-        var code = cm.display.lineDiv;
-        if (left + div.clientWidth + 5 > code.clientWidth) {
-            div.style.left = '';
-            div.style.right = '5px';
-        }
-
-        var distance = cm.defaultTextHeight();
-        if (top > distance + div.clientHeight) {
-            div.style.top = (pos.top - div.clientHeight) + 'px';
-        } else {
-            var currentSpace = cm.getWrapperElement().clientHeight - (top + distance + heather.top.getHeight());
-            if (currentSpace - div.clientHeight < 0) {
-                div.style.overflowY = 'auto';
-                if (currentSpace > top) {
-                    div.style.maxHeight = currentSpace + 'px';
-                    div.style.top = (pos.top + distance) + 'px';
-                } else {
-                    div.style.maxHeight = top + 'px';
-                    div.style.top = (pos.top - div.clientHeight) + 'px';
-                }
-            } else {
-                div.style.top = (pos.top + distance) + 'px';
-            }
-
-        }
     }
 
     commands['heading'] = function(heather) {
@@ -2345,7 +2299,7 @@ var Heather = (function() {
                 heather.execCommand('mermaid');
             }
         }]));
-        posCommandWidget(heather);
+		CodeMirror.signal(heather.editor,'update',heather.editor)
     }
 
     commands['table'] = function(heather) {
@@ -2435,7 +2389,7 @@ var Heather = (function() {
         }
     }
 
-    commands['strikethrough'] = function(heather) {
+    commands['strike'] = function(heather) {
         runWrapCommand(heather, '~~');
     }
 
@@ -2530,7 +2484,6 @@ var Heather = (function() {
             var singleLine = from.line == cm.getCursor('to').line;
             for (var i = 0; i < texts.length; i++) {
                 var text = texts[i];
-				console.log(text);
                 if (i == 0) {
                     var fullLine = cm.getLine(from.line);
                     var startBlankLength = fullLine.length - fullLine.trimLeft().length;
@@ -2744,7 +2697,7 @@ var Heather = (function() {
 	}
 
     function createPrefix(cm, cursor) {
-		var quote = cm.getLine(cursor.line);
+		var quote = getStartQuote(cm.getLine(cursor.line));
 		return " ".repeat(Math.max(cursor.ch - quote.length, 0)) + quote;
     }
 
@@ -2767,6 +2720,61 @@ var Heather = (function() {
             }
         }
     }
+	
+	function getEditorEditableWidth(cm){
+		var scrollInfo = cm.getScrollInfo();
+		var scrollbarWidth = 0;
+		if (scrollInfo.height > scrollInfo.offsetHeight) {
+			var scroller = cm.getScrollerElement();
+			scrollbarWidth = scroller.offsetWidth - scroller.offsetWidth;
+		}
+		return cm.getWrapperElement().offsetWidth-cm.getGutterElement().offsetWidth-scrollbarWidth;
+	}
+	
+	function posBox(heather,div){
+		var cm = heather.editor;
+		var cursor = cm.getCursor();
+		var pos = cm.cursorCoords(true, 'local');
+		div.style.maxHeight = '';
+		div.style.maxWidth = '';
+		div.style.overflowY = '';
+		div.style.overflowX = '';
+		div.style.left = pos.left + 'px';
+		div.style.right = '';
+
+		var top = pos.bottom - cm.getScrollInfo().top - heather.top.getHeight();
+		var left = parseFloat(div.style.left);
+		var code = cm.display.lineDiv;
+		if (left + div.offsetWidth + 5 > code.offsetWidth) {
+			div.style.left = '';
+			div.style.right = '5px';
+		}
+		if (top >  div.offsetHeight) {
+			div.style.top = (pos.bottom - div.offsetHeight) + 'px';
+		} else {
+			var currentSpace = cm.getWrapperElement().offsetHeight - (top  + heather.top.getHeight());
+			if (currentSpace - div.offsetHeight < 0) {
+				div.style.overflowY = 'auto';
+				if (currentSpace > top) {
+					div.style.maxHeight = currentSpace + 'px';
+					div.style.top = pos.bottom + 'px';
+				} else {
+					div.style.maxHeight = top + 'px';
+					div.style.top = (pos.bottom - div.offsetHeight) + 'px';
+				}
+			} else {
+				div.style.top = pos.bottom + 'px';
+			}
+		}
+		
+		var maxWidth = getEditorEditableWidth(cm);
+		if(div.offsetWidth > maxWidth){
+			div.style.maxWidth = maxWidth + 'px';
+			div.style.left = '0px';
+			div.style.right = '';
+		}
+		
+	}
 
     var NodeUpdate = function() {
 
@@ -2788,7 +2796,6 @@ var Heather = (function() {
 			}
             if (this.nodeUpdateTimer) {
 				clearTimeout(this.nodeUpdateTimer);
-				this.nodeUpdateTimer = undefined;
 			}
 			if(immediate === true){
 				heather.render();
@@ -2842,8 +2849,9 @@ var Heather = (function() {
                 me.sync.doSync();
             }, this.unregisters);
             registerEvents('editor.update', this.heather, function() {
-				if(me.updateTimer)
+				if(me.updateTimer){
 					clearTimeout(me.updateTimer);
+				}
 				me.updateTimer = setTimeout(function(){
 					if(!me.editor.display.input.composing){
 						me.heather.nodeUpdate.update();
@@ -2885,8 +2893,8 @@ var Heather = (function() {
             registerEvents('previewChange', this.heather, previewChangeHandler, this.unregisters);
             registerEvents('focusedHeightChange', this.heather, focusedHeightChangeHandler, this.unregisters);
 			this.view = div;
+			CodeMirror.signal(this.editor, "update", this.editor);
 			triggerEvent(this.heather, 'syncViewChange', true);
-			CodeMirror.signal(this.editor, "resize", this.editor);
 		}
 		
 		SyncView.prototype.disable = function(){
@@ -2895,8 +2903,8 @@ var Heather = (function() {
 			this.view.remove();
             unregisterEvents(this.unregisters);
             this.editor.getWrapperElement().classList.remove('heather_sync_view_editor');
+			CodeMirror.signal(this.editor, "update", this.editor);
 			triggerEvent(this.heather, 'syncViewChange', false);
-			CodeMirror.signal(this.editor, "resize", this.editor);
 		}
 		
 		SyncView.prototype.setDisplayMode = function(mode){
@@ -3034,12 +3042,17 @@ var Heather = (function() {
 			elem.after(div);
 			this.heather.nodeUpdate.update(true);
             container.innerHTML = this.heather.node.innerHTML;
-			container.addEventListener('scroll',function(){
-				for(const element of this.children){
+			
+			var displayViewportElement = function(container){
+				for(const element of container.children){
 					if(isElementInViewport(element)){
 						afterDisplay(element);
 					}
 				}
+			}
+			displayViewportElement(container);
+			container.addEventListener('scroll',function(){
+				displayViewportElement(this);
 			});
 			
 			this.view = div;
@@ -3064,8 +3077,8 @@ var Heather = (function() {
 			return (
 				rect.top >= 0 &&
 				rect.left >= 0 &&
-				rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) && 
-				rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+				rect.bottom <= (window.innerHeight || document.documentElement.offsetHeight) && 
+				rect.right <= (window.innerWidth || document.documentElement.offsetWidth)
 			);
 		}
 		
@@ -3088,15 +3101,18 @@ var Heather = (function() {
 			var me = this;
 			var setPadding = function(cm) {
                 var wrapper = cm.getWrapperElement();
-                var height = wrapper.clientHeight / 2;
-                cm.display.mover.style.paddingBottom = height + 'px';
-                cm.refresh();
-                triggerEvent(me.heather, 'focusedHeightChange', height);
+                var height = wrapper.offsetHeight / 2;
+				if(me.cachedHeight !== height){
+					me.cachedHeight = height;
+					cm.display.mover.style.paddingBottom = height + 'px';
+					cm.refresh();
+					triggerEvent(me.heather, 'focusedHeightChange', height);
+				}
             }
 
             if (!Util.android) {
                 setPadding(this.editor);
-                registerEvents('editor.resize', this.heather, setPadding, this.unregisters);
+                registerEvents('editor.update', this.heather, setPadding, this.unregisters);
             }
 
             registerEvents('editor.change', 'fullscreenChange', this.heather, function(cm) {
@@ -3119,7 +3135,7 @@ var Heather = (function() {
 		function scrollToMiddleByCursor(heather, cursor) {
 			var cm = heather.editor;
 			if (cm.somethingSelected()) return;
-			var height = cm.getWrapperElement().clientHeight / 2;
+			var height = cm.getWrapperElement().offsetHeight / 2;
 
 			var pos = cm.cursorCoords(cursor || true, 'local');
 			var space = pos.top - height + heather.top.getHeight();
@@ -3130,14 +3146,17 @@ var Heather = (function() {
 			}
 			if (Util.mobile) {
 				cm.scrollTo(null, space);
-				heather.commandBar.rePosition();
 			} else {
 				var minHeight = height / 2;
 				if (space - cm.getScrollInfo().top <= minHeight) return;
-				if (heather.scrollToMiddleTimer) {
-					clearTimeout(heather.scrollToMiddleTimer);
+				if(Util.edge){
+					cm.scrollTo(null, space);
+					return ;
 				}
-				heather.scrollToMiddleTimer = setTimeout(function() {
+				if (this.scrollToMiddleTimer) {
+					clearTimeout(this.scrollToMiddleTimer);
+				}
+				this.scrollToMiddleTimer = setTimeout(function() {
 					var scroller = cm.display.scroller;
 					scroller.scrollTo({
 						top: space,
@@ -3148,13 +3167,10 @@ var Heather = (function() {
 						clearTimeout(scrollTimeout);
 						scrollTimeout = setTimeout(function() {
 							scroller.removeEventListener('scroll', scrollHandler);
-							posCommandWidget(heather);
-							heather.commandBar.rePosition();
+							CodeMirror.signal(cm, "update", cm);	
 						}, 50);
 					}
 					scroller.addEventListener('scroll', scrollHandler);
-					heather.commandBar.rePosition();
-					heather.scrollToMiddleTimer = undefined;
 				}, 200)
 			}
 		}

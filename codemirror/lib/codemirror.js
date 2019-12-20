@@ -8622,7 +8622,6 @@
         });
         this.curOp.forceUpdate = true;
         signal(this, "refresh", this);
-        signal(this, "resize", this);
       }),
 
       operation: function(f){return runInOp(this, f)},

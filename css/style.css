@@ -85,7 +85,6 @@
 }
 
 .heather_hljs_tip {
-	visibility: hidden;
 	position: absolute;
 	z-index: 99;
 	overflow: auto;
@@ -131,7 +130,8 @@
 
 .heather_command_widget {
 	z-index: 99;
-	background-color:white
+	background-color:white;
+	word-break:keep-all;
 }
 
 .heather_command_list {
@@ -143,11 +143,23 @@
 
 .heather_command_list .active {
 	background: #e8f2ff;
+	overflow:auto;
+}
+
+.heather_command_list{
+	overflow:auto;
+}
+
+.heather_command_list li{
+	word-break:keep-all;
 }
 
 @media (max-width :768px) {
 	.heather_command_list{
 		font-size:24px
+	}
+	.heather_command_list .active {
+		background: transparent;
 	}
 }
 
@@ -295,4 +307,13 @@
 }
 .heather_svg_return{
 	background-image:url(../svg/return.svg)
+}
+.heather_svg_strike{
+	background-image:url(../svg/strike.svg)
+}
+.heather_svg_upload{
+	background-image:url(../svg/upload.svg)
+}
+.heather_svg_book{
+	background-image:url(../svg/book.svg)
 }
