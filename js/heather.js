@@ -2749,11 +2749,12 @@ var Heather = (function() {
 			div.style.left = '';
 			div.style.right = '5px';
 		}
-		if (top >  div.offsetHeight) {
-			div.style.top = (pos.bottom - div.offsetHeight) + 'px';
-		} else {
-			var currentSpace = cm.getWrapperElement().offsetHeight - (top  + heather.top.getHeight());
-			if (currentSpace - div.offsetHeight < 0) {
+		
+		var currentSpace = cm.getWrapperElement().offsetHeight - (top  + heather.top.getHeight());
+		if (currentSpace - div.offsetHeight < 0) {
+			if (top >  div.offsetHeight) {
+				div.style.top = (pos.bottom - div.offsetHeight) + 'px';
+			} else {
 				div.style.overflowY = 'auto';
 				if (currentSpace > top) {
 					div.style.maxHeight = currentSpace + 'px';
@@ -2762,9 +2763,9 @@ var Heather = (function() {
 					div.style.maxHeight = top + 'px';
 					div.style.top = (pos.bottom - div.offsetHeight) + 'px';
 				}
-			} else {
-				div.style.top = pos.bottom + 'px';
-			}
+			} 
+		}else {
+			div.style.top = pos.bottom + 'px';
 		}
 		
 		var maxWidth = getEditorEditableWidth(cm);
@@ -3105,7 +3106,9 @@ var Heather = (function() {
 				if(me.cachedHeight !== height){
 					me.cachedHeight = height;
 					cm.display.mover.style.paddingBottom = height + 'px';
-					cm.refresh();
+					setTimeout(function(){
+						cm.refresh();//TODO ? 
+					},10)
 					triggerEvent(me.heather, 'focusedHeightChange', height);
 				}
             }
