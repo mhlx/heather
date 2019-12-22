@@ -1,6 +1,7 @@
 var Heather = (function() {
 	
 	var mermaidId = 0;
+	var listRE = /^(\s*)(>[> ]*|[*+-] \[[x ]\]\s|[*+-]\s|(\d+)([.)]))(\s*)/;
     var lazyRes = {
         mermaid_js: "js/mermaid.min.js",
         katex_css: "katex/katex.min.css",
@@ -110,10 +111,26 @@ var Heather = (function() {
     }
 	
 	var setSize = CodeMirror.prototype.setSize;
+	
 	CodeMirror.prototype.setSize = function(width,height){
-		setSize.call(this,width,height);
-		if(this.heather && this.width){
-			this.getRootNode().style.width = width + 'px';
+		if(!this.heather){
+			setSize.call(this,width,height);
+			return ;
+		}
+		var interpret = function (val) { return typeof val == "number" || /^\d+$/.test(String(val)) ? val + "px" : val; };
+		if(width != null || height != null){
+			var root = this.getRootNode();
+			if(width != null){
+				var width = interpret(width);
+				root.style.width = width;
+				this.display.wrapper.style.width = '100%';
+			}
+			if(height != null){
+				var height = interpret(height);
+				root.style.height = height;
+				this.display.wrapper.style.height = '100%';
+			}
+			this.refresh();
 		}
 	}
 
@@ -157,7 +174,7 @@ var Heather = (function() {
         }
     });
 
-    function Editor(textarea, config) {
+    function Heather(textarea, config) {
         config = Object.assign({}, defaultConfig, config);
         this.eventHandlers = [];
         this.editor = createEditor(textarea, config.editor);
@@ -182,25 +199,25 @@ var Heather = (function() {
     }
 
 
-    Editor.prototype.getValue = function() {
+    Heather.prototype.getValue = function() {
         return this.editor.getValue();
     }
 
-    Editor.prototype.setValue = function(value) {
+    Heather.prototype.setValue = function(value) {
         this.editor.setValue(value);
     }
 
-    Editor.prototype.getHtmlNode = function() {
+    Heather.prototype.getHtmlNode = function() {
 		this.nodeUpdate.update(true);
 		return this.node.cloneNode(true);
     }
 
-    Editor.prototype.isFileUploadEnable = function() {
+    Heather.prototype.isFileUploadEnable = function() {
         var config = this.config.upload;
         return !Util.isUndefined(config) && !Util.isUndefined(config.url) && !Util.isUndefined(config.uploadFinish);
     }
 
-    Editor.prototype.getNodesByLine = function(line, includePlainHtmlNode) {
+    Heather.prototype.getNodesByLine = function(line, includePlainHtmlNode) {
         var nodes = [];
         var cm = this.editor;
         var addNode = function(node) {
@@ -222,15 +239,15 @@ var Heather = (function() {
         return nodes;
     }
 
-    Editor.prototype.fold = function(pos) {
+    Heather.prototype.fold = function(pos) {
         this.editor.foldCode(pos);
     }
 
-    Editor.prototype.isPreview = function() {
+    Heather.prototype.isPreview = function() {
         return this.view.isEnable;
     }
 
-    Editor.prototype.execCommand = function(name) {
+    Heather.prototype.execCommand = function(name) {
 		if(name.startsWith("editor.")) {
             name = name.substring(name.indexOf('.') + 1);
 			this.editor.execCommand(name);
@@ -243,34 +260,34 @@ var Heather = (function() {
 		}
     }
 
-    Editor.prototype.setPreview = function(preview) {
+    Heather.prototype.setPreview = function(preview) {
         if(preview === true)
 			this.view.enable();
 		else
 			this.view.disable();
     }
 
-    Editor.prototype.getToolbar = function() {
+    Heather.prototype.getToolbar = function() {
         return this.toolbar;
     }
 
-    Editor.prototype.getCommandBar = function() {
+    Heather.prototype.getCommandBar = function() {
         return this.commandBar;
     }
 
-    Editor.prototype.isFullscreen = function() {
+    Heather.prototype.isFullscreen = function() {
         return this.editor.getOption('fullScreen') === true;
     }
 	
-    Editor.prototype.setFullscreen = function(enable) {
+    Heather.prototype.setFullscreen = function(enable) {
        this.editor.setOption('fullScreen',enable);
     }
 	
-    Editor.prototype.hasSyncView = function() {
+    Heather.prototype.hasSyncView = function() {
         return this.syncView.isEnable;
     }
 
-    Editor.prototype.setSyncView = function(syncView) {
+    Heather.prototype.setSyncView = function(syncView) {
        if(syncView === true){
 		   this.syncView.enable();
 	   } else {
@@ -278,11 +295,11 @@ var Heather = (function() {
 	   }
     }
 	
-	Editor.prototype.setSyncDisplayMode = function(mode){
+	Heather.prototype.setSyncDisplayMode = function(mode){
 		this.syncView.setDisplayMode(mode);
 	}
 
-    Editor.prototype.on = function(eventName, handler) {
+    Heather.prototype.on = function(eventName, handler) {
         var me = this;
         if (eventName.startsWith("editor.")) {
             eventName = eventName.substring(eventName.indexOf('.') + 1);
@@ -306,7 +323,7 @@ var Heather = (function() {
         }
     }
 
-    Editor.prototype.off = function(eventName, handler) {
+    Heather.prototype.off = function(eventName, handler) {
         if (eventName.startsWith("editor.")) {
             eventName = eventName.substring(eventName.indexOf('.') + 1);
             this.editor.off(eventName, handler);
@@ -321,18 +338,18 @@ var Heather = (function() {
         }
     }
 
-    Editor.prototype.setFocused = function(focus) {
+    Heather.prototype.setFocused = function(focus) {
 		if(focus === true)
 			this.focusedMode.enable();
 		else
 			this.focusedMode.disable();
     }
 
-    Editor.prototype.isFocused = function() {
+    Heather.prototype.isFocused = function() {
        return this.focusedMode.isEnable;
     }
 
-    Editor.prototype.openSelectionHelper = function() {
+    Heather.prototype.openSelectionHelper = function() {
         if (!this.isPreview()) {
             this.closeSelectionHelper(true);
             this.selectionHelper = new SelectionHelper(this);
@@ -340,11 +357,11 @@ var Heather = (function() {
         }
     }
 
-    Editor.prototype.hasSelectionHelper = function() {
+    Heather.prototype.hasSelectionHelper = function() {
         return !Util.isUndefined(this.selectionHelper);
     }
 
-    Editor.prototype.closeSelectionHelper = function(unselect) {
+    Heather.prototype.closeSelectionHelper = function(unselect) {
         if (this.selectionHelper) {
             this.selectionHelper.remove(unselect !== true);
             this.selectionHelper = undefined;
@@ -352,7 +369,7 @@ var Heather = (function() {
         }
     }
 
-    Editor.prototype.addKeyMap = function(keyMap) {
+    Heather.prototype.addKeyMap = function(keyMap) {
         var me = this;
         var _keyMap = {};
         for (const key in keyMap) {
@@ -370,11 +387,11 @@ var Heather = (function() {
         return _keyMap;
     }
 
-    Editor.prototype.removeKeyMap = function(keyMap) {
+    Heather.prototype.removeKeyMap = function(keyMap) {
         this.editor.removeKeyMap(keyMap);
     }
 
-    Editor.prototype.render = function() {
+    Heather.prototype.render = function() {
 		var start = performance.now();
         var value = this.editor.getValue();
         var node = Util.parseHTML(this.markdownParser.render(value));
@@ -383,7 +400,7 @@ var Heather = (function() {
     }
 	
 	
-	Editor.prototype.upload = function(file){
+	Heather.prototype.upload = function(file){
 		if(!this.isFileUploadEnable()){
 			return ;
 		}
@@ -461,7 +478,7 @@ var Heather = (function() {
         editor.on('optionChange', function(cm, option) {
             if (option === 'readOnly') {
                 if (cm.isReadOnly()) {
-                    removeCommandWidget(heather);
+					if(heather.commandBox){heather.commandBox.remove();heather.commandBox = null};
                     heather.commandBar.setKeepHidden(true);
                 } else {
                     heather.commandBar.setKeepHidden(false);
@@ -568,7 +585,6 @@ var Heather = (function() {
 			var textarea = editor.getInputField();
 			textarea.style.width = "1000px";
 		}
-		
         return editor;
     }
 
@@ -1013,11 +1029,11 @@ var Heather = (function() {
             if (this.enabled === true) return;
             var me = this;
 
-            registerEvents('selectionHelperOpen', 'commandWidgetOpen', this.heather, function() {
+            registerEvents('selectionHelperOpen', 'commandBoxOpen', this.heather, function() {
                 me.setKeepHidden(true);
             }, this.eventUnregisters);
 
-            registerEvents('selectionHelperClose', 'commandWidgetClose', this.heather, function() {
+            registerEvents('selectionHelperClose', 'commandBoxClose', this.heather, function() {
                 me.setKeepHidden(false);
             }, this.eventUnregisters);
 			
@@ -1051,11 +1067,13 @@ var Heather = (function() {
         }
 
         CommandBar.prototype.setKeepHidden = function(keepHidden) {
-            if (keepHidden === true && this.bar)
+			if(this.enabled !== true) return ;
+			if (keepHidden !== true && (this.heather.hasSelectionHelper() || this.heather.commandBox)) return
+            if (keepHidden === true){
                 this.bar.getElement().style.display = 'none';
-            if (keepHidden !== true && (this.heather.hasSelectionHelper() || !Util.isUndefined(this.heather.commandWidgetState))) return
-            if (keepHidden !== true && this.bar)
-                this.bar.getElement().style.display = '';
+			} else {
+				this.bar.getElement().style.display = '';
+			}
             this.keepHidden = keepHidden === true;
         }
 		
@@ -1305,36 +1323,81 @@ var Heather = (function() {
     })();
 
     var Tooltip = (function() {
+		
+		var HeadingTip = (function(){
+			function HeadingTip(heather){
+				this.eventUnregisters = [];
+				this.heather = heather;
+			}
+			
+			HeadingTip.prototype.disable = function(){
+				if(this.commandBox){this.commandBox.remove();this.commandBox = null}
+				unregisterEvents(this.eventUnregisters);
+			}
+			
+			HeadingTip.prototype.enable = function(){
+				var me = this;
+				registerEvents('editor.cursorActivity', this.heather,function(cm){
+					if(cm.display.input.composing) {closeBox(me.heather);return;}
+					var cursor = cm.getCursor();
+                    var text = cm.getLine(cursor.line);
+					var quote = getStartQuote(text);
+					var ch = cursor.ch;
+					var lefts = text.substring(0,ch).substring(quote.length).split('');
+					if(lefts.length == 0) {closeBox(me.heather);return;}
+					for(const left of lefts){
+						ch--;
+						if(left != '#') {closeBox(me.heather);return;}
+					}
+					var rights = text.substring(cursor.ch).split('');
+					for(const right of rights){
+						if(right == '#') lefts.push(right);
+						else if(right != ' ') {closeBox(me.heather);return;}
+						else break;
+					}
+					if(lefts.length > 6) {closeBox(me.heather);return;}
+					var items = [];
+					for(var i=1;i<=6;i++){
+						items.push({
+							html : i,
+							handler : function(){
+								var level = parseInt(this.textContent);
+								cm.setSelection({
+									line: cursor.line,
+									ch: ch
+								}, {
+									line:  cursor.line,
+									ch: ch+lefts.length
+								});
+								cm.replaceSelection('#'.repeat(level));
+							}
+						})
+					}
+					me.commandBox = new CommandBox(me.heather,items);
+					me.commandBox.select(lefts.length-1);
+				},this.eventUnregisters);
+			}
+			
+			return HeadingTip;
+		})();
 
         var HljsTip = (function() {
 
             function HljsTip(heather) {
-				var editor = heather.editor;
-                var tip = document.createElement('div');
-                tip.classList.add('heather_hljs_tip');
-				tip.style.display = 'none';
-                editor.addWidget({
-                    line: 0,
-                    ch: 0
-                }, tip)
-                var state = {
-                    running: false,
-                    cursor: undefined
-                };
+				this.eventUnregisters = [];
+				var hljsLanguages = hljs.listLanguages();
+                hljsLanguages.push('mermaid');
+                this.languages = hljsLanguages;
+				this.heather = heather;
+            }
 
-                tip.addEventListener('click', function(e) {
-                    if (e.target.tagName === 'TD') {
-                        setLanguage(e.target);
-                    }
-                })
-
-                var setLanguage = function(selected) {
-                    hideTip();
-                    state.hideNext = true;
+            HljsTip.prototype.enable = function() {
+				var me = this;
+				var editor = this.heather.editor;
+				var setLanguage = function(selected) {
                     var lang = selected.textContent;
                     var cursor = editor.getCursor();
                     var text = editor.getLine(cursor.line);
-                    var startSpaceLength = text.length - text.trimLeft().length;
                     var index = text.indexOf('``` ');
                     editor.setSelection({
                         line: cursor.line,
@@ -1351,130 +1414,34 @@ var Heather = (function() {
                     }
                     editor.focus();
                 }
-
-                var hideTip = function() {
-                    tip.style.display = 'none';
-                    editor.removeKeyMap(languageInputKeyMap);
-                    state.running = false;
-                    state.cursor = undefined;
-                }
-
-                var languageInputKeyMap = {
-                    'Up': function() {
-                        var current = tip.querySelector('.active');
-                        var prev = current.previousElementSibling;
-                        if (prev != null) {
-                            current.classList.remove('active');
-                            prev.classList.add('active');
-                            tip.scrollTop = prev.offsetTop;
-                        }
-                    },
-                    'Down': function() {
-                        var current = tip.querySelector('.active');
-                        var next = current.nextElementSibling;
-                        if (next != null) {
-                            current.classList.remove('active');
-                            next.classList.add('active');
-                            tip.scrollTop = next.offsetTop;
-                        }
-                    },
-                    'Enter': function(editor) {
-                        setLanguage(tip.querySelector('.active'));
-                    },
-                    'Esc': function(editor) {
-                        hideTip();
-                    }
-                }
-                var hljsTimer;
-                var hljsLanguages = hljs.listLanguages();
-                hljsLanguages.push('mermaid');
-                this.hideTipOnCursorChange = function(editor) {
-                    if (editor.somethingSelected()) {
-                        hideTip();
-                        return;
-                    }
-                    var context = getTipContext(editor);
-                    if (!context.tip) {
-                        hideTip();
-                    }
-                }
-
-                var getTipContext = function(editor) {
-                    var cursor = editor.getCursor();
-                    var text = editor.getLine(cursor.line);
+				registerEvents('editor.change', this.heather,function(cm){
+					if(cm.display.input.composing) {closeBox(me.heather);return;}
+					var cursor = cm.getCursor();
+                    var text = cm.getLine(cursor.line);
 					var quote = getStartQuote(text);
-					if(cursor.ch < quote.length + 4) return {tip:false};
-                    var chLeft = text.substring(0,cursor.ch).substring(quote.length).trimLeft();
-                    var context = {
-                        tip: false,
-						quote : quote
-                    }
-                    if (chLeft.startsWith("``` ")) {
-                        var lang = text.substring(quote.length).trimLeft().substring(4).trimLeft();
-                        context.tip = lang != '';
-                        context.lang = lang;
-                    }
-                    return context;
-                }
-				
-                this.tipHandler = function(editor) {
-                    hideTip();
-                    if (state.hideNext === true) {
-                        state.hideNext = false;
-                        return;
-                    }
-                    if (!editor.somethingSelected()) {
-                        var context = getTipContext(editor);
-                        if (context.tip) {
-                            var lang = context.lang;
-                            var tips = [];
-                            for (var i = 0; i < hljsLanguages.length; i++) {
-                                var hljsLang = hljsLanguages[i];
-                                if (hljsLang.indexOf(lang) != -1) {
-                                    tips.push(hljsLang);
-                                }
-                            }
-                            if (tips.length > 0) {
-                                state.running = true;
-                                state.cursor = editor.getCursor();
-                                var html = '<ul class="heather_command_list">';
-                                for (var i = 0; i < tips.length; i++) {
-                                    var clazz = i == 0 ? 'active' : '';
-                                    html += '<li class="' + clazz + '" style="cursor:pointer">' + tips[i] + '</li>';
-                                }
-                                html += '</ul>';
-                                tip.innerHTML = html;
-								tip.querySelectorAll('li').forEach(ele=>{
-									ele.addEventListener('click',function(){
-										setLanguage(this);
-									})
-								});
-								tip.style.display = '';
-								posBox(heather,tip);
-                                editor.addKeyMap(languageInputKeyMap);
-                            } else {
-                                hideTip();
-                            }
-                        }
-                    }
-                }
-                this.hideTip = hideTip;
-                this.editor = editor;
-				this.rePosHandler = function(){
-					posBox(heather,tip);
-				}
-            }
-
-            HljsTip.prototype.enable = function() {
-                this.editor.on('cursorActivity', this.hideTipOnCursorChange);
-                this.editor.on('change', this.tipHandler);
-                this.editor.on('update', this.rePosHandler);
+					if(cursor.ch < quote.length + 4){closeBox(me.heather);return;}
+					var chLeft = text.substring(0,cursor.ch).substring(quote.length).trimLeft();
+					if (!chLeft.startsWith("``` ")) {closeBox(me.heather);return;}
+					var lang = text.substring(quote.length).trimLeft().substring(4).trimLeft();
+					if(lang.trim() === '') {closeBox(me.heather);return;}
+					var items = [];
+					for(const language of me.languages){
+						if(language.indexOf(lang) == -1) continue;
+						items.push({
+							html : language,
+							handler:function(){
+								setLanguage(this);
+							}
+						})
+					}
+					if(items.length == 0) {closeBox(me.heather);return;}
+					me.commandBox = new CommandBox(me.heather,items);
+				},this.eventUnregisters);
             }
 
             HljsTip.prototype.disable = function() {
-                this.editor.off('cursorActivity', this.hideTipOnCursorChange);
-                this.editor.off('change', this.tipHandler);
-                this.editor.off('update', this.rePosHandler);
+				if(this.commandBox){this.commandBox.remove();this.commandBox = null}
+				unregisterEvents(this.eventUnregisters);
             }
 
             return HljsTip;
@@ -1482,16 +1449,21 @@ var Heather = (function() {
 
         function Tooltip(heather, config) {
             this.hljsTip = new HljsTip(heather);
+			this.headingTip = new HeadingTip(heather);
             if (config.tooltipEnable !== false)
                 this.enable();
         }
 
         Tooltip.prototype.enable = function() {
             this.hljsTip.enable();
+			this.headingTip.enable();
         }
         Tooltip.prototype.disable = function() {
             this.hljsTip.disable();
+			this.headingTip.disable();
         }
+		
+		var closeBox = function(heather){if(heather.commandBox){heather.commandBox.remove();heather.commandBox = null}};
         return Tooltip;
 
     })();
@@ -1729,9 +1701,7 @@ var Heather = (function() {
                 }
                 if (context === 'hide') return;
 
-                var div = addCommandWidget(heather);
-
-                div.appendChild(createListCommandWidget(heather, [{
+                var items = [{
                     html: '插入列(前方)',
                     handler: function() {
                         addCol(heather, context, true);
@@ -1761,8 +1731,11 @@ var Heather = (function() {
                     handler: function() {
                         delRow(heather, context);
                     }
-                }]));
-				CodeMirror.signal(cm,'update',cm);
+                }];
+				var box = new CommandBox(heather,items);
+				box.on('editor.cursorActivity',function(){
+					box.remove();
+				});
             }
 
 
@@ -2102,130 +2075,6 @@ var Heather = (function() {
 
     })();
 
-    function createListCommandWidget(heather, items) {
-        var ul = document.createElement('ul');
-        ul.classList.add('heather_command_list');
-
-        for (var i = 0; i < items.length; i++) {
-            var item = items[i];
-            var li = document.createElement('li');
-            li.innerHTML = item.html;
-            li.setAttribute('data-index', i);
-            if (i == 0)
-                li.classList.add('active');
-            ul.appendChild(li);
-        }
-
-        var execute = function(li) {
-            var handler = items[parseInt(li.dataset.index)].handler;
-            if (handler) {
-                handler();
-            }
-            heather.editor.removeKeyMap(keyMap);
-            removeCommandWidget(heather);
-        }
-
-        var keyMap = {
-            'Up': function() {
-                var current = ul.querySelector('.active');
-                var prev = current.previousElementSibling;
-                if (prev != null) {
-                    current.classList.remove('active');
-                    prev.classList.add('active');
-                    ul.parentElement.scrollTop = prev.offsetTop;
-                } else {
-                    var lis = ul.querySelectorAll('li');
-                    if (lis.length > 0) {
-                        var last = lis[lis.length - 1];
-                        current.classList.remove('active');
-                        last.classList.add('active');
-                        ul.parentElement.scrollTop = last.offsetTop;
-                    }
-                }
-            },
-            'Down': function() {
-                var current = ul.querySelector('.active');
-                var next = current.nextElementSibling;
-                if (next != null) {
-                    current.classList.remove('active');
-                    next.classList.add('active');
-                    ul.parentElement.scrollTop = next.offsetTop;
-                } else {
-                    var li = ul.querySelector('li');
-                    if (li != null) {
-                        current.classList.remove('active');
-                        li.classList.add('active');
-                        ul.parentElement.scrollTop = li.offsetTop;
-                    }
-                }
-            },
-            'Enter': function() {
-                var li = ul.querySelector('.active');
-                execute(li);
-            },
-            'Esc': function() {
-                heather.editor.removeKeyMap(keyMap);
-                removeCommandWidget(heather);
-            }
-        }
-
-        heather.editor.addKeyMap(keyMap);
-
-        var state = heather.commandWidgetState || {};
-        state.keyMap = keyMap;
-        heather.commandWidgetState = state;
-
-        for (const li of ul.querySelectorAll('li')) {
-            li.addEventListener('click', function() {
-                execute(this);
-            })
-        }
-        return ul;
-    }
-
-
-    function removeCommandWidget(heather) {
-        var cws = heather.commandWidgetState
-        if (cws) {
-			heather.off('editor.update',cws.posHandler);
-            cws.widget.remove();
-            if (cws.keyMap) {
-                heather.editor.removeKeyMap(cws.keyMap);
-            }
-            heather.commandWidgetState = undefined;
-            triggerEvent(heather, 'commandWidgetClose', this);
-        }
-    }
-
-    function addCommandWidget(heather) {
-
-        removeCommandWidget(heather);
-
-        var cm = heather.editor;
-        var cursor = cm.getCursor();
-        var div = document.createElement('div');
-        div.classList.add('heather_command_widget')
-        div.setAttribute('data-widget', '');
-        cm.addWidget(cursor, div);
-
-        function remove() {
-            removeCommandWidget(heather);
-            cm.off('cursorActivity', remove);
-        }
-		
-
-        cm.on('cursorActivity', remove);
-        var cws = heather.commandWidgetState || {};
-        cws.widget = div;
-		cws.posHandler = function(){
-			posBox(heather,div);
-		}
-		cm.on('update',cws.posHandler)
-        heather.commandWidgetState = cws;
-        triggerEvent(heather, 'commandWidgetOpen', div);
-        return div;
-    }
-
     commands['heading'] = function(heather) {
         var cm = heather.editor;
         var line = cm.getCursor().line;
@@ -2251,9 +2100,7 @@ var Heather = (function() {
     }
 
     commands['commands'] = function(heather) {
-        var div = addCommandWidget(heather);
-
-        div.appendChild(createListCommandWidget(heather, [{
+        var items = [{
             html: '标题',
             handler: function() {
                 heather.execCommand('heading');
@@ -2298,8 +2145,11 @@ var Heather = (function() {
             handler: function() {
                 heather.execCommand('mermaid');
             }
-        }]));
-		CodeMirror.signal(heather.editor,'update',heather.editor)
+        }];
+		var box = new CommandBox(heather,items);
+		box.on('editor.cursorActivity',function(){
+			box.remove();
+		})
     }
 
     commands['table'] = function(heather) {
@@ -2677,20 +2527,18 @@ var Heather = (function() {
 		if(str.length - newStr.length > 4){
 			return "";
 		}
-		var quote = ' '.repeat(str.length - newStr.length);
-		while (newStr.startsWith(">")) {
-			quote += '>';
-			newStr = newStr.substring(1);
-			var trimed = newStr.trimLeft();
-			var blankLength = newStr.length - trimed.length;
-			if(blankLength > 4){
-				quote += " ".repeat(4);
-				return quote;
+		var match = listRE.exec(str);
+		if(match != null){
+			var quote = '';
+			while(match != null){
+				var start = match[0];
+				quote += start;
+				var oldStr = newStr;
+				newStr = newStr.substring(start.length-1);
+				if(oldStr === newStr)//prevent infinite loop
+					break;
+				match = listRE.exec(newStr);
 			}
-			quote += " ".repeat(blankLength);
-			newStr = trimed;
-		}
-		if(quote.indexOf('>') != -1){
 			return quote;
 		}
 		return '';
@@ -2721,62 +2569,21 @@ var Heather = (function() {
         }
     }
 	
-	function getEditorEditableWidth(cm){
+	function getScrollBarWidth(cm){
 		var scrollInfo = cm.getScrollInfo();
-		var scrollbarWidth = 0;
+		var scrollBarWidth = 0;
 		if (scrollInfo.height > scrollInfo.offsetHeight) {
 			var scroller = cm.getScrollerElement();
-			scrollbarWidth = scroller.offsetWidth - scroller.offsetWidth;
+			scrollBarWidth = scroller.offsetWidth - scroller.offsetWidth;
 		}
+		return scrollBarWidth;
+	}
+	
+	function getEditorEditableWidth(cm){
+		var scrollbarWidth = getScrollBarWidth(cm);
 		return cm.getWrapperElement().offsetWidth-cm.getGutterElement().offsetWidth-scrollbarWidth;
 	}
 	
-	function posBox(heather,div){
-		var cm = heather.editor;
-		var cursor = cm.getCursor();
-		var pos = cm.cursorCoords(true, 'local');
-		div.style.maxHeight = '';
-		div.style.maxWidth = '';
-		div.style.overflowY = '';
-		div.style.overflowX = '';
-		div.style.left = pos.left + 'px';
-		div.style.right = '';
-
-		var top = pos.bottom - cm.getScrollInfo().top - heather.top.getHeight();
-		var left = parseFloat(div.style.left);
-		var code = cm.display.lineDiv;
-		if (left + div.offsetWidth + 5 > code.offsetWidth) {
-			div.style.left = '';
-			div.style.right = '5px';
-		}
-		
-		var currentSpace = cm.getWrapperElement().offsetHeight - (top  + heather.top.getHeight());
-		if (currentSpace - div.offsetHeight < 0) {
-			if (top >  div.offsetHeight) {
-				div.style.top = (pos.bottom - div.offsetHeight) + 'px';
-			} else {
-				div.style.overflowY = 'auto';
-				if (currentSpace > top) {
-					div.style.maxHeight = currentSpace + 'px';
-					div.style.top = pos.bottom + 'px';
-				} else {
-					div.style.maxHeight = top + 'px';
-					div.style.top = (pos.bottom - div.offsetHeight) + 'px';
-				}
-			} 
-		}else {
-			div.style.top = pos.bottom + 'px';
-		}
-		
-		var maxWidth = getEditorEditableWidth(cm);
-		if(div.offsetWidth > maxWidth){
-			div.style.maxWidth = maxWidth + 'px';
-			div.style.left = '0px';
-			div.style.right = '';
-		}
-		
-	}
-
     var NodeUpdate = function() {
 
         function NodeUpdate(heather) {
@@ -3027,9 +2834,20 @@ var Heather = (function() {
 			var container = document.createElement('div');
             container.classList.add('markdown-body');
             container.classList.add('heather_preview');
-           
+			container.setAttribute('tabindex',0);
+			container.setAttribute('style','outline:none;')
 			
 			var me = this;
+			container.addEventListener('keydown',function(e){
+				if((e.ctrlKey || e.metaKey) && e.key === 'p'){
+					e.preventDefault();
+					e.stopPropagation();
+					me.disable();
+					return false;
+				}
+			});
+           
+			
             if (this.heather.config.disablePreviewCloseBtn !== true) {
                 var close = document.createElement('div');
                 close.classList.add('heather_preview_close');
@@ -3056,6 +2874,7 @@ var Heather = (function() {
 				displayViewportElement(this);
 			});
 			
+			container.focus();
 			this.view = div;
 			this.cursor = this.editor.getCursor();
 			triggerEvent(this.heather, 'previewChange', true);
@@ -3179,15 +2998,199 @@ var Heather = (function() {
 		}
 		return FocusedMode;
 	})();
+	
+	
+	var CommandBox = (function(){
+		function CommandBox(heather,items){
+			this.heather = heather;
+			if(this.heather.commandBox){
+				this.heather.commandBox.remove();
+			}
+			createCommandBoxElement(this,this.heather, items);
+			this.heather.commandBox = this;
+		}
+		
+		CommandBox.prototype.select = function(i){
+			if(!this.state || i<0) return ;
+			var active = this.state.element.querySelector('.active');
+			if(active != null) active.classList.remove('active');
+			var lis = this.state.element.querySelectorAll('li');
+			if(i>lis.length) return ;
+			lis[i].classList.add('active');
+		}
+		
+		CommandBox.prototype.on = function(name,handle){
+			if(!this.state) return ;
+			registerEvents(name, this.heather,handle,this.state.eventUnregisters);
+		}
+		
+		CommandBox.prototype.remove = function(){
+			if(!this.state){
+				return ;
+			}
+			this.heather.editor.removeKeyMap(this.state.keyMap);
+			this.state.element.remove();
+            unregisterEvents(this.state.eventUnregisters);
+			this.state = null;
+			this.heather.commandBox = null;
+			triggerEvent(this.heather, 'commandBoxClose');
+		}
+		
+		function createCommandBoxElement(box,heather, items) {
+			var div = document.createElement('div');
+			div.classList.add('heather_command_widget')
+			div.setAttribute('data-widget', '');
+			var ul = document.createElement('ul');
+			ul.classList.add('heather_command_list');
 
-    return {
-        create: function(textarea, config) {
-            return new Editor(textarea, config);
-        },
-        commands: commands,
-        lazyRes: lazyRes,
-        Util: Util,
-        defaultConfig: defaultConfig,
-        version: '2.1.4'
-    };
+			for (var i = 0; i < items.length; i++) {
+				var item = items[i];
+				var li = document.createElement('li');
+				li.innerHTML = item.html;
+				li.setAttribute('data-index', i);
+				if (i == 0)
+					li.classList.add('active');
+				ul.appendChild(li);
+			}
+
+			var execute = function(li) {
+				var handler = items[parseInt(li.dataset.index)].handler;
+				if (handler) {
+					handler.call(li);
+				}
+				box.remove();
+			}
+
+			var keyMap = {
+				'Up': function() {
+					var current = ul.querySelector('.active');
+					var prev = current.previousElementSibling;
+					if (prev != null) {
+						current.classList.remove('active');
+						prev.classList.add('active');
+						ul.parentElement.scrollTop = prev.offsetTop;
+					} else {
+						var lis = ul.querySelectorAll('li');
+						if (lis.length > 0) {
+							var last = lis[lis.length - 1];
+							current.classList.remove('active');
+							last.classList.add('active');
+							ul.parentElement.scrollTop = last.offsetTop;
+						}
+					}
+				},
+				'Down': function() {
+					var current = ul.querySelector('.active');
+					var next = current.nextElementSibling;
+					if (next != null) {
+						current.classList.remove('active');
+						next.classList.add('active');
+						ul.parentElement.scrollTop = next.offsetTop;
+					} else {
+						var li = ul.querySelector('li');
+						if (li != null) {
+							current.classList.remove('active');
+							li.classList.add('active');
+							ul.parentElement.scrollTop = li.offsetTop;
+						}
+					}
+				},
+				'Enter': function() {
+					var li = ul.querySelector('.active');
+					execute(li);
+				},
+				'Esc': function() {
+					heather.editor.removeKeyMap(keyMap);
+					box.remove();
+				}
+			}
+
+			for (const li of ul.querySelectorAll('li')) {
+				li.addEventListener('click', function() {
+					execute(this);
+				})
+			}
+			div.appendChild(ul);
+
+			heather.editor.addKeyMap(keyMap);
+			var eventUnregisters = [] ;
+            registerEvents('editor.update', heather, function(){
+				posBox(box)
+			}, eventUnregisters);
+			heather.editor.addWidget({
+                line: 0,
+                ch: 0
+            }, div);
+			box.state =  {
+				element : div,
+				keyMap : keyMap,
+				eventUnregisters : eventUnregisters,
+				cursor:heather.editor.getCursor()
+			};
+			posBox(box);
+			triggerEvent(heather, 'commandBoxOpen', div);
+		}
+		
+		function posBox(box){
+			var heather = box.heather;
+			var cm = heather.editor;
+			var cursor = cm.getCursor();
+			var oldCursor = box.state.cursor;
+			if(cursor.line !== oldCursor.line || cursor.ch !== oldCursor.ch){box.remove();return}
+			var div = box.state.element;
+			var pos = cm.cursorCoords(true, 'local');
+			div.style.maxHeight = '';
+			div.style.maxWidth = '';
+			div.style.overflowY = '';
+			div.style.overflowX = '';
+			div.style.left = pos.left + 'px';
+			div.style.right = '';
+
+			var top = pos.bottom - cm.getScrollInfo().top - heather.top.getHeight();
+			var left = parseFloat(div.style.left);
+			var code = cm.display.lineDiv;
+			var scrollBarWidth = getScrollBarWidth(cm);
+			if (left + div.offsetWidth + scrollBarWidth > code.offsetWidth) {
+				div.style.left = '';
+				div.style.right = scrollBarWidth+'px';
+			}
+			
+			var currentSpace = cm.getWrapperElement().offsetHeight - (top  + heather.top.getHeight());
+			if (currentSpace - div.offsetHeight < 0) {
+				if (top - (pos.bottom-pos.top) >  div.offsetHeight) {
+					div.style.top = (pos.top - div.offsetHeight) + 'px';
+				} else {
+					div.style.overflowY = 'auto';
+					if (currentSpace > top) {
+						div.style.maxHeight = currentSpace + 'px';
+						div.style.top = pos.bottom + 'px';
+					} else {
+						div.style.maxHeight = top + 'px';
+						div.style.top = (pos.bottom - div.offsetHeight) + 'px';
+					}
+				} 
+			}else {
+				div.style.top = pos.bottom + 'px';
+			}
+			
+			var maxWidth = getEditorEditableWidth(cm);
+			if(div.offsetWidth > maxWidth){
+				div.style.maxWidth = maxWidth + 'px';
+				div.style.left = '0px';
+				div.style.right = '';
+			}
+			
+		}
+
+		
+		return CommandBox;
+	})();
+	
+	Heather.commands = commands;
+	Heather.lazyRes = lazyRes;
+	Heather.Util = Util;
+	Heather.defaultConfig = defaultConfig;
+	Heather.version =  '2.1.4';
+	
+	return Heather;
 })();

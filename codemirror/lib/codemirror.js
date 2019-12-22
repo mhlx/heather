@@ -2209,14 +2209,16 @@
 
   function updateLineWidgets(cm, lineView, dims) {
     if (lineView.alignable) { lineView.alignable = null; }
+    var isWidget = classTest("CodeMirror-linewidget");
     for (var node = lineView.node.firstChild, next = (void 0); node; node = next) {
       next = node.nextSibling;
       if (node.className == "CodeMirror-linewidget")
         { lineView.node.removeChild(node); }
+      if (isWidget.test(node)) { lineView.node.removeChild(node); }
     }
     insertLineWidgets(cm, lineView, dims);
   }
-
+  
   // Build a line's DOM representation from scratch
   function buildLineElement(cm, lineView, lineN, dims) {
     var built = getLineContent(cm, lineView);
@@ -2242,7 +2244,7 @@
     if (!line.widgets) { return }
     var wrap = ensureLineWrapped(lineView);
     for (var i = 0, ws = line.widgets; i < ws.length; ++i) {
-      var widget = ws[i], node = elt("div", [widget.node], "CodeMirror-linewidget");
+     var widget = ws[i], node = elt("div", [widget.node], "CodeMirror-linewidget" + (widget.className ? " " + widget.className : ""));
       if (!widget.handleMouseEvents) { node.setAttribute("cm-ignore-events", "true"); }
       positionLineWidget(widget, node, lineView, dims);
       cm.display.input.setUneditable(node);
@@ -2965,7 +2967,7 @@
     try { x = e.clientX - space.left; y = e.clientY - space.top; }
     catch (e) { return null }
     var coords = coordsChar(cm, x, y), line;
-    if (forRect && coords.xRel == 1 && (line = getLine(cm.doc, coords.line).text).length == coords.ch) {
+    if (forRect && coords.xRel > 0 && (line = getLine(cm.doc, coords.line).text).length == coords.ch) {
       var colDiff = countColumn(line, line.length, cm.options.tabSize) - line.length;
       coords = Pos(coords.line, Math.max(0, Math.round((x - paddingH(cm.display).left) / charWidth(cm.display)) - colDiff));
     }
@@ -7239,6 +7241,8 @@
       if (!handled && code == 88 && !hasCopyEvent && (mac ? e.metaKey : e.ctrlKey))
         { cm.replaceSelection("", null, "cut"); }
     }
+	if (gecko && !mac && !handled && code == 46 && e.shiftKey && !e.ctrlKey && document.execCommand)
+      { document.execCommand("cut"); }
 
     // Turn mouse into crosshair when Alt is held on Mac.
     if (code == 18 && !/\bCodeMirror-crosshair\b/.test(cm.display.lineDiv.className))
@@ -9809,8 +9813,8 @@
   CodeMirror._fromTextArea = _fromTextArea;
 
   addLegacyProps(CodeMirror);
-
-  CodeMirror.version = "5.49.3";
+  
+  CodeMirror.version = "5.50.0";
 
   return CodeMirror;
 
