@@ -97,7 +97,11 @@ var Heather = (function() {
         },
         tooltipEnable: true,
         focused: true,
-		nodeUpdateMill: 300
+		nodeUpdateMill: 300,
+		tooltip : {
+			hljsTipEnable:true,
+			headingTipEnable:true
+		}
     }
 
 
@@ -184,7 +188,7 @@ var Heather = (function() {
         this.markdownParser = new MarkdownParser(config.markdownParser, this);
         this.toolbar = new Toolbar(this, config);
         this.commandBar = new CommandBar(this, config);
-        this.tooltip = new Tooltip(this, config);
+        this.tooltip = new Tooltip(this, config.tooltip);
         this.config = config;
 		this.syncView = new SyncView(this);
 		this.view = new View(this);
@@ -1338,43 +1342,60 @@ var Heather = (function() {
 			HeadingTip.prototype.enable = function(){
 				var me = this;
 				registerEvents('editor.cursorActivity', this.heather,function(cm){
-					if(cm.display.input.composing) {closeBox(me.heather);return;}
+					if(cm.somethingSelected()) {closeBox(me);return;}
+					if(cm.display.input.composing) {closeBox(me);return;}
 					var cursor = cm.getCursor();
                     var text = cm.getLine(cursor.line);
 					var quote = getStartQuote(text);
 					var ch = cursor.ch;
 					var lefts = text.substring(0,ch).substring(quote.length).split('');
-					if(lefts.length == 0) {closeBox(me.heather);return;}
+					if(lefts.length == 0) {closeBox(me);return;}
 					for(const left of lefts){
 						ch--;
-						if(left != '#') {closeBox(me.heather);return;}
+						if(left != '#') {closeBox(me);return;}
 					}
 					var rights = text.substring(cursor.ch).split('');
 					for(const right of rights){
 						if(right == '#') lefts.push(right);
-						else if(right != ' ') {closeBox(me.heather);return;}
+						else if(right != ' ') {closeBox(me);return;}
 						else break;
 					}
-					if(lefts.length > 6) {closeBox(me.heather);return;}
+					if(lefts.length > 6) {closeBox(me);return;}
 					var items = [];
+					var setHeading = function(level){
+						cm.setSelection({
+							line: cursor.line,
+							ch: ch
+						}, {
+							line:  cursor.line,
+							ch: ch+lefts.length
+						});
+						cm.replaceSelection('#'.repeat(level));
+						cm.focus();
+						cm.setCursor({line:cursor.line,ch:ch+level});
+					}
 					for(var i=1;i<=6;i++){
 						items.push({
 							html : i,
 							handler : function(){
 								var level = parseInt(this.textContent);
-								cm.setSelection({
-									line: cursor.line,
-									ch: ch
-								}, {
-									line:  cursor.line,
-									ch: ch+lefts.length
-								});
-								cm.replaceSelection('#'.repeat(level));
+								setHeading(level);
 							}
 						})
 					}
-					me.commandBox = new CommandBox(me.heather,items);
-					me.commandBox.select(lefts.length-1);
+					var keyMap = {
+					}
+					for(var i=1;i<=6;i++){
+						const level = i;
+						keyMap[level+""] = function(){setHeading(level)};
+					}
+					cm.addKeyMap(keyMap);
+					var box = new CommandBox(me.heather,items);
+					box.select(lefts.length-1);
+					box.onRemove(function(){
+						cm.removeKeyMap(keyMap);
+					})
+					me.commandBox = box;
 				},this.eventUnregisters);
 			}
 			
@@ -1415,26 +1436,19 @@ var Heather = (function() {
                     editor.focus();
                 }
 				registerEvents('editor.change', this.heather,function(cm){
-					if(cm.display.input.composing) {closeBox(me.heather);return;}
+					if(cm.display.input.composing) {closeBox(me);return;}
 					var cursor = cm.getCursor();
                     var text = cm.getLine(cursor.line);
 					var quote = getStartQuote(text);
-					if(cursor.ch < quote.length + 4){closeBox(me.heather);return;}
+					if(cursor.ch < quote.length + 4){closeBox(me);return;}
 					var chLeft = text.substring(0,cursor.ch).substring(quote.length).trimLeft();
-					if (!chLeft.startsWith("``` ")) {closeBox(me.heather);return;}
+					if (!chLeft.startsWith("``` ")) {closeBox(me);return;}
 					var lang = text.substring(quote.length).trimLeft().substring(4).trimLeft();
-					if(lang.trim() === '') {closeBox(me.heather);return;}
-					var items = [];
-					for(const language of me.languages){
-						if(language.indexOf(lang) == -1) continue;
-						items.push({
-							html : language,
-							handler:function(){
-								setLanguage(this);
-							}
-						})
-					}
-					if(items.length == 0) {closeBox(me.heather);return;}
+					if(lang.trim() === '') {closeBox(me);return;}
+					var items = filter(me,lang,function(){
+						setLanguage(this);
+					});
+					if(items.length == 0) {closeBox(me);return;}
 					me.commandBox = new CommandBox(me.heather,items);
 				},this.eventUnregisters);
             }
@@ -1443,15 +1457,34 @@ var Heather = (function() {
 				if(this.commandBox){this.commandBox.remove();this.commandBox = null}
 				unregisterEvents(this.eventUnregisters);
             }
+			
+			function filter(tip,str,handler){
+				var array = str.split('');
+				var languages = tip.languages;
+				var langs = [];
+				out:for(const lang of languages){
+					for(const ch of array){
+						if(lang.indexOf(ch) == -1){
+							continue out;
+						}
+					}
+					langs.push({
+						html : lang,
+						handler:handler
+					});
+				}
+				return langs;
+			}
 
             return HljsTip;
         })();
 
         function Tooltip(heather, config) {
+			config = config || {};
             this.hljsTip = new HljsTip(heather);
 			this.headingTip = new HeadingTip(heather);
-            if (config.tooltipEnable !== false)
-                this.enable();
+            if(config.hljsTipEnable === true) this.hljsTip.enable();
+            if(config.headingTipEnable === true) this.headingTip.enable();
         }
 
         Tooltip.prototype.enable = function() {
@@ -1463,7 +1496,7 @@ var Heather = (function() {
 			this.headingTip.disable();
         }
 		
-		var closeBox = function(heather){if(heather.commandBox){heather.commandBox.remove();heather.commandBox = null}};
+		var closeBox = function(o){if(o.commandBox){o.commandBox.remove();o.commandBox = null}};
         return Tooltip;
 
     })();
@@ -2533,10 +2566,12 @@ var Heather = (function() {
 			while(match != null){
 				var start = match[0];
 				quote += start;
-				var oldStr = newStr;
-				newStr = newStr.substring(start.length-1);
-				if(oldStr === newStr)//prevent infinite loop
+				newStr = newStr.substring(start.length);
+				var spaceLength = newStr.length - newStr.trimLeft().length;
+				if(spaceLength > 4)
 					break;
+				newStr = newStr.trimLeft();
+				quote += ' '.repeat(spaceLength);
 				match = listRE.exec(newStr);
 			}
 			return quote;
@@ -3008,6 +3043,7 @@ var Heather = (function() {
 			}
 			createCommandBoxElement(this,this.heather, items);
 			this.heather.commandBox = this;
+			this.removeHandlers = [];
 		}
 		
 		CommandBox.prototype.select = function(i){
@@ -3015,13 +3051,18 @@ var Heather = (function() {
 			var active = this.state.element.querySelector('.active');
 			if(active != null) active.classList.remove('active');
 			var lis = this.state.element.querySelectorAll('li');
-			if(i>lis.length) return ;
+			if(i>lis.length-1) return ;
 			lis[i].classList.add('active');
 		}
 		
 		CommandBox.prototype.on = function(name,handle){
 			if(!this.state) return ;
 			registerEvents(name, this.heather,handle,this.state.eventUnregisters);
+		}
+		
+		CommandBox.prototype.onRemove = function(handle){
+			if(!this.state) return ;
+			this.removeHandlers.push(handle);
 		}
 		
 		CommandBox.prototype.remove = function(){
@@ -3033,6 +3074,11 @@ var Heather = (function() {
             unregisterEvents(this.state.eventUnregisters);
 			this.state = null;
 			this.heather.commandBox = null;
+			for(const onRemove of this.removeHandlers){
+				try{
+					onRemove.call(this);
+				}catch(e){console.log(e)}
+			}
 			triggerEvent(this.heather, 'commandBoxClose');
 		}
 		
@@ -3179,10 +3225,8 @@ var Heather = (function() {
 				div.style.left = '0px';
 				div.style.right = '';
 			}
-			
 		}
 
-		
 		return CommandBox;
 	})();
 	
