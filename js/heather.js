@@ -493,7 +493,6 @@ var Heather = (function() {
 				triggerEvent(heather, 'fullscreenChange', cm.getOption(option) === true);
 			}
         })
-
     }
 
     function isWidget(target, cm) {
@@ -1350,17 +1349,25 @@ var Heather = (function() {
 					var ch = cursor.ch;
 					var lefts = text.substring(0,ch).substring(quote.length).split('');
 					if(lefts.length == 0) {closeBox(me);return;}
+					var blank = 0;
+					var array = [];
 					for(const left of lefts){
-						ch--;
+						if(left == ' '){
+							if(array.length > 0) {closeBox(me);return;}
+							else {blank++;if(blank == 4){closeBox(me);return;}continue}
+						} 
 						if(left != '#') {closeBox(me);return;}
+						ch--;
+						array.push(left);
 					}
+					if(array.length == 0) {closeBox(me);return;}
 					var rights = text.substring(cursor.ch).split('');
 					for(const right of rights){
-						if(right == '#') lefts.push(right);
+						if(right == '#') array.push(right);
 						else if(right != ' ') {closeBox(me);return;}
 						else break;
 					}
-					if(lefts.length > 6) {closeBox(me);return;}
+					if(array.length > 6) {closeBox(me);return;}
 					var items = [];
 					var setHeading = function(level){
 						cm.setSelection({
@@ -1368,7 +1375,7 @@ var Heather = (function() {
 							ch: ch
 						}, {
 							line:  cursor.line,
-							ch: ch+lefts.length
+							ch: ch+array.length
 						});
 						cm.replaceSelection('#'.repeat(level));
 						cm.focus();
@@ -1387,11 +1394,11 @@ var Heather = (function() {
 					}
 					for(var i=1;i<=6;i++){
 						const level = i;
-						keyMap[level+""] = function(){setHeading(level)};
+						keyMap[level] = function(){setHeading(level)};
 					}
 					cm.addKeyMap(keyMap);
 					var box = new CommandBox(me.heather,items);
-					box.select(lefts.length-1);
+					box.select(array.length-1);
 					box.onRemove(function(){
 						cm.removeKeyMap(keyMap);
 					})
@@ -1778,14 +1785,8 @@ var Heather = (function() {
                 var line = cursor.line;
 				
 				var state = cm.getStateAfter(line,true);
-				if(state.overlay.codeBlock){
-					 return 'no';
-				}
-				var lineStr = cm.getLine(line);
-				lineStr = lineStr.substring(getStartQuote(lineStr).length).trim();
-				if(!lineStr.startsWith('|') || !lineStr.endsWith('|') || lineStr.length <= 1){
-					return 'no';
-				}
+				if(state.overlay.codeBlock) return 'no';
+				if(!maybeTable(cm,line)) return "no";
 				
                 var nodes = heather.getNodesByLine(line);
                 if (nodes.length == 0) return 'no';
@@ -1839,13 +1840,9 @@ var Heather = (function() {
                 var line = cursor.line;
 				var state = editor.getStateAfter(line,true);
 				if(state.overlay.codeBlock){
-					 return false;
+					 return ;
 				}
-				var lineStr = editor.getLine(line);
-				lineStr = lineStr.substring(getStartQuote(lineStr).length).trim();
-				if(!lineStr.startsWith('|') || !lineStr.endsWith('|') || lineStr.length <= 1){
-					return false;
-				}
+				if(!maybeTable(editor,line)) return ;
                 var nodes = heather.getNodesByLine(line);
                 var mappingElem;
                 if (nodes.length > 0) {
@@ -2111,22 +2108,23 @@ var Heather = (function() {
     commands['heading'] = function(heather) {
         var cm = heather.editor;
         var line = cm.getCursor().line;
-        var heading = 1;
-        var nodes = heather.node.children;
-        for (var i = nodes.length - 1; i >= 0; i--) {
-            var node = nodes[i];
-            var startLine = parseInt(node.dataset.line);
-            if (startLine <= line) {
-                var tagName = node.tagName;
-                if (tagName.startsWith('H')) {
-                    var h = parseInt(tagName.substring(1));
-                    if (h >= 1 && h <= 6) {
-                        heading = h;
-                        break;
-                    }
-                }
-            }
-        }
+		var heading = 1;
+		first:while(line > 0){
+			line--;
+			var lineHandle = cm.getLineHandle(line);
+			second:for(const style of lineHandle.styles){
+				if(typeof style === 'string'){
+					for(const s of style.split(' ')){
+						if(s.startsWith('header-')){
+							try{
+								heading = parseInt(s.substring(7));
+								break first;
+							}catch(e){continue second;}
+						}
+					}
+				}
+			}
+		}
 
         cm.replaceSelection("#".repeat(heading) + " " + cm.getSelection());
         cm.focus();
@@ -2493,58 +2491,38 @@ var Heather = (function() {
             left: x,
             top: y
         }, 'window');
-		var state = heather.editor.getStateAfter(cursor.line,true);
+		var state = heather.editor.getStateAfter(cursor.line,false);
 		if(state.overlay.codeBlock){
-			 return false;
+			 return ;
 		}
 		var lineHandle = cm.getLineHandle(cursor.line);
-		var lineStr = lineHandle.text;
-		var quote = getStartQuote(lineStr);
-		var lineLeft = lineStr.substring(quote.length).trimLeft();
-        var lft = lineLeft.substring(0, cursor.ch - (lineStr.length - lineLeft.length)).replaceAll(' ', '');
-		if (lft != '-[' && lft != '-[x') {
-			return ;
-		}
-		
-        var nodes = heather.getNodesByLine(cursor.line);
-        if (nodes.length == 0) return;
-        var node = nodes[nodes.length - 1];
-        if (node.tagName == 'P') node = nodes[nodes.length - 2];
-        if (!node) return;
-        if (node.classList.contains('task-list-item')) {
-			//need change 
-			var checkbox = node.querySelector('.task-list-item-checkbox');
-			if (checkbox != null) {
-				var startCh, endCh;
-
-				for (var i = 0; i < lineStr.length; i++) {
-					var ch = lineStr.charAt(i);
-					if (ch == '[') {
-						startCh = i;
-					}
-					if (ch == ']') {
-						endCh = i;
-						break;
-					}
-				}
-
-				if (!Util.isUndefined(startCh) && !Util.isUndefined(endCh)) {
-					cm.setSelection({
-						line: cursor.line,
-						ch: startCh + 1
-					}, {
-						line: cursor.line,
-						ch: endCh
-					});
-					if (checkbox.checked) {
-						cm.replaceSelection(" ");
-					} else {
-						cm.replaceSelection("x");
-					}
-				}
-
+		var styles = lineHandle.styles;
+		var startCh, endCh;
+		for(var i=0;i<styles.length;i++){
+			var style = styles[i];
+			if(style === 'meta' || style === 'property'){
+				endCh = styles[i-1];
+				startCh = endCh - 3;
+				break;
 			}
-        }
+		}
+		if(Util.isUndefined(startCh) || Util.isUndefined(endCh)) return;
+		var lineStr = lineHandle.text;
+		if(cursor.ch <= startCh || cursor.ch >= endCh) return ;
+		var text = lineStr.substring(startCh,endCh);
+		if(text !== '[ ]' && text !== '[x]' && text !== '[X]') return ;
+		cm.setSelection({
+			line: cursor.line,
+			ch: startCh + 1
+		}, {
+			line: cursor.line,
+			ch: endCh-1
+		});
+		if (text !== '[ ]') {
+			cm.replaceSelection(" ");
+		} else {
+			cm.replaceSelection("x");
+		}
     }
 
     function createUnparsedMermaidElement(expression) {
@@ -2617,6 +2595,23 @@ var Heather = (function() {
 	function getEditorEditableWidth(cm){
 		var scrollbarWidth = getScrollBarWidth(cm);
 		return cm.getWrapperElement().offsetWidth-cm.getGutterElement().offsetWidth-scrollbarWidth;
+	}
+	
+	function maybeTable(cm,line){
+		var lastLine = cm.lastLine();
+		if(line == lastLine && line == 0) return ;
+		var startLine = line > 0 ? line - 1 : 0 ;
+		var endLine = line == lastLine ? line : line + 1;
+		var count = 0;
+		for(var i=startLine;i<=endLine;i++){
+			var lineStr = cm.getLine(i);
+			lineStr = lineStr.substring(getStartQuote(lineStr).length).trim();
+			if(!lineStr.startsWith('|') || !lineStr.endsWith('|') || lineStr.length <= 1){
+				continue;
+			}
+			count ++ ;
+		}
+		return count  > 1;
 	}
 	
     var NodeUpdate = function() {

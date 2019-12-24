@@ -89,9 +89,9 @@
 	
 	var util = Heather.Util;
 	
-	Heather.create(document.getElementById("editor1"));
+	new Heather(document.getElementById("editor1"));
 	
-	var editor2 = Heather.create(document.getElementById("editor2"));
+	var editor2 = new Heather(document.getElementById("editor2"));
 	var syncView = false;
 	editor2.on('syncViewChange',function(sv){
 		syncView = sv;
@@ -101,7 +101,7 @@
 	}));
 	editor2.setSyncView(true);
 	
-	var editor3 = Heather.create(document.getElementById("editor3"));
+	var editor3 = new Heather(document.getElementById("editor3"));
 	var toolbar= editor3.getToolbar();
 	toolbar.addElement(util.createBarIcon('save',function(){
 		alert('save');
@@ -115,13 +115,12 @@
 		editor3.getCommandBar().disable();
 	}))
 	
-	var editor4 = Heather.create(document.getElementById("editor4"),{editor:{lineNumber:false}});
+	var editor4 = new Heather(document.getElementById("editor4"),{editor:{lineNumber:false}});
 	
-	var editor5 = Heather.create(document.getElementById("editor5"),{focused:false});
+	var editor5 = new Heather(document.getElementById("editor5"),{focused:false});
 	editor5.editor.getWrapperElement().style.backgroundColor = 'green';
 	editor5.editor.setSize(300,150);
-	
-	var editor6 = Heather.create(document.getElementById("editor6"),{
+	var editor6 = new Heather(document.getElementById("editor6"),{
 		upload:{
 			url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
 			uploadFinish:function(resp){
@@ -148,13 +147,13 @@
 	editor6.getToolbar().addElement(uploadIcon);
 	
 	
-	var editor7 = Heather.create(document.getElementById("editor7"));
+	var editor7 = new Heather(document.getElementById("editor7"));
 	editor7.getToolbar().addElement(util.createBarIcon('eye',function(){
 		editor7.setPreview(true)
 	}))
 	
 	var fullscreen = false;
-	var editor8 = Heather.create(document.getElementById("editor8"));
+	var editor8 = new Heather(document.getElementById("editor8"));
 	editor8.on('fullscreenChange',function(fs){
 		fullscreen = fs;
 	});
@@ -163,7 +162,7 @@
 	}))
 	
 	
-	var editor9 = Heather.create(document.getElementById("editor9"));
+	var editor9 = new Heather(document.getElementById("editor9"));
 	var btn = document.createElement('button');
 	btn.textContent = '取值';
 	btn.setAttribute('style','margin-right:10px')

@@ -86,7 +86,7 @@ localStorageSupport = localStorageSupport !== false;
 		}
 	};
 	
-	var heather = Heather.create(document.getElementById("editor"),config);
+	var heather = new Heather(document.getElementById("editor"),config);
 	
 	if(!Heather.Util.mobile){
 		heather.on('fullscreenChange',function(fs){
