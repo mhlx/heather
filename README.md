@@ -10,3 +10,7 @@ https://md.qyh.me/demo.html
 document:
 
 https://www.qyh.me/document/heather/2.x.md
+
+changelog:
+
+https://www.qyh.me/document/heather/changelog.md
