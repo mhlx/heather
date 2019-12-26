@@ -48,7 +48,7 @@
 
 .heather_preview_close {
 	position: absolute;
-	right: 10px;
+	right: 18px;
 	top: 5px;
 	z-index:999;
 	width:24px;
@@ -128,37 +128,37 @@
 	z-index: 100
 }
 
-.heather_command_widget {
+.heather_command_box {
 	z-index: 99;
 	background-color:white;
 	word-break:keep-all;
 }
 
-.heather_command_list {
+.heather_command_box ul {
 	list-style: none;
 	padding: 5px;
 	margin: 0;
 	border: 1px solid #000;
 }
 
-.heather_command_list .active {
+.heather_command_box ul .active {
 	background: #e8f2ff;
 	overflow:auto;
 }
 
-.heather_command_list{
+.heather_command_box ul{
 	overflow:auto;
 }
 
-.heather_command_list li{
+.heather_command_box ul li{
 	word-break:keep-all;
 }
 
 @media (max-width :768px) {
-	.heather_command_list{
+	.heather_command_box ul{
 		font-size:24px
 	}
-	.heather_command_list .active {
+	.heather_command_box ul .active {
 		background: transparent;
 	}
 }

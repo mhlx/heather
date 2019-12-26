@@ -67,65 +67,67 @@
 var localStorageSupport = false;
 try{
 localStorageSupport = window.localStorage;
+localStorageSupport.setItem('1','1');
+localStorageSupport.removeItem('1');
 }catch(e){}
 localStorageSupport = localStorageSupport !== false;
 
-	var config = {
-		upload:{
-			url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
-			uploadFinish:function(resp){
-				return {
-					type : 'video',
-					url : 'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov',
-					poster:'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov/960'
-				};
-			},
-			beforeUpload:function(upload,file){
-				upload.start();
-			}
-		}
-	};
-	
-	var heather = new Heather(document.getElementById("editor"),config);
-	
-	if(!Heather.Util.mobile){
-		heather.on('fullscreenChange',function(fs){
-			heather.setSyncView(fs);
-		})
-	}
-	
-	var toolbar = heather.getToolbar();
-	
-	toolbar.addElement(Heather.Util.createBarIcon('fullscreen',function(elem){
-		heather.setFullscreen(!heather.isFullscreen());
-	}));
-	toolbar.addElement(Heather.Util.createBarIcon('eye',function(elem){
-		heather.setPreview(true);
-	}));
-	if(Heather.Util.mobile){
-		toolbar.addElement(Heather.Util.createBarIcon('cursor',function(elem){
-			if(!heather.hasSelectionHelper()){
-				heather.openSelectionHelper();
-			} else {
-				heather.closeSelectionHelper();
-			}
-		}));
-	};
-	
-	if(localStorageSupport){
-		var timer;
-		heather.on('editor.change',function(cm){
-			clearTimeout(timer);
-			timer = setTimeout(function(){
-				localStorage.setItem('markdown',cm.getValue());
-			},500)
-		});
-		var old = window.localStorage.getItem('markdown');
-		if(old != null){
-			heather.setValue(old);
+var config = {
+	upload:{
+		url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
+		uploadFinish:function(resp){
+			return {
+				type : 'video',
+				url : 'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov',
+				poster:'https://www.qyh.me/video2/news/FEE39819-FF07-45DD-8D8D-D85DE04DB7DC.mov/960'
+			};
+		},
+		beforeUpload:function(upload,file){
+			upload.start();
 		}
 	}
-	heather.setFullscreen(true);
+};
+
+var heather = new Heather(document.getElementById("editor"),config);
+
+if(!Heather.Util.mobile){
+	heather.on('fullscreenChange',function(fs){
+		heather.setSyncView(fs);
+	})
+}
+
+var toolbar = heather.getToolbar();
+
+toolbar.addElement(Heather.Util.createBarIcon('fullscreen',function(elem){
+	heather.setFullscreen(!heather.isFullscreen());
+}));
+toolbar.addElement(Heather.Util.createBarIcon('eye',function(elem){
+	heather.setPreview(true);
+}));
+if(Heather.Util.mobile){
+	toolbar.addElement(Heather.Util.createBarIcon('cursor',function(elem){
+		if(!heather.hasSelectionHelper()){
+			heather.openSelectionHelper();
+		} else {
+			heather.closeSelectionHelper();
+		}
+	}));
+};
+
+if(localStorageSupport){
+	var timer;
+	heather.on('editor.change',function(cm){
+		clearTimeout(timer);
+		timer = setTimeout(function(){
+			localStorage.setItem('markdown',cm.getValue());
+		},500)
+	});
+	var old = window.localStorage.getItem('markdown');
+	if(old != null){
+		heather.setValue(old);
+	}
+}
+heather.setFullscreen(true);
 </script>
 </body>
 </html>

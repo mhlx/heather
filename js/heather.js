@@ -3038,7 +3038,6 @@ var Heather = (function() {
 			}
 			createCommandBoxElement(this,this.heather, items);
 			this.heather.commandBox = this;
-			this.removeHandlers = [];
 		}
 		
 		CommandBox.prototype.select = function(i){
@@ -3050,6 +3049,11 @@ var Heather = (function() {
 			lis[i].classList.add('active');
 		}
 		
+		CommandBox.prototype.updatePosition = function(){
+			if(!this.state) return ;
+			posBox(this);
+		}
+		
 		CommandBox.prototype.on = function(name,handle){
 			if(!this.state) return ;
 			registerEvents(name, this.heather,handle,this.state.eventUnregisters);
@@ -3057,7 +3061,7 @@ var Heather = (function() {
 		
 		CommandBox.prototype.onRemove = function(handle){
 			if(!this.state) return ;
-			this.removeHandlers.push(handle);
+			this.state.removeHandlers.push(handle);
 		}
 		
 		CommandBox.prototype.remove = function(){
@@ -3066,23 +3070,22 @@ var Heather = (function() {
 			}
 			this.heather.editor.removeKeyMap(this.state.keyMap);
 			this.state.element.remove();
-            unregisterEvents(this.state.eventUnregisters);
-			this.state = null;
-			this.heather.commandBox = null;
-			for(const onRemove of this.removeHandlers){
+			for(const onRemove of this.state.removeHandlers){
 				try{
 					onRemove.call(this);
 				}catch(e){console.log(e)}
 			}
+            unregisterEvents(this.state.eventUnregisters);
+			this.state = null;
+			this.heather.commandBox = null;
 			triggerEvent(this.heather, 'commandBoxClose');
 		}
 		
 		function createCommandBoxElement(box,heather, items) {
 			var div = document.createElement('div');
-			div.classList.add('heather_command_widget')
+			div.classList.add('heather_command_box')
 			div.setAttribute('data-widget', '');
 			var ul = document.createElement('ul');
-			ul.classList.add('heather_command_list');
 
 			for (var i = 0; i < items.length; i++) {
 				var item = items[i];
@@ -3155,9 +3158,6 @@ var Heather = (function() {
 
 			heather.editor.addKeyMap(keyMap);
 			var eventUnregisters = [] ;
-            registerEvents('editor.update', heather, function(){
-				posBox(box)
-			}, eventUnregisters);
 			heather.editor.addWidget({
                 line: 0,
                 ch: 0
@@ -3166,9 +3166,13 @@ var Heather = (function() {
 				element : div,
 				keyMap : keyMap,
 				eventUnregisters : eventUnregisters,
-				cursor:heather.editor.getCursor()
+				cursor:heather.editor.getCursor(),
+				removeHandlers:[]
 			};
-			posBox(box);
+            registerEvents('editor.update', heather, function(){
+				posBox(box)
+			}, eventUnregisters);
+			posBox(box); 
 			triggerEvent(heather, 'commandBoxOpen', div);
 		}
 		
