@@ -19,23 +19,61 @@
 
 
 <style>
-.cm-header-1{
-	font-size:2rem
+.CodeMirror{
+	font-size:15px
 }
-.cm-header-2{
-	font-size:1.5rem
+
+.CodeMirror-fullscreen {
+	left:25%;
+	right:25%;
+	top:10%;
+	bottom:5%;
 }
-.cm-header-3{
-	font-size:1.17rem
+@media (max-width:768px) {
+	.CodeMirror-fullscreen{
+		left:5%;
+		right:5%;
+		top:5%;
+		bottom:5%;
+	}
 }
-.cm-header-4{
-	font-size:1rem
+
+ @media print {
+	 .CodeMirror-fullscreen{
+		position:inherit
+	 }
+	.markdown-body .mermaid {
+		text-align: center;
+	}
+
+	.markdown-body table {
+		overflow: visible !important;
+	}
+	 .markdown-body pre {
+		word-wrap: break-word !important;
+		white-space: pre-wrap !important;
+		word-break: break-all !important;
+	}
+
+	 .markdown-body pre code {
+		word-wrap: break-word !important;
+		white-space: pre-wrap !important;
+		word-break: break-all !important;
+	}
 }
-.cm-header-5{
-	font-size:0.83rem
-}
-.cm-header-6{
-	font-size:0.75rem
+
+@media (min-width:768px) {
+	::-webkit-scrollbar {
+		width: 6px;
+	}
+	 ::-webkit-scrollbar-track {
+		box-shadow: none;
+		border-radius: 3px;
+	}
+	 ::-webkit-scrollbar-thumb {
+		border-radius: 10px;
+		background-color: #bcd;
+	}
 }
 </style>
 </head>
@@ -53,6 +91,7 @@
 <script src="codemirror/addon/search/search.js"></script>
 <script src="codemirror/addon/search/jump-to-line.js"></script>
 <script src="codemirror/addon/display/fullscreen.js"></script>
+<script src="codemirror/addon/display/placeholder.js"></script>
 <script src="codemirror/addon/fold/foldcode.js"></script>
 <script src="codemirror/addon/fold/foldgutter.js"></script>
 <script src="highlight/highlight.pack.js"></script>
@@ -61,6 +100,11 @@
 <script src="js/markdown-it-katex.min.js"></script>
 <script src="js/markdownItAnchor.umd.js"></script>
 <script src="js/morphdom-umd.min.js"></script>
+
+
+<script src="support/turndown.js"></script>
+<script src="support/turndown-plugin-gfm.js"></script>
+<script src="support/heather_turndown.js"></script>
 <script src="js/heather.js"></script>
 <script>
 
@@ -71,6 +115,9 @@ localStorageSupport.setItem('1','1');
 localStorageSupport.removeItem('1');
 }catch(e){}
 localStorageSupport = localStorageSupport !== false;
+
+
+Heather.defaultConfig.editor.lineNumbers = false;
 
 var config = {
 	upload:{
@@ -83,24 +130,18 @@ var config = {
 			};
 		},
 		beforeUpload:function(upload,file){
-			upload.start();
+			return true;
 		}
 	}
 };
 
-var heather = new Heather(document.getElementById("editor"),config);
-
-if(!Heather.Util.mobile){
-	heather.on('fullscreenChange',function(fs){
-		heather.setSyncView(fs);
-	})
+Heather.prototype.setSyncView = function(){
 }
+var heather = new Heather(document.getElementById("editor"),config);
 
 var toolbar = heather.getToolbar();
 
-toolbar.addElement(Heather.Util.createBarIcon('fullscreen',function(elem){
-	heather.setFullscreen(!heather.isFullscreen());
-}));
+
 toolbar.addElement(Heather.Util.createBarIcon('eye',function(elem){
 	heather.setPreview(true);
 }));
@@ -116,7 +157,7 @@ if(Heather.Util.mobile){
 
 if(localStorageSupport){
 	var timer;
-	heather.on('editor.change',function(cm){
+	heather.on('change',function(cm){
 		clearTimeout(timer);
 		timer = setTimeout(function(){
 			localStorage.setItem('markdown',cm.getValue());
@@ -127,7 +168,30 @@ if(localStorageSupport){
 		heather.setValue(old);
 	}
 }
+
 heather.setFullscreen(true);
+Heather.prototype.setFullscreen = function(){
+
+}
+HtmlPasteHelper.turndownService.addRule('kbd', {
+	filter: ['kbd'],
+	replacement: function(content, node, options) {
+		return '<kbd>'+node.textContent+'</kbd>';
+	}
+});
+heather.on('paste',function(cm,e){
+	var files = e.clipboardData.files;
+	if(files && files.length > 0)return ;
+	var html = e.clipboardData.getData('text/html');
+	if(html && html.trim().length > 0){
+		e.preventDefault();
+		e.stopPropagation();
+		cm.replaceSelection(HtmlPasteHelper.getMarkdownFromPasteHTML(html));
+	}
+});
+window.addEventListener("afterprint", function(event) { 
+	heather.refresh();
+});
 </script>
 </body>
 </html>

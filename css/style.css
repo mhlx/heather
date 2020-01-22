@@ -152,14 +152,12 @@
 
 .heather_command_box ul li{
 	word-break:keep-all;
+	cursor:pointer;
 }
 
 @media (max-width :768px) {
 	.heather_command_box ul{
 		font-size:24px
-	}
-	.heather_command_box ul .active {
-		background: transparent;
 	}
 }
 
@@ -252,6 +250,7 @@
 	background-repeat:no-repeat;
 	background-image:url(../svg/delete.svg);
 	background-size: 18px 18px;
+	cursor:pointer;
 }
 
 @media (min-width:768px) {

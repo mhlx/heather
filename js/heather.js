@@ -1,7 +1,7 @@
 var Heather = (function() {
-	
-	var mermaidId = 0;
-	var listRE = /^(\s*)(>[> ]*|[*+-] \[[x ]\]\s|[*+-]\s|(\d+)([.)]))(\s*)/;
+
+    var mermaidId = 0;
+    var listRE = /^(\s*)(>[> ]*|[*+-] \[[x ]\]\s|[*+-]\s|(\d+)([.)]))(\s*)/;
     var lazyRes = {
         mermaid_js: "js/mermaid.min.js",
         katex_css: "katex/katex.min.css",
@@ -17,7 +17,7 @@ var Heather = (function() {
         var android = /Android/.test(userAgent);
         var mac = ios || /Mac/.test(platform);
         var chrome = !edge && /Chrome\//.test(userAgent)
-		var firefox = !edge && /Firefox\//.test(userAgent)
+        var firefox = !edge && /Firefox\//.test(userAgent)
         var mobile = ios || android || /webOS|BlackBerry|Opera Mini|Opera Mobi|IEMobile/i.test(userAgent);
         var headingTagNames = ["H1", "H2", "H3", "H4", "H5", "H6"];
 
@@ -25,48 +25,45 @@ var Heather = (function() {
             return (typeof o == 'undefined')
         }
 
-        var cloneAttributes = function(element, sourceNode, filter) {
-            filter = filter || function() {
-                return true;
-            }
-            let attr;
-            let attributes = Array.prototype.slice.call(sourceNode.attributes);
-            while (attr = attributes.pop()) {
-                if (filter(attr.nodeName)) {
-                    element.setAttribute(attr.nodeName, attr.nodeValue);
-                }
-            }
-        }
-
         return {
             parseHTML: function(html) {
                 return parser.parseFromString(html, "text/html").body;
             },
+			escape : function(str){
+				var map = {
+				'&': '&amp;',
+				'<': '&lt;',
+				'>': '&gt;',
+				'"': '&quot;',
+				"'": '&#039;'
+			  };
+
+			  return str.replace(/[&<>"']/g, function(m) { return map[m]; });
+			},
             isUndefined: isUndefined,
-            cloneAttributes: cloneAttributes,
             mobile: mobile,
             chrome: chrome,
             mac: mac,
             android: android,
             ios: ios,
             edge: edge,
-			firefox:firefox,
+            firefox: firefox,
             isHeading: function(element) {
                 return element.nodeType == 1 && headingTagNames.includes(element.tagName);
             },
-			createBarIcon : function(clazz,handler){
-				var label = document.createElement('label');
-				label.classList.add('heather_svg_'+clazz);
-				label.classList.add('heather_svg_icon');
-				if(handler){
-					label.addEventListener('click',function(e){
-						e.preventDefault();
-						e.stopPropagation();
-						handler.call(label,null);
-					})
-				}
-				return label;
-			}
+            createBarIcon: function(clazz, handler) {
+                var label = document.createElement('label');
+                label.classList.add('heather_svg_' + clazz);
+                label.classList.add('heather_svg_icon');
+                if (handler) {
+                    label.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handler.call(label, null);
+                    })
+                }
+                return label;
+            }
         }
 
     })();
@@ -97,13 +94,59 @@ var Heather = (function() {
         },
         tooltipEnable: true,
         focused: true,
-		nodeUpdateMill: 300,
-		tooltip : {
-			hljsTipEnable:true,
-			headingTipEnable:true
-		}
+        nodeUpdateMill: 300,
+        tooltip: {
+            hljsTipEnable: true,
+            headingTipEnable: true
+        },
+        commandBoxItems: [{
+            html: '标题',
+            handler: function(heather) {
+                heather.execCommand('heading');
+            }
+        }, {
+            html: '表格',
+            handler: function(heather) {
+                heather.execCommand('table');
+            }
+        }, {
+            html: '代码块',
+            handler: function(heather) {
+                heather.execCommand('codeBlock');
+            }
+        }, {
+            html: '无序列表',
+            handler: function(heather) {
+                heather.execCommand('unorderedList');
+            }
+        }, {
+            html: '有序列表',
+            handler: function(heather) {
+                heather.execCommand('orderedList');
+            }
+        }, {
+            html: '任务列表',
+            handler: function(heather) {
+                heather.execCommand('taskList');
+            }
+        }, {
+            html: '引用',
+            handler: function(heather) {
+                heather.execCommand('quote');
+            }
+        }, {
+            html: '数学公式块',
+            handler: function(heather) {
+                heather.execCommand('mathBlock');
+            }
+        }, {
+            html: 'mermaid图表',
+            handler: function(heather) {
+                heather.execCommand('mermaid');
+            }
+        }],
+		commandBarItems:['command','bold','italic','link','code','strike','undo','redo']
     }
-
 
     String.prototype.replaceAll = function(search, replacement) {
         var target = this;
@@ -113,34 +156,9 @@ var Heather = (function() {
     String.prototype.splice = function(start, delCount, newSubStr) {
         return this.slice(0, start) + newSubStr + this.slice(start + Math.abs(delCount));
     }
-	
-	var setSize = CodeMirror.prototype.setSize;
-	
-	CodeMirror.prototype.setSize = function(width,height){
-		if(!this.heather){
-			setSize.call(this,width,height);
-			return ;
-		}
-		var interpret = function (val) { return typeof val == "number" || /^\d+$/.test(String(val)) ? val + "px" : val; };
-		if(width != null || height != null){
-			var root = this.getRootNode();
-			if(width != null){
-				var width = interpret(width);
-				root.style.width = width;
-				this.display.wrapper.style.width = '100%';
-			}
-			if(height != null){
-				var height = interpret(height);
-				root.style.height = height;
-				this.display.wrapper.style.height = '100%';
-			}
-			this.refresh();
-		}
-	}
 
     CodeMirror.registerHelper("fold", "heather", function(cm, start) {
-        var heather = cm.heather;
-        var nodes = heather.getNodesByLine(start.line);
+        var nodes = cm.getNodesByLine(start.line);
         if (nodes.length == 0) {
             return null;
         }
@@ -150,7 +168,7 @@ var Heather = (function() {
         if (Util.isHeading(node)) {
             var headLevel = parseInt(node.tagName.substring(1));
             var valid = false;
-            for (const element of heather.node.children) {
+            for (const element of cm.node.children) {
                 if (element === node) {
                     valid = true;
                     continue;
@@ -180,19 +198,40 @@ var Heather = (function() {
 
     function Heather(textarea, config) {
         config = Object.assign({}, defaultConfig, config);
-        this.eventHandlers = [];
-        this.editor = createEditor(textarea, config.editor);
-        this.editor.heather = this;
+        this.commandBoxItems = config.commandBoxItems || [];
+		var editorConfig = config.editor || {};
+		var builder = editorBuilder(textarea,editorConfig);
+        
+		CodeMirror.call(this,builder.place,builder.options);
+		
+		this.rootNode = builder.rootNode;
+		if (editorConfig.callback) {
+            editorConfig.callback(this);
+        }
+
+        var fun = this.doc.mode.innerMode;
+        this.doc.mode.innerMode = function(state) {
+            var info = fun.call(null, state);
+            if (info.mode) info.mode.fold = 'heather'
+            return info;
+        }
+        this.doc.mode.fold = 'heather';
+
+        if (Util.firefox) {
+            var textarea = this.getInputField();
+            textarea.style.width = "1000px";
+        }
+		
         this.node = document.createElement('body');
         this.top = new Top(this);
-        this.markdownParser = new MarkdownParser(config.markdownParser, this);
+        this.markdownParser = new MarkdownParser(config.markdownParser);
         this.toolbar = new Toolbar(this, config);
         this.commandBar = new CommandBar(this, config);
         this.tooltip = new Tooltip(this, config.tooltip);
         this.config = config;
-		this.syncView = new SyncView(this);
-		this.view = new View(this);
-		this.focusedMode = new FocusedMode(this);
+        this.syncView = new SyncView(this);
+        this.view = new View(this);
+        this.focusedMode = new FocusedMode(this);
         this.nodeUpdate = new NodeUpdate(this);
         initKeyMap(this);
         handleDefaultEditorEvent(this);
@@ -201,19 +240,39 @@ var Heather = (function() {
             this.setFocused(true);
         }
     }
+	
+		
+	Heather.prototype = Object.create(CodeMirror.prototype);
 
-
-    Heather.prototype.getValue = function() {
-        return this.editor.getValue();
+    Heather.prototype.setSize = function(width, height) {
+        var interpret = function(val) {
+            return typeof val == "number" || /^\d+$/.test(String(val)) ? val + "px" : val;
+        };
+        if (width != null || height != null) {
+            var root = this.rootNode;
+            if (width != null) {
+                var width = interpret(width);
+                root.style.width = width;
+                this.display.wrapper.style.width = '100%';
+            }
+            if (height != null) {
+                var height = interpret(height);
+                root.style.height = height;
+                this.display.wrapper.style.height = '100%';
+            }
+            this.refresh();
+        }
     }
-
-    Heather.prototype.setValue = function(value) {
-        this.editor.setValue(value);
-    }
-
+	
+	Heather.prototype.getRootNode = function(){
+		return this.rootNode;
+	}
+	
     Heather.prototype.getHtmlNode = function() {
-		this.nodeUpdate.update(true);
-		return this.node.cloneNode(true);
+        this.nodeUpdate.update(true);
+        var node = this.node.cloneNode(true);
+        afterDisplay(node);
+        return node;
     }
 
     Heather.prototype.isFileUploadEnable = function() {
@@ -223,7 +282,6 @@ var Heather = (function() {
 
     Heather.prototype.getNodesByLine = function(line, includePlainHtmlNode) {
         var nodes = [];
-        var cm = this.editor;
         var addNode = function(node) {
             for (const dataLine of node.querySelectorAll('[data-line]')) {
                 if (dataLine.hasAttribute('data-html') && includePlainHtmlNode !== true) continue;
@@ -238,142 +296,30 @@ var Heather = (function() {
                 }
             }
         }
-		this.nodeUpdate.update(true);
+        this.nodeUpdate.update(true);
         addNode(this.node);
         return nodes;
-    }
-
-    Heather.prototype.fold = function(pos) {
-        this.editor.foldCode(pos);
     }
 
     Heather.prototype.isPreview = function() {
         return this.view.isEnable;
     }
+	
+	var execEditorCommand = CodeMirror.prototype.execCommand;
 
     Heather.prototype.execCommand = function(name) {
-		if(name.startsWith("editor.")) {
-            name = name.substring(name.indexOf('.') + 1);
-			this.editor.execCommand(name);
-        } else {
-			var handler = commands[name];
-			if (!Util.isUndefined(handler)) {
-				this.editor.ignoreNextFocusout = true;
-				handler(this);
-			}
+		var handler = commands[name];
+		if (!Util.isUndefined(handler)) {
+			this.ignoreNextFocusout = true;
+			handler(this);
+		} else {
+			execEditorCommand.call(this,name);
 		}
     }
-
-    Heather.prototype.setPreview = function(preview) {
-        if(preview === true)
-			this.view.enable();
-		else
-			this.view.disable();
-    }
-
-    Heather.prototype.getToolbar = function() {
-        return this.toolbar;
-    }
-
-    Heather.prototype.getCommandBar = function() {
-        return this.commandBar;
-    }
-
-    Heather.prototype.isFullscreen = function() {
-        return this.editor.getOption('fullScreen') === true;
-    }
 	
-    Heather.prototype.setFullscreen = function(enable) {
-       this.editor.setOption('fullScreen',enable);
-    }
+	var addEditorKeyMap = CodeMirror.prototype.addKeyMap;
 	
-    Heather.prototype.hasSyncView = function() {
-        return this.syncView.isEnable;
-    }
-
-    Heather.prototype.setSyncView = function(syncView) {
-       if(syncView === true){
-		   this.syncView.enable();
-	   } else {
-		   this.syncView.disable();
-	   }
-    }
-	
-	Heather.prototype.setSyncDisplayMode = function(mode){
-		this.syncView.setDisplayMode(mode);
-	}
-
-    Heather.prototype.on = function(eventName, handler) {
-        var me = this;
-        if (eventName.startsWith("editor.")) {
-            eventName = eventName.substring(eventName.indexOf('.') + 1);
-            this.editor.on(eventName, handler);
-            return {
-				name : "editor."+eventName,
-                off: function() {
-                    me.editor.off(eventName, handler)
-                }
-            }
-        }
-        this.eventHandlers.push({
-            name: eventName,
-            handler: handler
-        });
-        return {
-			name : eventName,
-            off: function() {
-                me.off(eventName, handler)
-            }
-        }
-    }
-
-    Heather.prototype.off = function(eventName, handler) {
-        if (eventName.startsWith("editor.")) {
-            eventName = eventName.substring(eventName.indexOf('.') + 1);
-            this.editor.off(eventName, handler);
-            return;
-        }
-        for (var i = this.eventHandlers.length - 1; i >= 0; i--) {
-            var eh = this.eventHandlers[i];
-            if (eh.handler === handler && eh.name === eventName) {
-                this.eventHandlers.splice(i, 1);
-                break;
-            }
-        }
-    }
-
-    Heather.prototype.setFocused = function(focus) {
-		if(focus === true)
-			this.focusedMode.enable();
-		else
-			this.focusedMode.disable();
-    }
-
-    Heather.prototype.isFocused = function() {
-       return this.focusedMode.isEnable;
-    }
-
-    Heather.prototype.openSelectionHelper = function() {
-        if (!this.isPreview()) {
-            this.closeSelectionHelper(true);
-            this.selectionHelper = new SelectionHelper(this);
-            triggerEvent(this, 'selectionHelperOpen', this);
-        }
-    }
-
-    Heather.prototype.hasSelectionHelper = function() {
-        return !Util.isUndefined(this.selectionHelper);
-    }
-
-    Heather.prototype.closeSelectionHelper = function(unselect) {
-        if (this.selectionHelper) {
-            this.selectionHelper.remove(unselect !== true);
-            this.selectionHelper = undefined;
-            triggerEvent(this, 'selectionHelperClose', this);
-        }
-    }
-
-    Heather.prototype.addKeyMap = function(keyMap) {
+	Heather.prototype.addKeyMap = function(keyMap) {
         var me = this;
         var _keyMap = {};
         for (const key in keyMap) {
@@ -387,63 +333,160 @@ var Heather = (function() {
                 _keyMap[key] = v;
             }
         }
-        this.editor.addKeyMap(_keyMap);
+        addEditorKeyMap.call(this,_keyMap);
         return _keyMap;
     }
 
-    Heather.prototype.removeKeyMap = function(keyMap) {
-        this.editor.removeKeyMap(keyMap);
+    Heather.prototype.setPreview = function(preview) {
+        if (preview === true)
+            this.view.enable();
+        else
+            this.view.disable();
+    }
+
+    Heather.prototype.getToolbar = function() {
+        return this.toolbar;
+    }
+
+    Heather.prototype.getCommandBar = function() {
+        return this.commandBar;
+    }
+
+    Heather.prototype.isFullscreen = function() {
+        return this.getOption('fullScreen') === true;
+    }
+
+    Heather.prototype.setFullscreen = function(enable) {
+        this.setOption('fullScreen', enable);
+    }
+
+    Heather.prototype.hasSyncView = function() {
+        return this.syncView.isEnable;
+    }
+
+    Heather.prototype.setSyncView = function(syncView) {
+        if (syncView === true) {
+            this.syncView.enable();
+        } else {
+            this.syncView.disable();
+        }
+    }
+
+    Heather.prototype.setSyncDisplayMode = function(mode) {
+        this.syncView.setDisplayMode(mode);
+    }
+	
+	
+	var editorOn = CodeMirror.prototype.on;
+
+    Heather.prototype.on = function(eventName, handler) {
+        var me = this;
+		editorOn.call(this,eventName,handler);
+        return {
+            name: eventName,
+            off: function() {
+                me.off(eventName, handler)
+            }
+        }
+    }
+
+    Heather.prototype.setFocused = function(focus) {
+        if (focus === true)
+            this.focusedMode.enable();
+        else
+            this.focusedMode.disable();
+    }
+
+    Heather.prototype.isFocused = function() {
+        return this.focusedMode.isEnable;
+    }
+
+    Heather.prototype.openSelectionHelper = function() {
+        if (!this.isPreview()) {
+            this.closeSelectionHelper(true);
+            this.selectionHelper = new SelectionHelper(this);
+			CodeMirror.signal(this, 'commandBoxClose',this);
+        }
+    }
+
+    Heather.prototype.hasSelectionHelper = function() {
+        return !Util.isUndefined(this.selectionHelper);
+    }
+
+    Heather.prototype.closeSelectionHelper = function(unselect) {
+        if (this.selectionHelper) {
+            this.selectionHelper.remove(unselect !== true);
+            this.selectionHelper = undefined;
+			CodeMirror.signal(this, 'selectionHelperClose',this);
+        }
+    }
+
+    Heather.prototype.addCommandBoxItems = function(items, index) {
+        var array = this.commandBoxItems;
+        if (Util.isUndefined(index))
+            index = array.length;
+        array.splice.apply(array, [index, 0].concat(items));
+        if (this.commandBox && this.commandBox.isDefault === true)
+            this.commandBox.reset(this.commandBoxItems);
+    }
+
+    Heather.prototype.removeCommandBoxItems = function(items) {
+        var array = this.commandBoxItems;
+        for (var i = array.length - 1; i >= 0; i--) {
+            var item = array[i];
+            if (items.includes(item))
+                array.splice(i, 1);
+        }
+        if (this.commandBox && this.commandBox.isDefault === true)
+            this.commandBox.reset(this.commandBoxItems);
     }
 
     Heather.prototype.render = function() {
-		var start = performance.now();
-        var value = this.editor.getValue();
+        var value = this.getValue();
         var node = Util.parseHTML(this.markdownParser.render(value));
         this.node = node;
-        triggerEvent(this, 'rendered', value, this.node.innerHTML);
+		CodeMirror.signal(this, 'rendered',value, this.node.innerHTML);
     }
-	
-	
-	Heather.prototype.upload = function(file){
-		if(!this.isFileUploadEnable()){
-			return ;
-		}
-		new FileUpload(file, this, this.config.upload).start();
-	}
+
+    Heather.prototype.upload = function(file) {
+        if (!this.isFileUploadEnable()) {
+            return;
+        }
+        new FileUpload(file, this, this.config.upload).start();
+    }
 
     function handleDefaultEditorEvent(heather) {
 
-        var editor = heather.editor;
-        if (editor.getValue() != '') {
+        if (heather.getValue() != '') {
             heather.nodeUpdate.update();
         }
 
         //change task list status
-        editor.on('mousedown', function(cm, e) {
+        heather.on('mousedown', function(cm, e) {
             if (isWidget(e.target, cm)) {
                 e.codemirrorIgnore = true;
                 return;
             }
             var x = e.clientX;
             var y = e.clientY;
-            changeTastListStatus(heather, x, y);
+            changeTastListStatus(cm, x, y);
         })
 
-        editor.on('touchstart', function(cm, e) {
+        heather.on('touchstart', function(cm, e) {
             if (isWidget(e.target, cm)) {
                 e.codemirrorIgnore = true;
                 return;
             }
             var x = e.touches[0].clientX;
             var y = e.touches[0].clientY;
-            changeTastListStatus(heather, x, y);
+            changeTastListStatus(cm, x, y);
         });
         //file upload 
-        editor.on('paste', function(editor, evt) {
+        heather.on('paste', function(editor, evt) {
             var clipboardData, pastedData;
             clipboardData = evt.clipboardData || window.clipboardData;
             var files = clipboardData.files;
-            if (files && files.length > 0 && heather.isFileUploadEnable()) {
+            if (files && files.length > 0 && editor.isFileUploadEnable()) {
                 var f = files[0];
                 var type = f.type;
                 if (type.indexOf('image/') == -1) {
@@ -452,11 +495,11 @@ var Heather = (function() {
                 evt.preventDefault();
                 evt.stopPropagation();
                 f.from = 'paste';
-                new FileUpload(f, heather, heather.config.upload).start();
+                new FileUpload(f, editor, editor.config.upload).start();
             }
         });
 
-        editor.on('drop', function(cm, e) {
+        heather.on('drop', function(cm, e) {
             var files = e.dataTransfer.files;
             if (files.length > 0) {
                 var file = files[0];
@@ -470,28 +513,31 @@ var Heather = (function() {
                         cm.replaceSelection(text);
                     }
 
-                } else if (heather.isFileUploadEnable()) {
+                } else if (cm.isFileUploadEnable()) {
                     e.preventDefault();
                     e.stopPropagation();
                     file.from = 'drop';
-                    new FileUpload(file, heather, heather.config.upload).start();
+                    new FileUpload(file, cm, cm.config.upload).start();
                 }
             }
         });
 
-        editor.on('optionChange', function(cm, option) {
+        heather.on('optionChange', function(cm, option) {
             if (option === 'readOnly') {
                 if (cm.isReadOnly()) {
-					if(heather.commandBox){heather.commandBox.remove();heather.commandBox = null};
-                    heather.commandBar.setKeepHidden(true);
+                    if (cm.commandBox) {
+                        cm.commandBox.remove();
+                        cm.commandBox = null
+                    };
+                    cm.commandBar.setKeepHidden(true);
                 } else {
-                    heather.commandBar.setKeepHidden(false);
+                    cm.commandBar.setKeepHidden(false);
                 }
             }
-			if (option === 'fullScreen') {
-				CodeMirror.signal(cm, "update", cm);
-				triggerEvent(heather, 'fullscreenChange', cm.getOption(option) === true);
-			}
+            if (option === 'fullScreen') {
+                CodeMirror.signal(cm, "update", cm);
+				CodeMirror.signal(cm, 'fullscreenChange',cm.getOption(option) === true);
+            }
         })
     }
 
@@ -515,7 +561,7 @@ var Heather = (function() {
         }
 
         function fold() {
-            heather.fold(heather.editor.getCursor());
+            heather.foldCode(heather.getCursor());
         }
 
         var keyMap = Util.mac ? {
@@ -526,7 +572,7 @@ var Heather = (function() {
             "Cmd-Enter": toggleFullscreen,
             "Cmd-P": togglePreview,
             "Cmd-Q": fold,
-			"Shift-Tab": 'editor.indentLess'
+            "Shift-Tab": 'indentLess'
         } : {
             "Ctrl-B": 'bold',
             "Ctrl-I": 'italic',
@@ -535,67 +581,16 @@ var Heather = (function() {
             "Ctrl-Enter": toggleFullscreen,
             "Ctrl-P": togglePreview,
             "Ctrl-Q": fold,
-			"Shift-Tab": 'editor.indentLess'
+            "Shift-Tab": 'indentLess'
         }
 
         heather.addKeyMap(keyMap);
-    }
-
-    function triggerEvent(heather, name, ...args) {
-        for (var i = 0; i < heather.eventHandlers.length; i++) {
-            var eh = heather.eventHandlers[i];
-            if (eh.name === name) {
-                try {
-                    var handler = eh.handler;
-                    handler.apply(heather, args);
-                } catch (e) {}
-            }
-        }
-    }
-
-    function createEditor(textarea, config) {
-        config = config || {};
-        config.styleActiveLine = true;
-        config.inputStyle = 'textarea';
-        config.mode = {
-            name: 'gfm'
-        };
-        config.lineWrapping = true;
-        config.value = textarea.value;
-
-        var node = document.createElement('div');
-        node.classList.add('heather_editor_wrapper');
-        textarea.after(node);
-
-        var editor = CodeMirror._fromTextArea(textarea, config, node);
-        editor.getRootNode = function() {
-            return node;
-        }
-
-        if (config.callback) {
-            config.callback(editor);
-        }
-
-        var fun = editor.doc.mode.innerMode;
-        editor.doc.mode.innerMode = function(state) {
-            var info = fun.call(null, state);
-            if (info.mode) info.mode.fold = 'heather'
-            return info;
-        }
-        editor.doc.mode.fold = 'heather';
-		
-		if(Util.firefox){
-			var textarea = editor.getInputField();
-			textarea.style.width = "1000px";
-		}
-        return editor;
     }
 
     var SelectionHelper = (function() {
 
         function SelectionHelper(heather) {
 
-            var editor = heather.editor;
             var eventUnregisters = [];
 
             var html = '';
@@ -610,13 +605,13 @@ var Heather = (function() {
             div.style.display = 'none';
             div.setAttribute('data-widget', '');
             div.innerHTML = html;
-            editor.addWidget({
+            heather.addWidget({
                 line: 0,
                 ch: 0
             }, div);
 
             var resize = function() {
-                var w = editor.getWrapperElement().offsetWidth * 0.6;
+                var w = heather.getWrapperElement().offsetWidth * 0.6;
                 div.style.width = w + 'px'
                 div.style.height = w + 'px';
                 if (heather.isFullscreen()) {
@@ -627,16 +622,16 @@ var Heather = (function() {
                     div.style.position = 'absolute';
                     div.style.bottom = '';
                 }
-				pos();
+                pos();
             }
 
             var pos = function() {
                 div.style.left = '';
                 if (!heather.isFullscreen()) {
-                    var w = editor.getWrapperElement().offsetWidth * 0.6;
-					var cursor = editor.getCursor();
-                    var top = editor.cursorCoords(cursor, 'local').top + editor.defaultTextHeight();
-                    var h = editor.getScrollInfo().height;
+                    var w = heather.getWrapperElement().offsetWidth * 0.6;
+                    var cursor = heather.getCursor();
+                    var top = heather.cursorCoords(cursor, 'local').top + heather.defaultTextHeight();
+                    var h = heather.getScrollInfo().height;
                     if (top + w > h) {
                         top = h - w;
                     }
@@ -646,9 +641,9 @@ var Heather = (function() {
             resize();
             div.style.display = '';
 
-            this.start = editor.getCursor(true);
-            this.end = editor.getCursor(false);
-            this.marked = editor.markText(this.start, this.end, {
+            this.start = heather.getCursor(true);
+            this.end = heather.getCursor(false);
+            this.marked = heather.markText(this.start, this.end, {
                 className: "heather_selection_marked"
             });
             var me = this;
@@ -656,14 +651,14 @@ var Heather = (function() {
             var cursorActivityHandler = function(cm) {
                 if (me.movedByMouseOrTouch === true) {
                     me.movedByMouseOrTouch = false;
-                    me.start = editor.getCursor();
+                    me.start = heather.getCursor();
                 }
                 pos();
             };
 
-            cursorActivityHandler(editor);
+            cursorActivityHandler(heather);
 
-            editor.setOption('readOnly', 'nocursor');
+            heather.setOption('readOnly', 'nocursor');
 
             var close = div.querySelector('.heather_selection_helper_close');
             close.addEventListener('click', function() {
@@ -671,15 +666,15 @@ var Heather = (function() {
             });
             var moveCursor = function(action) {
                 if (me.end) {
-                    editor.setCursor(me.end);
+                    heather.setCursor(me.end);
                 }
-                editor.execCommand(action);
-                me.end = editor.getCursor();
+                heather.execCommand(action);
+                me.end = heather.getCursor();
                 var cursors = me.getCursors();
                 if (me.marked) {
                     me.marked.clear();
                 }
-                me.marked = editor.markText(cursors.start, cursors.end, {
+                me.marked = heather.markText(cursors.start, cursors.end, {
                     className: "heather_selection_marked"
                 });
             }
@@ -692,18 +687,18 @@ var Heather = (function() {
                     close.style.display = 'none';
                 })
                 arrow.addEventListener('touchend', function() {
-                    if (showCloseTimer){
+                    if (showCloseTimer) {
                         clearTimeout(showCloseTimer);
-					}
+                    }
                     showCloseTimer = setTimeout(function() {
                         close.style.display = '';
                     }, 300)
                 })
             }
 
-            registerEvents('editor.cursorActivity', heather, cursorActivityHandler, eventUnregisters);
-            registerEvents('editor.update', heather, resize, eventUnregisters);
-            registerEvents('editor.mousedown', 'editor.touchstart', heather, function(cm, e) {
+            registerEvents('cursorActivity', heather, cursorActivityHandler, eventUnregisters);
+            registerEvents('update', heather, resize, eventUnregisters);
+            registerEvents('mousedown', 'touchstart', heather, function(cm, e) {
                 if (isWidget(e.target, cm)) {
                     e.codemirrorIgnore = true;
                     return;
@@ -740,16 +735,15 @@ var Heather = (function() {
             if (this.marked) {
                 this.marked.clear();
             }
-            var editor = this.heather.editor;
             if (this.end && setSelection === true) {
                 var cursors = this.getCursors();
-                editor.setSelection(cursors.start, cursors.end);
+                this.heather.setSelection(cursors.start, cursors.end);
             }
             this.div.remove();
 
             unregisterEvents(this.eventUnregisters);
-            editor.setOption('readOnly', false);
-            editor.focus();
+            this.heather.setOption('readOnly', false);
+            this.heather.focus();
         }
 
         return SelectionHelper;
@@ -774,13 +768,12 @@ var Heather = (function() {
             return scrollElement.querySelectorAll('[data-line]');
         }
 
-        function getEditorScrollInfo(editor, scrollElement) {
+        function getEditorScrollInfoByPosition(editor, scrollElement, currentPosition) {
             var lines = [];
             var lineMarkers = getLineMarker(scrollElement);
             lineMarkers.forEach(function(ele) {
                 lines.push(parseInt(ele.dataset.line));
             });
-            var currentPosition = editor.getScrollInfo().top
             var lastMarker
             var nextMarker
             for (var i = 0; i < lines.length; i++) {
@@ -807,8 +800,14 @@ var Heather = (function() {
             }
         }
 
-        Sync.prototype.doSync = function() {
-            var editorScroll = getEditorScrollInfo(this.editor, this.scrollElement);
+        Sync.prototype.doSyncByCurrentCursor = function() {
+            this.doSync(this.editor.cursorCoords(true, 'local').top);
+        }
+
+
+        Sync.prototype.doSync = function(position) {
+            position = Util.isUndefined(position) ? this.editor.getScrollInfo().top : position;
+            var editorScroll = getEditorScrollInfoByPosition(this.editor, this.scrollElement, position);
             var lastPosition = 0
             var nextPosition = this.scrollElement.offsetHeight;
             var last;
@@ -846,7 +845,7 @@ var Heather = (function() {
         Bar.prototype.getElement = function() {
             return this.element;
         }
-		
+
         Bar.prototype.remove = function() {
             this.element.remove();
         }
@@ -862,11 +861,11 @@ var Heather = (function() {
         Bar.prototype.length = function() {
             return this.element.childNodes.length;
         }
-		
+
         Bar.prototype.clear = function() {
             this.element.innerHTML = '';
         }
-		
+
         Bar.prototype.insertElement = function(element, index) {
             var toolbar = this.element;
             if (index >= this.length()) {
@@ -902,28 +901,41 @@ var Heather = (function() {
         function Top(heather) {
             var div = document.createElement('div');
             div.classList.add('heather_top');
-            div.style.left = heather.editor.getGutterElement().offsetWidth + 'px';
-            heather.editor.getWrapperElement().append(div);
+            div.style.left = heather.getGutterElement().offsetWidth + 'px';
+            heather.getWrapperElement().append(div);
             this.div = div;
             this.components = [];
-            this.cm = heather.editor;
+			this.heather = heather;
             this.cachedHeight = 0;
             var me = this;
-			
-			var resize = function(cm){
-				var gutterWidth = cm.getGutterElement().offsetWidth;
-				me.div.style.left = gutterWidth + 'px';
-				me.div.style.width = getEditorEditableWidth(cm)+'px';
-			}
-			
-            heather.on('editor.update', function(cm) {
-				resize(cm);
-				me.calcMarginTop();
+            this.heather.on('update', function(cm) {
+                me.resize();
             })
         }
 
+        Top.prototype.resize = function() {
+            var gutterWidth = this.heather.getGutterElement().offsetWidth;
+            this.div.style.left = gutterWidth + 'px';
+            this.div.style.width = getEditorEditableWidth(this.heather) + 'px';
+            this.calcMarginTop();
+        }
+
         Top.prototype.addComponent = function(cmp) {
-            this.components.push(cmp)
+            this.div.appendChild(cmp.getElement());
+            this.components.push(cmp);
+            this.resize();
+        }
+
+        Top.prototype.removeComponent = function(cmp) {
+            for (var i = this.components.length - 1; i >= 0; i--) {
+                var _cmp = this.components[i];
+                if (_cmp === cmp) {
+                    this.components.splice(i, 1);
+                    cmp.getElement().remove();
+                    this.resize();
+                    break;
+                }
+            }
         }
 
         Top.prototype.calcMarginTop = function() {
@@ -933,13 +945,13 @@ var Heather = (function() {
             }
             if (h !== this.cachedHeight) {
                 this.cachedHeight = h;
-                this.cm.display.lineDiv.style.marginTop = h + 'px';
-				if(h == 0){
-					this.div.style.display = 'none';
-				} else {
-					this.div.style.display = '';
-				}
-				CodeMirror.signal(this.cm, "update", this.cm);
+                this.heather.display.lineSpace.style.marginTop = h + 'px';
+                if (h == 0) {
+                    this.div.style.display = 'none';
+                } else {
+                    this.div.style.display = '';
+                }
+                CodeMirror.signal(this.heather, "update", this.heather);
             }
         }
 
@@ -953,22 +965,22 @@ var Heather = (function() {
     var Toolbar = (function() {
 
         function Toolbar(heather, config) {
-            var cm = heather.editor;
             var div = document.createElement('div');
             div.classList.add('heather_toolbar_bar');
             div.setAttribute('data-widget', '');
 
-            heather.top.div.appendChild(div);
             this.height = 0;
             this.heather = heather;
-            this.cm = cm;
             this.bar = new Bar(div);
 
             var me = this;
 
-            heather.top.addComponent({
+            this.heather.top.addComponent({
                 getHeight: function() {
                     return me.bar.getElement().style.display === 'none' ? 0 : me.bar.height();
+                },
+                getElement: function() {
+                    return div;
                 }
             });
         }
@@ -1009,23 +1021,22 @@ var Heather = (function() {
     var CommandBar = (function() {
 
         function CommandBar(heather, config) {
-            this.cm = heather.editor;
             this.heather = heather;
             this.eventUnregisters = [];
             this.config = config;
-			this.bar = createBar(this.cm, this.heather);
-			this.bar.getElement().setAttribute('data-widget', '');
-			this.bar.getElement().style.display = 'none';
-			this.cm.addWidget({
-				line: 0,
-				ch: 0
-			}, this.bar.getElement());
+            this.bar = createBar(this.heather,this.config);
+            this.bar.getElement().setAttribute('data-widget', '');
+            this.bar.getElement().style.display = 'none';
+            this.heather.addWidget({
+                line: 0,
+                ch: 0
+            }, this.bar.getElement());
             if (this.config.commandBarEnable !== false)
                 this.enable();
         }
 
         CommandBar.prototype.getBarHelper = function() {
-			return this.bar;
+            return this.bar;
         }
 
         CommandBar.prototype.enable = function() {
@@ -1039,84 +1050,62 @@ var Heather = (function() {
             registerEvents('selectionHelperClose', 'commandBoxClose', this.heather, function() {
                 me.setKeepHidden(false);
             }, this.eventUnregisters);
-			
-			registerEvents('editor.update','editor.cursorActivity',this.heather,function(cm){
-				if (me.enabled !== true || me.keepHidden === true) {
-					return;
-				}
-				var pos = cm.cursorCoords(true, 'local');
-				me.bar.getElement().style.display = '';
-				var toolbarHeight = me.heather.top.getHeight();
-				var top = pos.top - cm.getScrollInfo().top - toolbarHeight;
-				var cursor = cm.getCursor();
-				var distance = cm.defaultTextHeight();
-				if (top > distance + me.bar.getElement().offsetHeight) {
-					me.bar.getElement().style.top = (pos.top - distance - me.bar.getElement().offsetHeight) + 'px';
-				} else {
-					me.bar.getElement().style.top = (pos.bottom + distance) + 'px';
-				}
-				me.bar.getElement().style.width = getEditorEditableWidth(cm)+'px';
-			},this.eventUnregisters)
+
+            registerEvents('update', 'cursorActivity', this.heather, function(cm) {
+                if (me.enabled !== true || me.keepHidden === true) {
+                    return;
+                }
+                var pos = cm.cursorCoords(true, 'local');
+                me.bar.getElement().style.display = '';
+                var toolbarHeight = me.heather.top.getHeight();
+                var top = pos.top - cm.getScrollInfo().top - toolbarHeight;
+                var cursor = cm.getCursor();
+                var distance = cm.defaultTextHeight();
+                if (top > distance + me.bar.getElement().offsetHeight) {
+                    me.bar.getElement().style.top = (pos.top - distance - me.bar.getElement().offsetHeight) + 'px';
+                } else {
+                    me.bar.getElement().style.top = (pos.bottom + distance) + 'px';
+                }
+                me.bar.getElement().style.width = getEditorEditableWidth(cm) + 'px';
+            }, this.eventUnregisters)
 
             this.enabled = true;
         }
 
         CommandBar.prototype.disable = function() {
             if (this.enabled !== true) return;
-			this.bar.getElement().style.display = 'none';
+            this.bar.getElement().style.display = 'none';
             unregisterEvents(this.eventUnregisters);
             this.eventUnregisters = [];
             this.enabled = false;
         }
 
         CommandBar.prototype.setKeepHidden = function(keepHidden) {
-			if(this.enabled !== true) return ;
-			if (keepHidden !== true && (this.heather.hasSelectionHelper() || this.heather.commandBox)) return
-            if (keepHidden === true){
+            if (this.enabled !== true) return;
+            if (keepHidden !== true && (this.heather.hasSelectionHelper() || this.heather.commandBox)) return
+            if (keepHidden === true) {
                 this.bar.getElement().style.display = 'none';
-			} else {
-				this.bar.getElement().style.display = '';
-			}
+            } else {
+                this.bar.getElement().style.display = '';
+            }
             this.keepHidden = keepHidden === true;
         }
-		
-        function createBar(cm, heather) {
+
+        function createBar(cm,config) {
             var div = document.createElement('div');
             div.classList.add('heather_command_bar')
             var bar = new Bar(div);
 			
-            bar.addElement(Util.createBarIcon('command',function(){
-				heather.execCommand('commands');
-			}));
-			
-			bar.addElement(Util.createBarIcon('bold',function(){
-				heather.execCommand('bold');
-			}));
-			
-			bar.addElement(Util.createBarIcon('italic',function(){
-				heather.execCommand('italic');
-			}));
-			
-            bar.addElement(Util.createBarIcon('link',function(){
-				heather.execCommand('link');
-			}));
-			
-            bar.addElement(Util.createBarIcon('code',function(){
-				heather.execCommand('code');
-			}));
-
-
-			bar.addElement(Util.createBarIcon('strike',function(){
-				heather.execCommand('strike');
-			}));
-
-			bar.addElement(Util.createBarIcon('undo',function(){
-				heather.execCommand('editor.undo');
-			}));
-
-            bar.addElement(Util.createBarIcon('redo',function(){
-				heather.execCommand('editor.redo');
-			}));
+			var items = config.commandBarItems || [];
+			for(const item of items){
+				if(typeof item === "string"){
+					bar.addElement(Util.createBarIcon(item, function() {
+						cm.execCommand(item);
+					}));
+				} else {
+					bar.addElement(item);
+				}
+			}
 
             div.addEventListener('click', function(e) {
                 var cursor = cm.coordsChar({
@@ -1135,20 +1124,20 @@ var Heather = (function() {
     //markdown render that with line numbers
     var MarkdownParser = (function() {
 
-        function MarkdownParser(config, heather) {
+        function MarkdownParser(config) {
             config = config || {};
             config.highlight = function(str, lang) {
                 if (lang == 'mermaid') {
                     return createUnparsedMermaidElement(str).outerHTML;
                 }
                 if (lang && hljs.getLanguage(lang)) {
-                    return '<pre class="hljs"><code class="language-' + lang + '"></code><textarea style="display:none !important">'+str+'</textarea></pre>';                  
+                    return '<pre class="hljs"><code class="language-' + lang + '">' + Util.escape(str) + '</code></pre>';
                 }
             }
             var md = window.markdownit(config);
             if (config.callback)
                 config.callback(md);
-            addLineNumberAttribute(md, heather);
+            addLineNumberAttribute(md);
             this.md = md;
         }
 
@@ -1156,7 +1145,7 @@ var Heather = (function() {
             return this.md.render(markdown);
         }
 
-        function addLineNumberAttribute(md, heather) {
+        function addLineNumberAttribute(md) {
             var injectLineNumbers = function(tokens, idx, options, env, slf) {
                 var line;
                 if (tokens[idx].map) {
@@ -1179,7 +1168,7 @@ var Heather = (function() {
             addFenceLineNumber(md);
             addHtmlBlockLineNumber(md);
             addCodeBlockLineNumber(md);
-			addMathBlockLineNumber(md);
+            addMathBlockLineNumber(md);
         }
 
         function addMathBlockLineNumber(md) {
@@ -1191,7 +1180,7 @@ var Heather = (function() {
                 if (addLine) {
                     return "<div class='katex-block line' data-line='" + token.map[0] + "' data-end-line='" + token.map[1] + "'>" + latex + "</div>";
                 } else {
-                    return "<span class='katex-block'>"+latex+"</span>";
+                    return "<span class='katex-block'>" + latex + "</span>";
                 }
             }
         }
@@ -1326,103 +1315,149 @@ var Heather = (function() {
     })();
 
     var Tooltip = (function() {
-		
-		var HeadingTip = (function(){
-			function HeadingTip(heather){
-				this.eventUnregisters = [];
-				this.heather = heather;
-			}
-			
-			HeadingTip.prototype.disable = function(){
-				if(this.commandBox){this.commandBox.remove();this.commandBox = null}
-				unregisterEvents(this.eventUnregisters);
-			}
-			
-			HeadingTip.prototype.enable = function(){
-				var me = this;
-				registerEvents('editor.cursorActivity', this.heather,function(cm){
-					if(cm.somethingSelected()) {closeBox(me);return;}
-					if(cm.display.input.composing) {closeBox(me);return;}
-					var cursor = cm.getCursor();
+
+        var HeadingTip = (function() {
+            function HeadingTip(heather) {
+                this.eventUnregisters = [];
+                this.heather = heather;
+            }
+
+            HeadingTip.prototype.disable = function() {
+                if (this.commandBox) {
+                    this.commandBox.remove();
+                    this.commandBox = null
+                }
+                unregisterEvents(this.eventUnregisters);
+            }
+
+            HeadingTip.prototype.enable = function() {
+                var me = this;
+                registerEvents('cursorActivity', this.heather, function(cm) {
+                    if (cm.somethingSelected()) {
+                        closeBox(me);
+                        return;
+                    }
+                    var cursor = cm.getCursor();
                     var text = cm.getLine(cursor.line);
-					var quote = getStartQuote(text);
-					var ch = cursor.ch;
-					var lefts = text.substring(0,ch).substring(quote.length).split('');
-					if(lefts.length == 0) {closeBox(me);return;}
-					var blank = 0;
-					var array = [];
-					for(const left of lefts){
-						if(left == ' '){
-							if(array.length > 0) {closeBox(me);return;}
-							else {blank++;if(blank == 4){closeBox(me);return;}continue}
-						} 
-						if(left != '#') {closeBox(me);return;}
-						ch--;
-						array.push(left);
-					}
-					if(array.length == 0) {closeBox(me);return;}
-					var rights = text.substring(cursor.ch).split('');
-					for(const right of rights){
-						if(right == '#') array.push(right);
-						else if(right != ' ') {closeBox(me);return;}
-						else break;
-					}
-					if(array.length > 6) {closeBox(me);return;}
-					var items = [];
-					var setHeading = function(level){
-						cm.setSelection({
-							line: cursor.line,
-							ch: ch
-						}, {
-							line:  cursor.line,
-							ch: ch+array.length
-						});
-						cm.replaceSelection('#'.repeat(level));
-						cm.focus();
-						cm.setCursor({line:cursor.line,ch:ch+level});
-					}
-					for(var i=1;i<=6;i++){
-						items.push({
-							html : i,
-							handler : function(){
-								var level = parseInt(this.textContent);
-								setHeading(level);
-							}
-						})
-					}
-					var keyMap = {
-					}
-					for(var i=1;i<=6;i++){
-						const level = i;
-						keyMap[level] = function(){setHeading(level)};
-					}
-					cm.addKeyMap(keyMap);
-					var box = new CommandBox(me.heather,items);
-					box.select(array.length-1);
-					box.onRemove(function(){
-						cm.removeKeyMap(keyMap);
-					})
-					me.commandBox = box;
-				},this.eventUnregisters);
-			}
-			
-			return HeadingTip;
-		})();
+                    var quote = getStartQuote(text);
+                    var ch = cursor.ch;
+                    var lefts = text.substring(0, ch).substring(quote.length).split('');
+                    if (lefts.length == 0) {
+                        closeBox(me);
+                        return;
+                    }
+                    var blank = 0;
+                    var array = [];
+                    for (const left of lefts) {
+                        if (left == ' ') {
+                            if (array.length > 0) {
+                                closeBox(me);
+                                return;
+                            } else {
+                                blank++;
+                                if (blank == 4) {
+                                    closeBox(me);
+                                    return;
+                                }
+                                continue
+                            }
+                        }
+                        if (left != '#') {
+                            closeBox(me);
+                            return;
+                        }
+                        ch--;
+                        array.push(left);
+                    }
+                    if (array.length == 0) {
+                        closeBox(me);
+                        return;
+                    }
+                    var rights = text.substring(cursor.ch).split('');
+                    for (const right of rights) {
+                        if (right == '#') array.push(right);
+                        else if (right != ' ') {
+                            closeBox(me);
+                            return;
+                        } else break;
+                    }
+                    if (array.length > 6) {
+                        closeBox(me);
+                        return;
+                    }
+                    var items = [];
+                    var setHeading = function(level) {
+                        cm.setSelection({
+                            line: cursor.line,
+                            ch: ch
+                        }, {
+                            line: cursor.line,
+                            ch: ch + array.length
+                        });
+                        cm.replaceSelection('#'.repeat(level));
+                        cm.focus();
+                        cm.setCursor({
+                            line: cursor.line,
+                            ch: ch + level
+                        });
+                    }
+                    for (var i = 1; i <= 6; i++) {
+                        items.push({
+                            html: i,
+                            handler: function() {
+                                var level = parseInt(this.textContent);
+                                setHeading(level);
+                            }
+                        })
+                    }
+                    var box = new CommandBox(cm, items);
+                    box.select(array.length - 1);
+                    var input = cm.getInputField();
+                    var keydownHandler = function(event) {
+                        input.removeAttribute('readonly');
+                        if (event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) {
+                            return;
+                        }
+                        var code = event.code;
+                        for (var i = 1; i <= 6; i++) {
+                            if (code === 'Digit' + i || code === 'Numpad' + i) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                clearTimeout(me.timer);
+                                input.setAttribute('readonly', true);
+                                setHeading(i);
+                                return false;
+                            }
+                        }
+                    };
+                    input.addEventListener('keydown', keydownHandler);
+                    box.onRemove(function() {
+                        input.removeEventListener('keydown', keydownHandler);
+                        me.timer = setTimeout(function() {
+                            input.removeAttribute('readonly');
+                        }, 10)
+                    })
+                    me.commandBox = box;
+                }, this.eventUnregisters);
+            }
+
+            return HeadingTip;
+        })();
 
         var HljsTip = (function() {
 
             function HljsTip(heather) {
-				this.eventUnregisters = [];
-				var hljsLanguages = hljs.listLanguages();
+                this.eventUnregisters = [];
+                var hljsLanguages = hljs.listLanguages();
                 hljsLanguages.push('mermaid');
                 this.languages = hljsLanguages;
-				this.heather = heather;
+                this.heather = heather;
             }
 
             HljsTip.prototype.enable = function() {
-				var me = this;
-				var editor = this.heather.editor;
-				var setLanguage = function(selected) {
+                var me = this;
+                var editor = this.heather;
+                var setLanguage = function(selected) {
                     var lang = selected.textContent;
                     var cursor = editor.getCursor();
                     var text = editor.getLine(cursor.line);
@@ -1442,68 +1477,91 @@ var Heather = (function() {
                     }
                     editor.focus();
                 }
-				registerEvents('editor.change', this.heather,function(cm){
-					if(cm.display.input.composing) {closeBox(me);return;}
-					var cursor = cm.getCursor();
+                registerEvents('change', this.heather, function(cm) {
+                    if (cm.display.input.composing) {
+                        closeBox(me);
+                        return;
+                    }
+                    var cursor = cm.getCursor();
                     var text = cm.getLine(cursor.line);
-					var quote = getStartQuote(text);
-					if(cursor.ch < quote.length + 4){closeBox(me);return;}
-					var chLeft = text.substring(0,cursor.ch).substring(quote.length).trimLeft();
-					if (!chLeft.startsWith("``` ")) {closeBox(me);return;}
-					var lang = text.substring(quote.length).trimLeft().substring(4).trimLeft();
-					if(lang.trim() === '') {closeBox(me);return;}
-					var items = filter(me,lang,function(){
-						setLanguage(this);
-					});
-					if(items.length == 0) {closeBox(me);return;}
-					me.commandBox = new CommandBox(me.heather,items);
-				},this.eventUnregisters);
+                    var quote = getStartQuote(text);
+                    if (cursor.ch < quote.length + 4) {
+                        closeBox(me);
+                        return;
+                    }
+                    var chLeft = text.substring(0, cursor.ch).substring(quote.length).trimLeft();
+                    if (!chLeft.startsWith("``` ")) {
+                        closeBox(me);
+                        return;
+                    }
+                    var lang = text.substring(quote.length).trimLeft().substring(4).trimLeft();
+                    if (lang.trim() === '') {
+                        closeBox(me);
+                        return;
+                    }
+                    var items = filter(me, lang, function() {
+                        setLanguage(this);
+                    });
+                    if (items.length == 0) {
+                        closeBox(me);
+                        return;
+                    }
+                    me.commandBox = new CommandBox(cm, items);
+                }, this.eventUnregisters);
             }
 
             HljsTip.prototype.disable = function() {
-				if(this.commandBox){this.commandBox.remove();this.commandBox = null}
-				unregisterEvents(this.eventUnregisters);
+                if (this.commandBox) {
+                    this.commandBox.remove();
+                    this.commandBox = null
+                }
+                unregisterEvents(this.eventUnregisters);
             }
-			
-			function filter(tip,str,handler){
-				var array = str.split('');
-				var languages = tip.languages;
-				var langs = [];
-				out:for(const lang of languages){
-					for(const ch of array){
-						if(lang.indexOf(ch) == -1){
-							continue out;
-						}
-					}
-					langs.push({
-						html : lang,
-						handler:handler
-					});
-				}
-				return langs;
-			}
+
+            function filter(tip, str, handler) {
+                var array = str.split('');
+                var languages = tip.languages;
+                var langs = [];
+                out: for (const lang of languages) {
+                    for (const ch of array) {
+                        if (lang.indexOf(ch) == -1) {
+                            continue out;
+                        }
+                    }
+                    langs.push({
+                        html: lang,
+                        handler: handler
+                    });
+                }
+                return langs;
+            }
 
             return HljsTip;
         })();
 
         function Tooltip(heather, config) {
-			config = config || {};
+            config = config || {};
             this.hljsTip = new HljsTip(heather);
-			this.headingTip = new HeadingTip(heather);
-            if(config.hljsTipEnable === true) this.hljsTip.enable();
-            if(config.headingTipEnable === true) this.headingTip.enable();
+            this.headingTip = new HeadingTip(heather);
+            if (config.hljsTipEnable === true) this.hljsTip.enable();
+            if (config.headingTipEnable === true) this.headingTip.enable();
         }
 
         Tooltip.prototype.enable = function() {
             this.hljsTip.enable();
-			this.headingTip.enable();
+            this.headingTip.enable();
         }
         Tooltip.prototype.disable = function() {
             this.hljsTip.disable();
-			this.headingTip.disable();
+            this.headingTip.disable();
         }
-		
-		var closeBox = function(o){if(o.commandBox){o.commandBox.remove();o.commandBox = null}};
+
+        var closeBox = function(o) {
+            if (o.commandBox) {
+                o.commandBox.remove();
+                o.commandBox = null
+            }
+        };
         return Tooltip;
 
     })();
@@ -1518,12 +1576,14 @@ var Heather = (function() {
             this.fileUploadFinish = config.uploadFinish;
             this.heather = heather;
             this.fileNameGen = config.fileNameGen;
+            this.validate = config.validate;
             this.withCredentials = config.withCredentials === true;
         }
 
         FileUpload.prototype.start = function() {
+            if (this.validate && this.validate(this.file) !== true) return;
             var me = this;
-            var editor = this.heather.editor;
+            var editor = this.heather;
             var formData = new FormData();
             var fileName = this.file.name;
             if (this.fileNameGen)
@@ -1532,26 +1592,10 @@ var Heather = (function() {
             var xhr = new XMLHttpRequest();
             if (this.withCredentials === true)
                 xhr.withCredentials = true;
-            var bar = document.createElement("div");
-            var scrollInfo = editor.getScrollInfo();
-            var scrollbarWidth = 0;
-            if (scrollInfo.height > scrollInfo.offsetHeight) {
-                var scroller = editor.getScrollerElement();
-                scrollbarWidth = scroller.offsetWidth - scroller.offsetWidth;
-            }
-            bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="heather_upload_stop_icon" style="position: absolute;top: 0;right: ' + scrollbarWidth + 'px;"><i></div>'
-           
-			bar.querySelector('i').addEventListener('click', function() {
-                xhr.abort();
-            });
-            var widget = editor.addLineWidget(editor.getCursor().line, bar, {
-                coverGutter: false,
-                noHScroll: true
-            })
-			var marginTop = Math.max(bar.querySelector('.heather_progressbar').offsetHeight - bar.querySelector('.heather_upload_stop_icon').offsetHeight,0)/2;
-            bar.querySelector('.heather_upload_stop_icon').style.marginTop = marginTop+'px';
-			xhr.upload.addEventListener("progress", function(e) {
-                if (e.lengthComputable) {
+
+            xhr.upload.addEventListener("progress", function(e) {
+                if (e.lengthComputable && me.state) {
+                    var bar = me.state.cmp.getElement();
                     var percentComplete = parseInt(e.loaded * 100 / e.total) + "";
                     var pb = bar.querySelector('.heather_progressbar').firstChild;
                     pb.style.width = percentComplete + "%"
@@ -1559,8 +1603,40 @@ var Heather = (function() {
                 }
             }, false);
             xhr.addEventListener('readystatechange', function(e) {
-                if (this.readyState === 4) {
-                    editor.removeLineWidget(widget);
+                if (this.readyState === XMLHttpRequest.OPENED) {
+                    var bar = document.createElement("div");
+                    var scrollbarWidth = getScrollBarWidth(editor);
+                    bar.innerHTML = '<div class="heather_progressbar"><div></div><span style="position:absolute;top:0"></span><i class="heather_upload_stop_icon" style="position: absolute;top: 0;right: ' + scrollbarWidth + 'px;"><i></div>'
+                    bar.querySelector('i').addEventListener('click', function() {
+                        xhr.abort();
+                        if (me.state) {
+                            editor.top.removeComponent(me.state.cmp);
+                            me.state = undefined;
+                        }
+                    });
+
+                    var cmp = {
+                        getHeight: function() {
+                            return bar.offsetHeight;
+                        },
+                        getElement: function() {
+                            return bar;
+                        }
+                    };
+
+                    editor.top.addComponent(cmp);
+
+                    var marginTop = Math.max(bar.querySelector('.heather_progressbar').offsetHeight - bar.querySelector('.heather_upload_stop_icon').offsetHeight, 0) / 2;
+                    bar.querySelector('.heather_upload_stop_icon').style.marginTop = marginTop + 'px';
+                    me.state = {
+                        cmp: cmp
+                    }
+                }
+                if (this.readyState === XMLHttpRequest.DONE) {
+                    if (me.state) {
+                        editor.top.removeComponent(me.state.cmp);
+                        me.state = undefined;
+                    }
                     if (xhr.status !== 0) {
                         var info = me.fileUploadFinish(xhr.response);
                         if (info) {
@@ -1608,7 +1684,7 @@ var Heather = (function() {
                 }
             });
 
-            xhr.open("POST", this.uploadUrl);
+            xhr.open("POST", (typeof this.uploadUrl === "function") ? this.uploadUrl.call() : this.uploadUrl);
             if (this.beforeUpload) {
                 var result = this.beforeUpload({
                     formData: formData,
@@ -1636,18 +1712,18 @@ var Heather = (function() {
         var katexLoaded = false;
         var mermaidLoading = false;
         var mermaidLoaded = false;
-		var katexCallbacks = [];
-		var mermaidCallbacks = [];
+        var katexCallbacks = [];
+        var mermaidCallbacks = [];
 
         function loadKatex(callback) {
             if (katexLoaded) {
                 if (callback) callback();
                 return;
             }
-            if (katexLoading){
-				katexCallbacks.push(callback);
-				return;
-			}
+            if (katexLoading) {
+                katexCallbacks.push(callback);
+                return;
+            }
             katexLoading = true;
 
             var link = document.createElement('link');
@@ -1656,19 +1732,19 @@ var Heather = (function() {
             link.setAttribute('href', lazyRes.katex_css);
             document.head.appendChild(link);
 
-			loadScript(lazyRes.katex_js).then(function(){
-				katexLoaded = true;
+            loadScript(lazyRes.katex_js).then(function() {
+                katexLoaded = true;
                 if (callback) callback();
-				try{
-					for(const cb of katexCallbacks){
-						try{
-							cb();
-						}catch(e){}
-					}
-				} finally {
-					katexCallbacks = [];
-				}
-			});
+                try {
+                    for (const cb of katexCallbacks) {
+                        try {
+                            cb();
+                        } catch (e) {}
+                    }
+                } finally {
+                    katexCallbacks = [];
+                }
+            });
         }
 
         function loadMermaid(callback) {
@@ -1677,46 +1753,46 @@ var Heather = (function() {
                 return;
             }
             if (mermaidLoading) {
-				mermaidCallbacks.push(callback);
-				return ;
-			}
+                mermaidCallbacks.push(callback);
+                return;
+            }
             mermaidLoading = true;
-			loadScript(lazyRes.mermaid_js).then(function(){
-				var config = {
-					startOnLoad:false,
-					flowchart:{
-						useMaxWidth:true
-					},
-					sequence:{
-						useMaxWidth:true
-					}
-				};
-				mermaid.initialize(config);
+            loadScript(lazyRes.mermaid_js).then(function() {
+                var config = {
+                    startOnLoad: false,
+                    flowchart: {
+                        useMaxWidth: true
+                    },
+                    sequence: {
+                        useMaxWidth: true
+                    }
+                };
+                mermaid.initialize(config);
                 mermaidLoaded = true;
                 if (callback) callback();
-				try{
-					for(const cb of mermaidCallbacks){
-						try{
-							cb();
-						}catch(e){}
-					}
-				} finally {
-					mermaidCallbacks = [];
-				}
-			});
+                try {
+                    for (const cb of mermaidCallbacks) {
+                        try {
+                            cb();
+                        } catch (e) {}
+                    }
+                } finally {
+                    mermaidCallbacks = [];
+                }
+            });
         }
 
-		var loadScript = function(uri){
-			  return new Promise((resolve, reject) => {
-				var tag = document.createElement('script');
-				tag.src = uri;
-				tag.async = true;
-				tag.onload = () => {
-				  resolve();
-				};
-				document.body.appendChild(tag);
-			});
-		}
+        var loadScript = function(uri) {
+            return new Promise((resolve, reject) => {
+                var tag = document.createElement('script');
+                tag.src = uri;
+                tag.async = true;
+                tag.onload = () => {
+                    resolve();
+                };
+                document.body.appendChild(tag);
+            });
+        }
 
         return {
             loadKatex: loadKatex,
@@ -1729,12 +1805,9 @@ var Heather = (function() {
 
         function TableHelper(heather) {
 
-
-            var commandsHandler = commands['commands'];
-
-            commands['commands'] = function(heather) {
-                var cm = heather.editor;
-                var context = getTableMenuContext(cm);
+            var commandsHandler = commands['command'];
+            commands['command'] = function(heather) {
+                var context = getTableMenuContext(heather);
                 if (context === 'no') {
                     commandsHandler(heather);
                     return;
@@ -1772,10 +1845,10 @@ var Heather = (function() {
                         delRow(heather, context);
                     }
                 }];
-				var box = new CommandBox(heather,items);
-				box.on('editor.cursorActivity',function(){
-					box.remove();
-				});
+                var box = new CommandBox(heather, items);
+                box.on('editor.cursorActivity', function() {
+                    box.remove();
+                });
             }
 
 
@@ -1783,12 +1856,12 @@ var Heather = (function() {
                 if (cm.somethingSelected()) return 'no';
                 var cursor = cm.getCursor();
                 var line = cursor.line;
-				
-				var state = cm.getStateAfter(line,true);
-				if(state.overlay.codeBlock) return 'no';
-				if(!maybeTable(cm,line)) return "no";
-				
-                var nodes = heather.getNodesByLine(line);
+
+                var state = cm.getStateAfter(line, true);
+                if (state.overlay.codeBlock) return 'no';
+                if (!maybeTable(cm, line)) return "no";
+
+                var nodes = cm.getNodesByLine(line);
                 if (nodes.length == 0) return 'no';
                 var node = nodes[nodes.length - 1];
                 if (node.tagName == 'P') node = nodes[nodes.length - 2];
@@ -1825,8 +1898,8 @@ var Heather = (function() {
 
             var keyMap = {
                 'Tab': function(cm) {
-                    if (!tab(heather))
-                        heather.execCommand('editor.indentMore');
+                    if (!tab(cm))
+                        cm.execCommand('indentMore');
                 }
             }
 
@@ -1834,15 +1907,14 @@ var Heather = (function() {
         }
 
         function tab(heather) {
-            var editor = heather.editor;
-            if (!editor.somethingSelected()) {
-                var cursor = editor.getCursor();
+            if (!heather.somethingSelected()) {
+                var cursor = heather.getCursor();
                 var line = cursor.line;
-				var state = editor.getStateAfter(line,true);
-				if(state.overlay.codeBlock){
-					 return ;
-				}
-				if(!maybeTable(editor,line)) return ;
+                var state = heather.getStateAfter(line, true);
+                if (state.overlay.codeBlock) {
+                    return;
+                }
+                if (!maybeTable(heather, line)) return;
                 var nodes = heather.getNodesByLine(line);
                 var mappingElem;
                 if (nodes.length > 0) {
@@ -1855,7 +1927,7 @@ var Heather = (function() {
                     var setNextCursor = function(i, substr) {
                         if (i == startLine + 1) return false; // 
                         substr = i == line && substr === true;
-                        var lineStr = substr ? editor.getLine(i).substring(cursor.ch) : editor.getLine(i);
+                        var lineStr = substr ? heather.getLine(i).substring(cursor.ch) : heather.getLine(i);
                         var firstCh, lastCh;
                         for (var j = 0; j < lineStr.length; j++) {
                             var ch = lineStr.charAt(j);
@@ -1877,7 +1949,7 @@ var Heather = (function() {
                         if (!Util.isUndefined(firstCh) && !Util.isUndefined(lastCh)) {
                             //set cursor at middle
                             var ch = parseInt(Math.ceil((lastCh - firstCh) / 2)) + firstCh + (substr ? cursor.ch : 0);
-                            editor.setCursor({
+                            heather.setCursor({
                                 line: i,
                                 ch: ch
                             });
@@ -1906,7 +1978,7 @@ var Heather = (function() {
         }
 
         function addCol(heather, context, before) {
-            var cm = heather.editor;
+            var cm = heather;
             var line = cm.getCursor().line;
             var array = [];
             var lineIndex = 0;
@@ -1948,7 +2020,7 @@ var Heather = (function() {
                 ch: 0
             });
             var newText = array.join('\n');
-            if (endLine-1 != cm.lastLine()) {
+            if (endLine - 1 != cm.lastLine()) {
                 newText += '\n';
             }
             cm.replaceSelection(newText);
@@ -1961,7 +2033,7 @@ var Heather = (function() {
 
 
         function delCol(heather, context) {
-            var cm = heather.editor;
+            var cm = heather;
             var node = context.node;
             var startLine = context.startLine;
             var endLine = context.endLine;
@@ -2012,7 +2084,7 @@ var Heather = (function() {
         }
 
         function delRow(heather, context) {
-            var cm = heather.editor;
+            var cm = heather;
             var node = context.node;
             var startLine = context.startLine;
             var endLine = context.endLine;
@@ -2051,7 +2123,7 @@ var Heather = (function() {
         }
 
         function addRow(heather, context, before) {
-            var cm = heather.editor;
+            var cm = heather;
             var node = context.node;
             var startLine = context.startLine;
             var endLine = context.endLine;
@@ -2105,86 +2177,43 @@ var Heather = (function() {
 
     })();
 
-    commands['heading'] = function(heather) {
-        var cm = heather.editor;
+    commands['heading'] = function(cm) {
         var line = cm.getCursor().line;
-		var heading = 1;
-		first:while(line > 0){
-			line--;
-			var lineHandle = cm.getLineHandle(line);
-			second:for(const style of lineHandle.styles){
-				if(typeof style === 'string'){
-					for(const s of style.split(' ')){
-						if(s.startsWith('header-')){
-							try{
-								heading = parseInt(s.substring(7));
-								break first;
-							}catch(e){continue second;}
-						}
-					}
-				}
-			}
-		}
+        var heading = 1;
+        first: while (line > 0) {
+            line--;
+            var lineHandle = cm.getLineHandle(line);
+            second: for (const style of lineHandle.styles) {
+                if (typeof style === 'string') {
+                    for (const s of style.split(' ')) {
+                        if (s.startsWith('header-')) {
+                            try {
+                                heading = parseInt(s.substring(7));
+                                break first;
+                            } catch (e) {
+                                continue second;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         cm.replaceSelection("#".repeat(heading) + " " + cm.getSelection());
         cm.focus();
     }
 
-    commands['commands'] = function(heather) {
-        var items = [{
-            html: '标题',
-            handler: function() {
-                heather.execCommand('heading');
-            }
-        }, {
-            html: '表格',
-            handler: function() {
-                heather.execCommand('table');
-            }
-        }, {
-            html: '代码块',
-            handler: function() {
-                heather.execCommand('codeBlock');
-            }
-        }, {
-            html: '无序列表',
-            handler: function() {
-                heather.execCommand('unorderedList');
-            }
-        }, {
-            html: '有序列表',
-            handler: function() {
-                heather.execCommand('orderedList');
-            }
-        }, {
-            html: '任务列表',
-            handler: function() {
-                heather.execCommand('taskList');
-            }
-        }, {
-            html: '引用',
-            handler: function() {
-                heather.execCommand('quote');
-            }
-        }, {
-            html: '数学公式块',
-            handler: function() {
-                heather.execCommand('mathBlock');
-            }
-        }, {
-            html: 'mermaid图表',
-            handler: function() {
-                heather.execCommand('mermaid');
-            }
-        }];
-		var box = new CommandBox(heather,items);
-		box.on('editor.cursorActivity',function(){
-			box.remove();
-		})
+    commands['command'] = function(heather) {
+        var items = heather.commandBoxItems;
+        if (items.length === 0) return;
+        var box = new CommandBox(heather, items);
+        box.isDefault = true;
+        box.on('editor.cursorActivity', function() {
+            box.remove();
+        })
     }
 
-    commands['table'] = function(heather) {
-        var cm = heather.editor;
+    commands['table'] = function(cm) {
         var cursor = cm.getCursor();
         var rows = cols = 2;
         var text = '';
@@ -2253,8 +2282,7 @@ var Heather = (function() {
         runWrapCommand(heather, '`');
     }
 
-    commands['link'] = function(heather) {
-        var cm = heather.editor;
+    commands['link'] = function(cm) {
         cm.focus();
         if (!cm.somethingSelected()) {
             cm.replaceSelection("[](https://)");
@@ -2300,14 +2328,600 @@ var Heather = (function() {
         runWrapCommand(heather, '*');
     }
 
-    commands['br'] = function(heather) {
-        var cm = heather.editor;
+    commands['br'] = function(cm) {
         cm.replaceSelection('<br>');
         cm.focus();
         var cursor = cm.getCursor('from');
         cursor.ch = cursor.ch + 4;
         cm.setCursor(cursor);
     }
+
+    var NodeUpdate = function() {
+
+        function NodeUpdate(heather) {
+            this.heather = heather;
+            var me = this;
+            this.change = false;
+            this.heather.on('change', function() {
+                me.change = true;
+            })
+        }
+
+        NodeUpdate.prototype.update = function(immediate) {
+            var heather = this.heather;
+            if (heather.node && !this.change) {
+                return;
+            }
+            if (this.nodeUpdateTimer) {
+                clearTimeout(this.nodeUpdateTimer);
+            }
+            if (immediate === true) {
+                heather.render();
+                this.change = false;
+            } else {
+                var me = this;
+                this.nodeUpdateTimer = setTimeout(function() {
+                    heather.render();
+                    me.change = false;
+                }, heather.config.nodeUpdateMill);
+            }
+        }
+
+        return NodeUpdate;
+    }();
+
+
+
+    var SyncView = (function() {
+        function SyncView(heather) {
+            this.partDisplay = false;
+            this.isEnable = false;
+            this.heather = heather;
+            this.unregisters = [];
+            this.refreshDisplayMill = heather.config.refreshDisplayMill;
+        }
+
+        SyncView.prototype.enable = function() {
+            if (this.isEnable) return;
+            this.isEnable = true;
+            var wrapper = this.heather.getWrapperElement();
+            wrapper.classList.add('heather_sync_view_editor');
+
+            var div = document.createElement('div');
+            div.classList.add('heather_sync_view');
+            div.classList.add('markdown-body');
+            var container = document.createElement('div');
+            container.classList.add('heather_sync_view_container');
+            div.appendChild(container);
+            this.container = container;
+            this.heather.rootNode.appendChild(div);
+            this.sync = new Sync(this.heather, div);
+            if (this.partDisplay) {
+                setPartDisplay(this);
+            } else {
+                setFullDisplay(this);
+            }
+            var me = this;
+            registerEvents('scroll', this.heather, function() {
+                me.sync.doSync();
+                displayViewportElement(container);
+            }, this.unregisters);
+            registerEvents('update', this.heather, function() {
+                if (me.updateTimer) {
+                    clearTimeout(me.updateTimer);
+                }
+                me.updateTimer = setTimeout(function() {
+                    if (!me.heather.display.input.composing) {
+                        me.heather.nodeUpdate.update();
+                    }
+                }, 10)
+            }, this.unregisters);
+
+            var fullscreenChangeHandler = function(fs) {
+                if (fs) {
+                    div.style.position = 'fixed';
+                } else {
+                    div.style.position = 'absolute';
+                }
+            }
+            fullscreenChangeHandler(this.heather.isFullscreen());
+
+            var previewChangeHandler = function(preview) {
+                if (preview) {
+                    wrapper.classList.remove('heather_sync_view_editor');
+                    div.style.display = 'none';
+                } else {
+                    wrapper.classList.add('heather_sync_view_editor');
+                    div.style.display = '';
+                }
+            }
+            previewChangeHandler(this.heather.isPreview());
+
+            var focusedHeightChangeHandler = function(h) {
+                div.querySelector('.heather_sync_view_container').style['paddingBottom'] = h + 'px';
+            }
+
+            if (this.heather.isFocused()) {
+                var h = parseFloat(this.heather.display.mover.style.paddingBottom);
+                if (!isNaN(h)) {
+                    focusedHeightChangeHandler(h);
+                }
+            }
+            registerEvents('fullscreenChange', this.heather, fullscreenChangeHandler, this.unregisters);
+            registerEvents('previewChange', this.heather, previewChangeHandler, this.unregisters);
+            registerEvents('focusedHeightChange', this.heather, focusedHeightChangeHandler, this.unregisters);
+            this.view = div;
+            CodeMirror.signal(this.heather, "update", this.heather);
+			CodeMirror.signal(this.heather, 'syncViewChange', true);
+        }
+
+        SyncView.prototype.disable = function() {
+            if (!this.isEnable) return;
+            this.isEnable = false;
+            this.view.remove();
+            unregisterEvents(this.unregisters);
+            this.heather.getWrapperElement().classList.remove('heather_sync_view_editor');
+            CodeMirror.signal(this.heather, "update", this.heather);
+			CodeMirror.signal(this.heather, 'syncViewChange', false);
+        }
+
+        SyncView.prototype.setDisplayMode = function(mode) {
+            if (mode === 'part')
+                setPartDisplay(this);
+            else
+                setFullDisplay(this);
+        }
+
+        function setPartDisplay(view) {
+            view.partDisplay = true;
+            if (!view.enable) return;
+            for (var i = view.unregisters.length - 1; i >= 0; i--) {
+                var unreg = view.unregisters[i];
+                if (unreg.name === 'rendered') {
+                    unreg.off();
+                    view.unregisters.splice(i, 1);
+                }
+            }
+            registerEvents('rendered', view.heather, function() {
+                var html = '';
+                var viewport = view.heather.getViewport();
+                //part render
+                for (const child of view.heather.node.children) {
+                    var ls = parseInt(child.dataset.line);
+                    if (ls >= viewport.from && ls <= viewport.to) {
+                        html += child.outerHTML;
+                    }
+                    if (ls > viewport.to) {
+                        break;
+                    }
+                }
+                view.container.innerHTML = html;
+                afterDisplay(view.container);
+                view.sync.doSync();
+            }, view.unregisters);
+
+            registerEvents('viewportChange', view.heather, function(cm, start, end) {
+                var html = '';
+                for (const child of cm.node.children) {
+                    var ls = parseInt(child.dataset.line);
+                    if (ls >= start && ls <= end) {
+                        html += child.outerHTML;
+                    }
+                    if (ls > end) {
+                        break;
+                    }
+                }
+                var node = view.container.cloneNode(true);
+                node.innerHTML = html;
+                morphdom(view.container, node);
+                afterDisplay(view.container);
+                view.sync.doSync();
+
+            }, view.unregisters);
+            view.heather.render();
+        }
+
+        function setFullDisplay(view) {
+            view.partDisplay = false
+            if (!view.enable) return;
+            for (var i = view.unregisters.length - 1; i >= 0; i--) {
+                var unreg = view.unregisters[i];
+                if (unreg.name === 'rendered' || unreg.name == 'editor.viewportChange') {
+                    unreg.off();
+                    view.unregisters.splice(i, 1);
+                }
+            }
+
+            registerEvents('rendered', view.heather, function() {
+                var node = view.container.cloneNode(true);
+                node.innerHTML = view.heather.node.innerHTML;
+                morphdom(view.container, node);
+                displayViewportElement(view.container);
+                view.sync.doSync();
+            }, view.unregisters);
+            view.heather.render();
+        }
+
+        return SyncView;
+    })();
+
+
+    var View = (function() {
+        function View(heather) {
+            this.isEnable = false;
+            this.heather = heather;
+        }
+
+        View.prototype.enable = function() {
+            if (this.isEnable) return;
+            this.isEnable = true;
+            var elem = this.heather.getScrollerElement();
+            this.heather.setOption('readOnly', 'nocursor');
+            var div = document.createElement('div');
+            var container = document.createElement('div');
+            container.classList.add('markdown-body');
+            container.classList.add('heather_preview');
+            container.setAttribute('tabindex', 0);
+            container.setAttribute('style', 'outline:none;')
+
+            var me = this;
+            container.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    me.disable();
+                    return false;
+                }
+            });
+
+
+            if (this.heather.config.disablePreviewCloseBtn !== true) {
+                var close = document.createElement('div');
+                close.classList.add('heather_preview_close');
+                div.appendChild(close);
+                close.addEventListener('click', function() {
+                    me.disable();
+                })
+            }
+
+            div.appendChild(container);
+            elem.after(div);
+            this.heather.nodeUpdate.update(true);
+            container.innerHTML = this.heather.node.innerHTML;
+            displayViewportElement(container);
+            container.addEventListener('scroll', function() {
+                displayViewportElement(this);
+            });
+
+            container.focus();
+            new Sync(this.heather, container).doSync();
+            this.view = div;
+            this.cursor = this.heather.getCursor();
+			CodeMirror.signal(this.heather, 'previewChange', true);
+        }
+
+        View.prototype.disable = function() {
+            if (!this.isEnable) return;
+            this.isEnable = false;
+            this.view.remove();
+            this.heather.setOption('readOnly', false);
+            this.heather.refresh();
+            this.heather.focus();
+            this.heather.setCursor(this.cursor);
+			CodeMirror.signal(this.heather, 'previewChange', false);
+        }
+
+        return View;
+    })();
+
+
+    var FocusedMode = (function() {
+        function FocusedMode(heather) {
+            this.isEnable = false;
+            this.unregisters = [];
+            this.heather = heather;
+        }
+
+        FocusedMode.prototype.enable = function() {
+            if (this.isEnable) return;
+            this.isEnable = true;
+
+            var me = this;
+            var setPadding = function(cm) {
+                var wrapper = cm.getWrapperElement();
+                var height = wrapper.offsetHeight / 2;
+                if (me.cachedHeight !== height) {
+                    me.cachedHeight = height;
+                    cm.display.mover.style.paddingBottom = height + 'px';
+                    setTimeout(function() {
+                        cm.refresh(); //TODO ? 
+                    }, 10)
+					CodeMirror.signal(me.heather, 'focusedHeightChange', height);
+                }
+            }
+
+            if (!Util.android) {
+                setPadding(this.heather);
+                registerEvents('update', this.heather, setPadding, this.unregisters);
+            }
+
+            registerEvents('change', 'fullscreenChange', this.heather, function(cm) {
+                scrollToMiddleByCursor(me.heather);
+            }, this.unregisters);
+
+			CodeMirror.signal(this.heather, 'focusedChange', true);
+        }
+
+        FocusedMode.prototype.disable = function() {
+            if (!this.isEnable) return;
+            this.isEnable = false;
+            unregisterEvents(this.unregisters);
+            this.heather.display.mover.style.paddingBottom = '';
+			CodeMirror.signal(this.heather, 'focusedChange', false);
+			CodeMirror.signal(this.heather, 'focusedHeightChange', 0);
+        }
+
+
+        function scrollToMiddleByCursor(heather, cursor) {
+            var cm = heather;
+            if (cm.somethingSelected()) return;
+            var height = cm.getWrapperElement().offsetHeight / 2;
+
+            var pos = cm.cursorCoords(cursor || true, 'local');
+            var space = pos.top - height + cm.top.getHeight();
+
+            if (Util.ios && cm.isFullscreen()) {
+                //ios will scroll screen when focused
+                window.scrollTo(0, 0);
+            }
+            if (Util.mobile) {
+                cm.scrollTo(null, space);
+            } else {
+                var minHeight = height / 2;
+                if (space - cm.getScrollInfo().top <= minHeight) return;
+                if (Util.edge) {
+                    cm.scrollTo(null, space);
+                    return;
+                }
+                if (this.scrollToMiddleTimer) {
+                    clearTimeout(this.scrollToMiddleTimer);
+                }
+                this.scrollToMiddleTimer = setTimeout(function() {
+                    var scroller = cm.display.scroller;
+                    scroller.scrollTo({
+                        top: space,
+                        behavior: 'smooth'
+                    })
+                    var scrollTimeout;
+                    var scrollHandler = function() {
+                        clearTimeout(scrollTimeout);
+                        scrollTimeout = setTimeout(function() {
+                            scroller.removeEventListener('scroll', scrollHandler);
+                            CodeMirror.signal(cm, "update", cm);
+                        }, 50);
+                    }
+                    scroller.addEventListener('scroll', scrollHandler);
+                }, 200)
+            }
+        }
+        return FocusedMode;
+    })();
+
+
+    var CommandBox = (function() {
+        function CommandBox(heather, items) {
+            this.heather = heather;
+            if (this.heather.commandBox) {
+                this.heather.commandBox.remove();
+            }
+            var div = createCommandBoxElement(this, this.heather, items);
+            this.heather.commandBox = this;
+			CodeMirror.signal(this.heather, 'commandBoxOpen', div);
+        }
+
+        CommandBox.prototype.select = function(i) {
+            if (!this.state || i < 0) return;
+            var active = this.state.element.querySelector('.active');
+            if (active != null) active.classList.remove('active');
+            var lis = this.state.element.querySelectorAll('li');
+            if (i > lis.length - 1) return;
+            lis[i].classList.add('active');
+        }
+
+        CommandBox.prototype.reset = function(items) {
+            if (!this.state) {
+                return;
+            }
+            this.heather.removeKeyMap(this.state.keyMap);
+            this.state.element.remove();
+            unregisterEvents(this.state.eventUnregisters);
+            this.state = null;
+            createCommandBoxElement(this, this.heather, items);
+        }
+
+        CommandBox.prototype.updatePosition = function() {
+            if (!this.state) return;
+            posBox(this);
+        }
+
+        CommandBox.prototype.on = function(name, handle) {
+            if (!this.state) return;
+            registerEvents(name, this.heather, handle, this.state.eventUnregisters);
+        }
+
+        CommandBox.prototype.onRemove = function(handle) {
+            if (!this.state) return;
+            this.state.removeHandlers.push(handle);
+        }
+
+        CommandBox.prototype.remove = function() {
+            if (!this.state) {
+                return;
+            }
+            this.heather.removeKeyMap(this.state.keyMap);
+            this.state.element.remove();
+            for (const onRemove of this.state.removeHandlers) {
+                try {
+                    onRemove.call(this);
+                } catch (e) {
+                    console.log(e)
+                }
+            }
+            unregisterEvents(this.state.eventUnregisters);
+            this.state = null;
+            this.heather.commandBox = null;
+			CodeMirror.signal(this.heather, 'commandBoxClose',this.heather);
+        }
+
+        function createCommandBoxElement(box, heather, items) {
+            var div = document.createElement('div');
+            div.classList.add('heather_command_box')
+            div.setAttribute('data-widget', '');
+            var ul = document.createElement('ul');
+
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var li = document.createElement('li');
+                li.innerHTML = item.html;
+                li.setAttribute('data-index', i);
+                if (i == 0)
+                    li.classList.add('active');
+                ul.appendChild(li);
+            }
+
+            var execute = function(li) {
+                var handler = items[parseInt(li.dataset.index)].handler;
+                if (handler && handler.call(li, heather) === false) {
+                    return;
+                }
+                box.remove();
+            }
+
+            var keyMap = {
+                'Up': function() {
+                    var current = ul.querySelector('.active');
+                    var prev = current.previousElementSibling;
+                    if (prev != null) {
+                        current.classList.remove('active');
+                        prev.classList.add('active');
+                        ul.parentElement.scrollTop = prev.offsetTop;
+                    } else {
+                        var lis = ul.querySelectorAll('li');
+                        if (lis.length > 0) {
+                            var last = lis[lis.length - 1];
+                            current.classList.remove('active');
+                            last.classList.add('active');
+                            ul.parentElement.scrollTop = last.offsetTop;
+                        }
+                    }
+                },
+                'Down': function() {
+                    var current = ul.querySelector('.active');
+                    var next = current.nextElementSibling;
+                    if (next != null) {
+                        current.classList.remove('active');
+                        next.classList.add('active');
+                        ul.parentElement.scrollTop = next.offsetTop;
+                    } else {
+                        var li = ul.querySelector('li');
+                        if (li != null) {
+                            current.classList.remove('active');
+                            li.classList.add('active');
+                            ul.parentElement.scrollTop = li.offsetTop;
+                        }
+                    }
+                },
+                'Enter': function() {
+                    var li = ul.querySelector('.active');
+                    execute(li);
+                },
+                'Esc': function() {
+                    heather.removeKeyMap(keyMap);
+                    box.remove();
+                }
+            }
+
+            for (const li of ul.querySelectorAll('li')) {
+                li.addEventListener('click', function() {
+                    execute(this);
+                })
+            }
+            div.appendChild(ul);
+
+            keyMap = heather.addKeyMap(keyMap);
+            var eventUnregisters = [];
+            heather.addWidget({
+                line: 0,
+                ch: 0
+            }, div);
+            box.state = {
+                element: div,
+                keyMap: keyMap,
+                eventUnregisters: eventUnregisters,
+                cursor: heather.getCursor(),
+                removeHandlers: []
+            };
+            registerEvents('update', heather, function() {
+                posBox(box)
+            }, eventUnregisters);
+            posBox(box);
+            return div;
+        }
+
+        function posBox(box) {
+            var cm = box.heather;
+            var cursor = cm.getCursor();
+            var oldCursor = box.state.cursor;
+            if (cursor.line !== oldCursor.line || cursor.ch !== oldCursor.ch) {
+                box.remove();
+                return
+            }
+            var div = box.state.element;
+            var pos = cm.cursorCoords(true, 'local');
+            div.style.maxHeight = '';
+            div.style.maxWidth = '';
+            div.style.overflowY = '';
+            div.style.overflowX = '';
+            div.style.left = pos.left + 'px';
+            div.style.right = '';
+
+            var top = pos.bottom - cm.getScrollInfo().top - cm.top.getHeight();
+            var left = parseFloat(div.style.left);
+            var code = cm.display.lineDiv;
+            var scrollBarWidth = getScrollBarWidth(cm);
+            if (left + div.offsetWidth + scrollBarWidth > code.offsetWidth) {
+                div.style.left = '';
+                div.style.right = scrollBarWidth + 'px';
+            }
+
+            var currentSpace = cm.getWrapperElement().offsetHeight - (top + cm.top.getHeight());
+            if (currentSpace - div.offsetHeight < 0) {
+                if (top - (pos.bottom - pos.top) > div.offsetHeight) {
+                    div.style.top = (pos.top - div.offsetHeight) + 'px';
+                } else {
+                    div.style.overflowY = 'auto';
+                    if (currentSpace > top) {
+                        div.style.maxHeight = currentSpace + 'px';
+                        div.style.top = pos.bottom + 'px';
+                    } else {
+                        div.style.maxHeight = top + 'px';
+                        div.style.top = (pos.bottom - div.offsetHeight) + 'px';
+                    }
+                }
+            } else {
+                div.style.top = pos.bottom + 'px';
+            }
+
+            var maxWidth = getEditorEditableWidth(cm);
+            if (div.offsetWidth > maxWidth) {
+                div.style.maxWidth = maxWidth + 'px';
+                div.style.left = '0px';
+                div.style.right = '';
+            }
+        }
+
+        return CommandBox;
+    })();
 
     function runListCommand(heather, type) {
         runBlockCommand(heather, function(line, index) {
@@ -2324,8 +2938,8 @@ var Heather = (function() {
     }
 
     function runWrapBlockCommand(heather, start, after) {
-        var last = heather.editor.getCursor('to');
-        var first = heather.editor.getCursor('from');
+        var last = heather.getCursor('to');
+        var first = heather.getCursor('from');
         var resetCursor = false;
         runBlockCommand(heather, function(line, i, startBlankLength, noSelection, singleLine) {
             if (noSelection) {
@@ -2345,7 +2959,7 @@ var Heather = (function() {
             }
         });
         if (resetCursor) {
-            heather.editor.setCursor({
+            heather.setCursor({
                 line: last.line + 1,
                 cursor: last.ch
             })
@@ -2353,8 +2967,7 @@ var Heather = (function() {
     }
 
 
-    function runBlockCommand(heather, lineHandler) {
-        var cm = heather.editor;
+    function runBlockCommand(cm, lineHandler) {
         cm.focus();
         if (!cm.somethingSelected()) {
             cm.replaceSelection(lineHandler('', 0, 0, true, true));
@@ -2384,8 +2997,7 @@ var Heather = (function() {
         }
     }
 
-    function runWrapCommand(heather, wrap) {
-        var cm = heather.editor;
+    function runWrapCommand(cm, wrap) {
         cm.focus();
         if (!cm.somethingSelected()) {
             cm.replaceSelection(wrap + wrap);
@@ -2400,73 +3012,87 @@ var Heather = (function() {
             cm.replaceSelection(wrap + cm.getSelection() + wrap);
         }
     }
+
+    function displayViewportElement(container) {
+        for (const element of container.children) {
+            if (isElementInViewport(element)) {
+                afterDisplay(element);
+            }
+        }
+    }
+
+    function isElementInViewport(el) {
+        var r, html;
+		if ( !el || 1 !== el.nodeType ) { return false; }
+		html = document.documentElement;
+		r = el.getBoundingClientRect();
+
+		return ( !!r 
+		  && r.bottom >= 0 
+		  && r.right >= 0 
+		  && r.top <= html.clientHeight 
+		  && r.left <= html.clientWidth 
+		);
+    }
+
     function afterDisplay(element) {
-		var pres = element.matches('pre.hljs') ? [element] : element.querySelectorAll('pre.hljs');
-		for(const pre of pres){
-			if(pre.hasAttribute('data-processed')) continue;
-			var code = pre.firstElementChild;
-			var className = code.className || '';
-			if(code.className.startsWith('language-')){
-				var textarea = code.nextElementSibling;
-				if(textarea){
-					var language = className.substring(9).trim();
-					var html = hljs.highlight(language, textarea.value, true).value;
-					code.innerHTML = html;
-					textarea.remove();
-				}
-			}
-			pre.setAttribute('data-processed','');
-		}
-		
-		var inlines = element.querySelectorAll(".katex-inline");
-		var blocks = element.matches('.katex-block') ? [element] : element.querySelectorAll(".katex-block");
-		
-		if(inlines.length > 0 || blocks.length > 0){
-			LazyLoader.loadKatex(function() {
-				for (var i = 0; i < inlines.length; i++) {
-					var inline = inlines[i];
-					if(inline.hasAttribute('data-inline-katex')) continue;
-					var expression = inline.textContent;
-					var result = parseKatex(expression, false);
-					var div = document.createElement('div');
-					div.innerHTML = result;
-					var child = div.firstChild;
-					child.setAttribute('data-inline-katex', '');
-					inline.outerHTML = child.outerHTML;
-				}
-				for (var i = 0; i < blocks.length; i++) {
-					var block = blocks[i];
-					if(block.hasAttribute('data-block-katex')) continue;
-					var expression = block.textContent;
-					var result = parseKatex(expression, true);
-					var div = document.createElement('div');
-					div.innerHTML = result;
-					var child = div.firstChild;
-					block.innerHTML = child.outerHTML;
-					block.setAttribute('data-block-katex', '');
-				}
-			});
-		}
-      
-		var mermaidElems = element.classList.contains('mermaid') ? [element] :  element.querySelectorAll('.mermaid');
-		if(mermaidElems.length > 0){
-			LazyLoader.loadMermaid(function() {
-				for (const mermaidElem of mermaidElems) {
-					if(mermaidElem.hasAttribute('data-processed')) continue;
-					try {
-						mermaid.parse(mermaidElem.textContent);
-						var graph = mermaid.mermaidAPI.render('mermaid_'+mermaidId++, mermaidElem.nextElementSibling.value);
-						mermaidElem.innerHTML = graph
-					} catch (e) {
-						mermaidElem.removeAttribute('data-mermaid-id');
-						mermaidElem.innerHTML = '<pre>' + e.str + '</pre>'
-					}
-					mermaidElem.nextElementSibling.remove();
-					mermaidElem.setAttribute('data-processed','');
-				}
-				
-			});
-		}
+        var pres = element.matches('pre.hljs') ? [element] : element.querySelectorAll('pre.hljs');
+        for (const pre of pres) {
+            if (pre.hasAttribute('data-processed')) continue;
+            var code = pre.firstElementChild;
+			if(code == null) continue;
+            hljs.highlightBlock(code);
+            pre.setAttribute('data-processed', '');
+        }
+
+        var inlines = element.querySelectorAll(".katex-inline");
+        var blocks = element.matches('.katex-block') ? [element] : element.querySelectorAll(".katex-block");
+
+        if (inlines.length > 0 || blocks.length > 0) {
+            LazyLoader.loadKatex(function() {
+                for (var i = 0; i < inlines.length; i++) {
+                    var inline = inlines[i];
+                    if (inline.hasAttribute('data-inline-katex')) continue;
+                    var expression = inline.textContent;
+                    var result = parseKatex(expression, false);
+                    var div = document.createElement('div');
+                    div.innerHTML = result;
+                    var child = div.firstChild;
+                    child.setAttribute('data-inline-katex', '');
+                    inline.outerHTML = child.outerHTML;
+                }
+                for (var i = 0; i < blocks.length; i++) {
+                    var block = blocks[i];
+                    if (block.hasAttribute('data-block-katex')) continue;
+                    var expression = block.textContent;
+                    var result = parseKatex(expression, true);
+                    var div = document.createElement('div');
+                    div.innerHTML = result;
+                    var child = div.firstChild;
+                    block.innerHTML = child.outerHTML;
+                    block.setAttribute('data-block-katex', '');
+                }
+            });
+        }
+
+        var mermaidElems = element.classList.contains('mermaid') ? [element] : element.querySelectorAll('.mermaid');
+        if (mermaidElems.length > 0) {
+            LazyLoader.loadMermaid(function() {
+                for (const mermaidElem of mermaidElems) {
+                    if (mermaidElem.hasAttribute('data-processed')) continue;
+                    try {
+                        mermaid.parse(mermaidElem.textContent);
+                        var graph = mermaid.mermaidAPI.render('mermaid_' + mermaidId++, mermaidElem.nextElementSibling.value);
+                        mermaidElem.innerHTML = graph
+                    } catch (e) {
+                        mermaidElem.innerHTML = '<pre>' + e.str + '</pre>'
+                    }
+                    mermaidElem.nextElementSibling.remove();
+                    mermaidElem.setAttribute('data-processed', '');
+                }
+
+            });
+        }
     }
 
     function parseKatex(expression, displayMode) {
@@ -2485,44 +3111,43 @@ var Heather = (function() {
         }
     }
 
-    function changeTastListStatus(heather, x, y) {
-        var cm = heather.editor;
+    function changeTastListStatus(cm, x, y) {
         var cursor = cm.coordsChar({
             left: x,
             top: y
         }, 'window');
-		var state = heather.editor.getStateAfter(cursor.line,false);
-		if(state.overlay.codeBlock){
-			 return ;
-		}
-		var lineHandle = cm.getLineHandle(cursor.line);
-		var styles = lineHandle.styles;
-		var startCh, endCh;
-		for(var i=0;i<styles.length;i++){
-			var style = styles[i];
-			if(style === 'meta' || style === 'property'){
-				endCh = styles[i-1];
-				startCh = endCh - 3;
-				break;
-			}
-		}
-		if(Util.isUndefined(startCh) || Util.isUndefined(endCh)) return;
-		var lineStr = lineHandle.text;
-		if(cursor.ch <= startCh || cursor.ch >= endCh) return ;
-		var text = lineStr.substring(startCh,endCh);
-		if(text !== '[ ]' && text !== '[x]' && text !== '[X]') return ;
-		cm.setSelection({
-			line: cursor.line,
-			ch: startCh + 1
-		}, {
-			line: cursor.line,
-			ch: endCh-1
-		});
-		if (text !== '[ ]') {
-			cm.replaceSelection(" ");
-		} else {
-			cm.replaceSelection("x");
-		}
+        var state = cm.getStateAfter(cursor.line, false);
+        if (state.overlay.codeBlock) {
+            return;
+        }
+        var lineHandle = cm.getLineHandle(cursor.line);
+        var styles = lineHandle.styles;
+        var startCh, endCh;
+        for (var i = 0; i < styles.length; i++) {
+            var style = styles[i];
+            if (style === 'meta' || style === 'property') {
+                endCh = styles[i - 1];
+                startCh = endCh - 3;
+                break;
+            }
+        }
+        if (Util.isUndefined(startCh) || Util.isUndefined(endCh)) return;
+        var lineStr = lineHandle.text;
+        if (cursor.ch <= startCh || cursor.ch >= endCh) return;
+        var text = lineStr.substring(startCh, endCh);
+        if (text !== '[ ]' && text !== '[x]' && text !== '[X]') return;
+        cm.setSelection({
+            line: cursor.line,
+            ch: startCh + 1
+        }, {
+            line: cursor.line,
+            ch: endCh - 1
+        });
+        if (text !== '[ ]') {
+            cm.replaceSelection(" ");
+        } else {
+            cm.replaceSelection("x");
+        }
     }
 
     function createUnparsedMermaidElement(expression) {
@@ -2532,34 +3157,34 @@ var Heather = (function() {
         div.querySelector('.mermaid').innerHTML = expression;
         return div;
     }
-	
-	function getStartQuote(str){
-		var newStr = str.trimLeft();
-		if(str.length - newStr.length > 4){
-			return "";
-		}
-		var match = listRE.exec(str);
-		if(match != null){
-			var quote = '';
-			while(match != null){
-				var start = match[0];
-				quote += start;
-				newStr = newStr.substring(start.length);
-				var spaceLength = newStr.length - newStr.trimLeft().length;
-				if(spaceLength > 4)
-					break;
-				newStr = newStr.trimLeft();
-				quote += ' '.repeat(spaceLength);
-				match = listRE.exec(newStr);
-			}
-			return quote;
-		}
-		return '';
-	}
+
+    function getStartQuote(str) {
+        var newStr = str.trimLeft();
+        if (str.length - newStr.length > 4) {
+            return "";
+        }
+        var match = listRE.exec(str);
+        if (match != null) {
+            var quote = '';
+            while (match != null) {
+                var start = match[0];
+                quote += start;
+                newStr = newStr.substring(start.length);
+                var spaceLength = newStr.length - newStr.trimLeft().length;
+                if (spaceLength > 4)
+                    break;
+                newStr = newStr.trimLeft();
+                quote += ' '.repeat(spaceLength);
+                match = listRE.exec(newStr);
+            }
+            return quote;
+        }
+        return '';
+    }
 
     function createPrefix(cm, cursor) {
-		var quote = getStartQuote(cm.getLine(cursor.line));
-		return " ".repeat(Math.max(cursor.ch - quote.length, 0)) + quote;
+        var quote = getStartQuote(cm.getLine(cursor.line));
+        return " ".repeat(Math.max(cursor.ch - quote.length, 0)) + quote;
     }
 
     function registerEvents(...args) {
@@ -2581,659 +3206,61 @@ var Heather = (function() {
             }
         }
     }
-	
-	function getScrollBarWidth(cm){
-		var scrollInfo = cm.getScrollInfo();
-		var scrollBarWidth = 0;
-		if (scrollInfo.height > scrollInfo.offsetHeight) {
-			var scroller = cm.getScrollerElement();
-			scrollBarWidth = scroller.offsetWidth - scroller.offsetWidth;
-		}
-		return scrollBarWidth;
-	}
-	
-	function getEditorEditableWidth(cm){
-		var scrollbarWidth = getScrollBarWidth(cm);
-		return cm.getWrapperElement().offsetWidth-cm.getGutterElement().offsetWidth-scrollbarWidth;
-	}
-	
-	function maybeTable(cm,line){
-		var lastLine = cm.lastLine();
-		if(line == lastLine && line == 0) return ;
-		var startLine = line > 0 ? line - 1 : 0 ;
-		var endLine = line == lastLine ? line : line + 1;
-		var count = 0;
-		for(var i=startLine;i<=endLine;i++){
-			var lineStr = cm.getLine(i);
-			lineStr = lineStr.substring(getStartQuote(lineStr).length).trim();
-			if(!lineStr.startsWith('|') || !lineStr.endsWith('|') || lineStr.length <= 1){
-				continue;
-			}
-			count ++ ;
-		}
-		return count  > 1;
-	}
-	
-    var NodeUpdate = function() {
 
-        function NodeUpdate(heather) {
-            this.heather = heather;
-            var me = this;
-            var editor = heather.editor;
-            this.change = false;
-
-            editor.on('change', function() {
-                me.change = true;
-            })
+    function getScrollBarWidth(cm) {
+        var scrollInfo = cm.getScrollInfo();
+        var scrollBarWidth = 0;
+        if (scrollInfo.height > scrollInfo.offsetHeight) {
+            var scroller = cm.getScrollerElement();
+            scrollBarWidth = scroller.offsetWidth - scroller.clientWidth;
         }
+        return scrollBarWidth;
+    }
 
-        NodeUpdate.prototype.update = function(immediate) {
-            var heather = this.heather;
-			if(heather.node && !this.change){
-				return ;
-			}
-            if (this.nodeUpdateTimer) {
-				clearTimeout(this.nodeUpdateTimer);
-			}
-			if(immediate === true){
-				heather.render();
-				this.change = false;
-			} else {
-				var me = this;
-				this.nodeUpdateTimer = setTimeout(function() {
-					heather.render();
-					me.change = false;
-				}, heather.config.nodeUpdateMill);
-			}
+    function getEditorEditableWidth(cm) {
+        var scrollbarWidth = getScrollBarWidth(cm);
+        return cm.getWrapperElement().offsetWidth - cm.getGutterElement().offsetWidth - scrollbarWidth;
+    }
+
+    function maybeTable(cm, line) {
+        var lastLine = cm.lastLine();
+        if (line == lastLine && line == 0) return;
+        var startLine = line > 0 ? line - 1 : 0;
+        var endLine = line == lastLine ? line : line + 1;
+        var count = 0;
+        for (var i = startLine; i <= endLine; i++) {
+            var lineStr = cm.getLine(i);
+            lineStr = lineStr.substring(getStartQuote(lineStr).length).trim();
+            if (!lineStr.startsWith('|') || !lineStr.endsWith('|') || lineStr.length <= 1) {
+                continue;
+            }
+            count++;
         }
-
-        return NodeUpdate;
-    }();
+        return count > 1;
+    }
 	
-	
-	
-	var SyncView = (function(){
-		function SyncView(heather){
-			this.partDisplay = false;
-			this.isEnable = false;
-			this.editor = heather.editor;
-			this.heather = heather;
-			this.unregisters = [];
-			this.refreshDisplayMill = heather.config.refreshDisplayMill;
-		}
-		
-		SyncView.prototype.enable = function(){
-			if(this.isEnable) return ;
-			this.isEnable = true;
-			var wrapper = this.editor.getWrapperElement();
-			wrapper.classList.add('heather_sync_view_editor');
-			
-			var div = document.createElement('div');
-            div.classList.add('heather_sync_view');
-            div.classList.add('markdown-body');
-            var container = document.createElement('div');
-            container.classList.add('heather_sync_view_container');
-            div.appendChild(container);
-			this.container = container;
-			this.editor.getRootNode().appendChild(div);
-			this.sync = new Sync(this.editor, div);
-			if(this.partDisplay){
-				setPartDisplay(this);
-			} else {
-				setFullDisplay(this);
-			}
-			var me = this;
-            registerEvents('editor.scroll', this.heather, function() {
-                me.sync.doSync();
-            }, this.unregisters);
-            registerEvents('editor.update', this.heather, function() {
-				if(me.updateTimer){
-					clearTimeout(me.updateTimer);
-				}
-				me.updateTimer = setTimeout(function(){
-					if(!me.editor.display.input.composing){
-						me.heather.nodeUpdate.update();
-					}
-				},10)
-            }, this.unregisters);
-			
-			var fullscreenChangeHandler = function(fs) {
-                if (fs) {
-                    div.style.position = 'fixed';
-                } else {
-                    div.style.position = 'absolute';
-                }
-            }
-            fullscreenChangeHandler(this.heather.isFullscreen());
-			
-            var previewChangeHandler = function(preview) {
-                if (preview) {
-                    wrapper.classList.remove('heather_sync_view_editor');
-                    div.style.display = 'none';
-                } else {
-                    wrapper.classList.add('heather_sync_view_editor');
-                    div.style.display = '';
-                }
-            }
-            previewChangeHandler(this.heather.isPreview());
+	function editorBuilder(textarea, config){
+        config.styleActiveLine = true;
+        config.inputStyle = 'textarea';
+        config.mode = {
+            name: 'gfm'
+        };
+        config.lineWrapping = true;
+        config.value = textarea.value;
 
-            var focusedHeightChangeHandler = function(h) {
-                div.querySelector('.heather_sync_view_container').style['paddingBottom'] = h + 'px';
-            }
+        var node = document.createElement('div');
+        node.classList.add('heather_editor_wrapper');
+        textarea.after(node);
+		var builder =  CodeMirror.buildFromTextArea(textarea, config, node);
+		builder.rootNode = node;
+		return builder;
+	}
 
-            if (this.heather.isFocused()) {
-                var h = parseFloat(this.editor.display.mover.style.paddingBottom);
-                if (!isNaN(h)) {
-                    focusedHeightChangeHandler(h);
-                }
-            }
-            registerEvents('fullscreenChange', this.heather, fullscreenChangeHandler, this.unregisters);
-            registerEvents('previewChange', this.heather, previewChangeHandler, this.unregisters);
-            registerEvents('focusedHeightChange', this.heather, focusedHeightChangeHandler, this.unregisters);
-			this.view = div;
-			CodeMirror.signal(this.editor, "update", this.editor);
-			triggerEvent(this.heather, 'syncViewChange', true);
-		}
-		
-		SyncView.prototype.disable = function(){
-			if(!this.isEnable) return ;
-			this.isEnable = false;
-			this.view.remove();
-            unregisterEvents(this.unregisters);
-            this.editor.getWrapperElement().classList.remove('heather_sync_view_editor');
-			CodeMirror.signal(this.editor, "update", this.editor);
-			triggerEvent(this.heather, 'syncViewChange', false);
-		}
-		
-		SyncView.prototype.setDisplayMode = function(mode){
-			if(mode === 'part')
-				setPartDisplay(this);
-			else
-				setFullDisplay(this);
-		}
-		
-		function setPartDisplay(view){
-			view.partDisplay = true;
-			if(!view.enable) return;
-			for(var i=view.unregisters.length-1;i>=0;i--){
-				var unreg = view.unregisters[i];
-				if(unreg.name === 'rendered' || unreg.name == 'editor.viewportChange'){
-					unreg.off();
-					view.unregisters.splice(i,1);
-				}
-			}
-			registerEvents('rendered', view.heather, function(){
-				var html = '';
-				var viewport = view.editor.getViewport();
-				//part render
-				for(const child of view.heather.node.children){
-					var ls = parseInt(child.dataset.line);
-					if(ls >= viewport.from && ls <= viewport.to){
-						html += child.outerHTML;
-					}
-					if(ls > viewport.to){
-						break;
-					}
-				} 
-				view.container.innerHTML = html;
-				afterDisplay(view.container); 
-				view.sync.doSync();
-			}, view.unregisters);
-			 
-			registerEvents('editor.viewportChange', view.heather, function(cm,start,end){
-				var html = '';
-				for(const child of view.heather.node.children){
-					var ls = parseInt(child.dataset.line);
-					if(ls >= start && ls <= end){
-						html += child.outerHTML;
-					}
-					if(ls > end){
-						break;
-					}
-				} 
-				var node = view.container.cloneNode(true);
-				node.innerHTML = html;
-				morphdom(view.container, node);
-				afterDisplay(view.container);
-				view.sync.doSync();		
-				
-			 }, view.unregisters);
-			view.heather.render();
-		}
-		
-		function setFullDisplay(view){
-			view.partDisplay = false
-			if(!view.enable) return;
-			for(var i=view.unregisters.length-1;i>=0;i--){
-				var unreg = view.unregisters[i];
-				if(unreg.name === 'rendered' || unreg.name == 'editor.viewportChange'){
-					unreg.off();
-					view.unregisters.splice(i,1);
-				}
-			}
-			
-			registerEvents('rendered', view.heather, function(){
-				var node = view.container.cloneNode(true);
-				node.innerHTML = view.heather.node.innerHTML;
-				morphdom(view.container, node);
-				var viewport = view.editor.getViewport();
-				for(const child of view.container.children){
-					var ls = parseInt(child.dataset.line);
-					if(ls >= viewport.from && ls <= viewport.to){
-						afterDisplay(child);
-					}
-					if(ls > viewport.to){
-						break;
-					}
-				} 
-				view.sync.doSync();
-			}, view.unregisters);
-			 
-			registerEvents('editor.viewportChange', view.heather, function(cm,start,end){
-				for(const child of view.container.children){
-					var ls = parseInt(child.dataset.line);
-					if(ls >= start && ls <= end){
-						afterDisplay(child);
-					}
-					if(ls > end){
-						break;
-					}
-				} 
-				view.sync.doSync();
-			 }, view.unregisters);
-			 view.heather.render();
-		}
-			
-		return SyncView;
-	})();
-	
-	
-	var View = (function(){
-		function View(heather){
-			this.isEnable = false;
-			this.editor = heather.editor;
-			this.heather = heather;
-		}
-		
-		View.prototype.enable = function(){
-			if(this.isEnable) return ;
-			this.isEnable = true;
-			var elem = this.editor.getScrollerElement();
-            this.editor.setOption('readOnly', 'nocursor');
-            var div = document.createElement('div');
-			var container = document.createElement('div');
-            container.classList.add('markdown-body');
-            container.classList.add('heather_preview');
-			container.setAttribute('tabindex',0);
-			container.setAttribute('style','outline:none;')
-			
-			var me = this;
-			container.addEventListener('keydown',function(e){
-				if((e.ctrlKey || e.metaKey) && e.key === 'p'){
-					e.preventDefault();
-					e.stopPropagation();
-					me.disable();
-					return false;
-				}
-			});
-           
-			
-            if (this.heather.config.disablePreviewCloseBtn !== true) {
-                var close = document.createElement('div');
-                close.classList.add('heather_preview_close');
-                div.appendChild(close);
-                close.addEventListener('click', function() {
-                   me.disable();
-                })
-            }
-			
-			div.appendChild(container);
-			elem.after(div);
-			this.heather.nodeUpdate.update(true);
-            container.innerHTML = this.heather.node.innerHTML;
-			
-			var displayViewportElement = function(container){
-				for(const element of container.children){
-					if(isElementInViewport(element)){
-						afterDisplay(element);
-					}
-				}
-			}
-			displayViewportElement(container);
-			container.addEventListener('scroll',function(){
-				displayViewportElement(this);
-			});
-			
-			container.focus();
-			this.view = div;
-			this.cursor = this.editor.getCursor();
-			triggerEvent(this.heather, 'previewChange', true);
-		}
-		
-		View.prototype.disable = function(){
-			if(!this.isEnable) return ;
-			this.isEnable = false;
-			this.view.remove();
-            this.editor.setOption('readOnly', false);
-            this.editor.refresh();
-            this.editor.focus();
-            this.editor.setCursor(this.cursor);
-			triggerEvent(this.heather, 'previewChange', false);
-		}
-		
-		function isElementInViewport (el) {
-			var rect = el.getBoundingClientRect();
+    Heather.commands = commands;
+    Heather.lazyRes = lazyRes;
+    Heather.Util = Util;
+    Heather.defaultConfig = defaultConfig;
+    Heather.version = '2.2';
 
-			return (
-				rect.top >= 0 &&
-				rect.left >= 0 &&
-				rect.bottom <= (window.innerHeight || document.documentElement.offsetHeight) && 
-				rect.right <= (window.innerWidth || document.documentElement.offsetWidth)
-			);
-		}
-		
-		return View;
-	})();
-	
-	
-	var FocusedMode = (function(){
-		function FocusedMode(heather){
-			this.isEnable = false;
-			this.editor = heather.editor;
-			this.unregisters = [];
-			this.heather = heather;
-		}
-		
-		FocusedMode.prototype.enable = function(){
-			if(this.isEnable) return;
-			this.isEnable = true;
-			
-			var me = this;
-			var setPadding = function(cm) {
-                var wrapper = cm.getWrapperElement();
-                var height = wrapper.offsetHeight / 2;
-				if(me.cachedHeight !== height){
-					me.cachedHeight = height;
-					cm.display.mover.style.paddingBottom = height + 'px';
-					setTimeout(function(){
-						cm.refresh();//TODO ? 
-					},10)
-					triggerEvent(me.heather, 'focusedHeightChange', height);
-				}
-            }
-
-            if (!Util.android) {
-                setPadding(this.editor);
-                registerEvents('editor.update', this.heather, setPadding, this.unregisters);
-            }
-
-            registerEvents('editor.change', 'fullscreenChange', this.heather, function(cm) {
-                scrollToMiddleByCursor(me.heather);
-            }, this.unregisters);
-
-            triggerEvent(this.heather, 'focusedChange', true);
-		}
-		
-		FocusedMode.prototype.disable = function(){
-			if(!this.isEnable) return;
-			this.isEnable = false;
-			unregisterEvents(this.unregisters);
-            this.editor.display.mover.style.paddingBottom = '';
-            triggerEvent(this.heather, 'focusedChange', false);
-            triggerEvent(this.heather, 'focusedHeightChange', 0);
-		}
-		
-		
-		function scrollToMiddleByCursor(heather, cursor) {
-			var cm = heather.editor;
-			if (cm.somethingSelected()) return;
-			var height = cm.getWrapperElement().offsetHeight / 2;
-
-			var pos = cm.cursorCoords(cursor || true, 'local');
-			var space = pos.top - height + heather.top.getHeight();
-
-			if (Util.ios && heather.isFullscreen()) {
-				//ios will scroll screen when focused
-				window.scrollTo(0, 0);
-			}
-			if (Util.mobile) {
-				cm.scrollTo(null, space);
-			} else {
-				var minHeight = height / 2;
-				if (space - cm.getScrollInfo().top <= minHeight) return;
-				if(Util.edge){
-					cm.scrollTo(null, space);
-					return ;
-				}
-				if (this.scrollToMiddleTimer) {
-					clearTimeout(this.scrollToMiddleTimer);
-				}
-				this.scrollToMiddleTimer = setTimeout(function() {
-					var scroller = cm.display.scroller;
-					scroller.scrollTo({
-						top: space,
-						behavior: 'smooth'
-					})
-					var scrollTimeout;
-					var scrollHandler = function() {
-						clearTimeout(scrollTimeout);
-						scrollTimeout = setTimeout(function() {
-							scroller.removeEventListener('scroll', scrollHandler);
-							CodeMirror.signal(cm, "update", cm);	
-						}, 50);
-					}
-					scroller.addEventListener('scroll', scrollHandler);
-				}, 200)
-			}
-		}
-		return FocusedMode;
-	})();
-	
-	
-	var CommandBox = (function(){
-		function CommandBox(heather,items){
-			this.heather = heather;
-			if(this.heather.commandBox){
-				this.heather.commandBox.remove();
-			}
-			createCommandBoxElement(this,this.heather, items);
-			this.heather.commandBox = this;
-		}
-		
-		CommandBox.prototype.select = function(i){
-			if(!this.state || i<0) return ;
-			var active = this.state.element.querySelector('.active');
-			if(active != null) active.classList.remove('active');
-			var lis = this.state.element.querySelectorAll('li');
-			if(i>lis.length-1) return ;
-			lis[i].classList.add('active');
-		}
-		
-		CommandBox.prototype.updatePosition = function(){
-			if(!this.state) return ;
-			posBox(this);
-		}
-		
-		CommandBox.prototype.on = function(name,handle){
-			if(!this.state) return ;
-			registerEvents(name, this.heather,handle,this.state.eventUnregisters);
-		}
-		
-		CommandBox.prototype.onRemove = function(handle){
-			if(!this.state) return ;
-			this.state.removeHandlers.push(handle);
-		}
-		
-		CommandBox.prototype.remove = function(){
-			if(!this.state){
-				return ;
-			}
-			this.heather.editor.removeKeyMap(this.state.keyMap);
-			this.state.element.remove();
-			for(const onRemove of this.state.removeHandlers){
-				try{
-					onRemove.call(this);
-				}catch(e){console.log(e)}
-			}
-            unregisterEvents(this.state.eventUnregisters);
-			this.state = null;
-			this.heather.commandBox = null;
-			triggerEvent(this.heather, 'commandBoxClose');
-		}
-		
-		function createCommandBoxElement(box,heather, items) {
-			var div = document.createElement('div');
-			div.classList.add('heather_command_box')
-			div.setAttribute('data-widget', '');
-			var ul = document.createElement('ul');
-
-			for (var i = 0; i < items.length; i++) {
-				var item = items[i];
-				var li = document.createElement('li');
-				li.innerHTML = item.html;
-				li.setAttribute('data-index', i);
-				if (i == 0)
-					li.classList.add('active');
-				ul.appendChild(li);
-			}
-
-			var execute = function(li) {
-				var handler = items[parseInt(li.dataset.index)].handler;
-				if (handler) {
-					handler.call(li);
-				}
-				box.remove();
-			}
-
-			var keyMap = {
-				'Up': function() {
-					var current = ul.querySelector('.active');
-					var prev = current.previousElementSibling;
-					if (prev != null) {
-						current.classList.remove('active');
-						prev.classList.add('active');
-						ul.parentElement.scrollTop = prev.offsetTop;
-					} else {
-						var lis = ul.querySelectorAll('li');
-						if (lis.length > 0) {
-							var last = lis[lis.length - 1];
-							current.classList.remove('active');
-							last.classList.add('active');
-							ul.parentElement.scrollTop = last.offsetTop;
-						}
-					}
-				},
-				'Down': function() {
-					var current = ul.querySelector('.active');
-					var next = current.nextElementSibling;
-					if (next != null) {
-						current.classList.remove('active');
-						next.classList.add('active');
-						ul.parentElement.scrollTop = next.offsetTop;
-					} else {
-						var li = ul.querySelector('li');
-						if (li != null) {
-							current.classList.remove('active');
-							li.classList.add('active');
-							ul.parentElement.scrollTop = li.offsetTop;
-						}
-					}
-				},
-				'Enter': function() {
-					var li = ul.querySelector('.active');
-					execute(li);
-				},
-				'Esc': function() {
-					heather.editor.removeKeyMap(keyMap);
-					box.remove();
-				}
-			}
-
-			for (const li of ul.querySelectorAll('li')) {
-				li.addEventListener('click', function() {
-					execute(this);
-				})
-			}
-			div.appendChild(ul);
-
-			heather.editor.addKeyMap(keyMap);
-			var eventUnregisters = [] ;
-			heather.editor.addWidget({
-                line: 0,
-                ch: 0
-            }, div);
-			box.state =  {
-				element : div,
-				keyMap : keyMap,
-				eventUnregisters : eventUnregisters,
-				cursor:heather.editor.getCursor(),
-				removeHandlers:[]
-			};
-            registerEvents('editor.update', heather, function(){
-				posBox(box)
-			}, eventUnregisters);
-			posBox(box); 
-			triggerEvent(heather, 'commandBoxOpen', div);
-		}
-		
-		function posBox(box){
-			var heather = box.heather;
-			var cm = heather.editor;
-			var cursor = cm.getCursor();
-			var oldCursor = box.state.cursor;
-			if(cursor.line !== oldCursor.line || cursor.ch !== oldCursor.ch){box.remove();return}
-			var div = box.state.element;
-			var pos = cm.cursorCoords(true, 'local');
-			div.style.maxHeight = '';
-			div.style.maxWidth = '';
-			div.style.overflowY = '';
-			div.style.overflowX = '';
-			div.style.left = pos.left + 'px';
-			div.style.right = '';
-
-			var top = pos.bottom - cm.getScrollInfo().top - heather.top.getHeight();
-			var left = parseFloat(div.style.left);
-			var code = cm.display.lineDiv;
-			var scrollBarWidth = getScrollBarWidth(cm);
-			if (left + div.offsetWidth + scrollBarWidth > code.offsetWidth) {
-				div.style.left = '';
-				div.style.right = scrollBarWidth+'px';
-			}
-			
-			var currentSpace = cm.getWrapperElement().offsetHeight - (top  + heather.top.getHeight());
-			if (currentSpace - div.offsetHeight < 0) {
-				if (top - (pos.bottom-pos.top) >  div.offsetHeight) {
-					div.style.top = (pos.top - div.offsetHeight) + 'px';
-				} else {
-					div.style.overflowY = 'auto';
-					if (currentSpace > top) {
-						div.style.maxHeight = currentSpace + 'px';
-						div.style.top = pos.bottom + 'px';
-					} else {
-						div.style.maxHeight = top + 'px';
-						div.style.top = (pos.bottom - div.offsetHeight) + 'px';
-					}
-				} 
-			}else {
-				div.style.top = pos.bottom + 'px';
-			}
-			
-			var maxWidth = getEditorEditableWidth(cm);
-			if(div.offsetWidth > maxWidth){
-				div.style.maxWidth = maxWidth + 'px';
-				div.style.left = '0px';
-				div.style.right = '';
-			}
-		}
-
-		return CommandBox;
-	})();
-	
-	Heather.commands = commands;
-	Heather.lazyRes = lazyRes;
-	Heather.Util = Util;
-	Heather.defaultConfig = defaultConfig;
-	Heather.version =  '2.1.4';
-	
-	return Heather;
+    return Heather;
 })();

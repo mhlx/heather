@@ -2212,9 +2212,7 @@
     var isWidget = classTest("CodeMirror-linewidget");
     for (var node = lineView.node.firstChild, next = (void 0); node; node = next) {
       next = node.nextSibling;
-      if (node.className == "CodeMirror-linewidget")
-        { lineView.node.removeChild(node); }
-      if (isWidget.test(node)) { lineView.node.removeChild(node); }
+      if (isWidget.test(node.className)) { lineView.node.removeChild(node); }
     }
     insertLineWidgets(cm, lineView, dims);
   }
@@ -2244,7 +2242,7 @@
     if (!line.widgets) { return }
     var wrap = ensureLineWrapped(lineView);
     for (var i = 0, ws = line.widgets; i < ws.length; ++i) {
-     var widget = ws[i], node = elt("div", [widget.node], "CodeMirror-linewidget" + (widget.className ? " " + widget.className : ""));
+      var widget = ws[i], node = elt("div", [widget.node], "CodeMirror-linewidget" + (widget.className ? " " + widget.className : ""));
       if (!widget.handleMouseEvents) { node.setAttribute("cm-ignore-events", "true"); }
       positionLineWidget(widget, node, lineView, dims);
       cm.display.input.setUneditable(node);
@@ -7241,7 +7239,7 @@
       if (!handled && code == 88 && !hasCopyEvent && (mac ? e.metaKey : e.ctrlKey))
         { cm.replaceSelection("", null, "cut"); }
     }
-	if (gecko && !mac && !handled && code == 46 && e.shiftKey && !e.ctrlKey && document.execCommand)
+    if (gecko && !mac && !handled && code == 46 && e.shiftKey && !e.ctrlKey && document.execCommand)
       { document.execCommand("cut"); }
 
     // Turn mouse into crosshair when Alt is held on Mac.
@@ -9666,10 +9664,11 @@
   
   function fromTextArea(textarea,options){
 	  var place = function (node) { return textarea.parentNode.insertBefore(node, textarea.nextSibling); };
-	  return _fromTextArea(textarea,options,place);
+	  var builder = buildFromTextArea(textarea,options,place);
+	  return CodeMirror(builder.place,builder.options)
   }
 
-  function _fromTextArea(textarea, options,place) {
+  function buildFromTextArea(textarea, options,place) {
     options = options ? copyObj(options) : {};
     options.value = textarea.value;
     if (!options.tabindex && textarea.tabIndex)
@@ -9721,9 +9720,7 @@
     };
 
     textarea.style.display = "none";
-    var cm = CodeMirror(place,
-      options);
-    return cm
+	return {place:place,options:options}
   }
 
   function addLegacyProps(CodeMirror) {
@@ -9810,7 +9807,7 @@
   };
 
   CodeMirror.fromTextArea = fromTextArea;
-  CodeMirror._fromTextArea = _fromTextArea;
+  CodeMirror.buildFromTextArea = buildFromTextArea;
 
   addLegacyProps(CodeMirror);
   
