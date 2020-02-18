@@ -2854,6 +2854,8 @@ var Heather = (function() {
                 line: 0,
                 ch: 0
             }, div);
+			
+			heather.focus();
             box.state = {
                 element: div,
                 keyMap: keyMap,

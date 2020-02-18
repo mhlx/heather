@@ -118,8 +118,9 @@
 	var editor4 = new Heather(document.getElementById("editor4"),{editor:{lineNumber:false}});
 	
 	var editor5 = new Heather(document.getElementById("editor5"),{focused:false});
-	editor5.editor.getWrapperElement().style.backgroundColor = 'green';
-	editor5.editor.setSize(300,150);
+	editor5.getWrapperElement().style.backgroundColor = 'green';
+	editor5.setSize(300,150);
+	editor5.setSyncView(true);
 	var editor6 = new Heather(document.getElementById("editor6"),{
 		upload:{
 			url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
