@@ -568,7 +568,7 @@ var Heather = (function() {
             "Cmd-B": 'bold',
             "Cmd-I": 'italic',
             "Cmd-L": 'link',
-            "Cmd-/": 'commands',
+            "Cmd-/": 'command',
             "Cmd-Enter": toggleFullscreen,
             "Cmd-P": togglePreview,
             "Cmd-Q": fold,
@@ -577,7 +577,7 @@ var Heather = (function() {
             "Ctrl-B": 'bold',
             "Ctrl-I": 'italic',
             "Ctrl-L": 'link',
-            "Alt-/": 'commands',
+            "Alt-/": 'command',
             "Ctrl-Enter": toggleFullscreen,
             "Ctrl-P": togglePreview,
             "Ctrl-Q": fold,
@@ -2674,7 +2674,7 @@ var Heather = (function() {
                 //ios will scroll screen when focused
                 window.scrollTo(0, 0);
             }
-            if (Util.mobile) {
+            if (Util.mobile || heather.config.focusedBehavior !== 'smooth') {
                 cm.scrollTo(null, space);
             } else {
                 var minHeight = height / 2;
@@ -3262,7 +3262,7 @@ var Heather = (function() {
     Heather.lazyRes = lazyRes;
     Heather.Util = Util;
     Heather.defaultConfig = defaultConfig;
-    Heather.version = '2.2';
+    Heather.version = '2.2.1';
 
     return Heather;
 })();
