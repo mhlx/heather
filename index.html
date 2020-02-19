@@ -16,13 +16,15 @@
 <link rel="stylesheet" href="codemirror/addon/fold/foldgutter.css" />
 <link rel="stylesheet" href="css/markdown.css">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/easymde.min.css">
 
 
 <style>
 .CodeMirror{
-	font-size:15px
+	line-height:25px;
+	font-size:15px;
+	border:none;
 }
-
 .CodeMirror-fullscreen {
 	left:25%;
 	right:25%;
@@ -138,6 +140,7 @@ var config = {
 Heather.prototype.setSyncView = function(){
 }
 var heather = new Heather(document.getElementById("editor"),config);
+heather.setOption('theme','easymde')
 
 var toolbar = heather.getToolbar();
 
