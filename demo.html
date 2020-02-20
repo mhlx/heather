@@ -42,22 +42,147 @@
 <body>
 <h2>基础</h2>
 <textarea id="editor1" style="display:none"></textarea>
+<pre>
+<code class="javascript">
+new Heather(document.getElementById("editor1"));
+</code>
+</pre>
 <h2>同步预览</h2>
 <textarea id="editor2" style="display:none"></textarea>
+<pre>
+<code class="javascript">
+var editor2 = new Heather(document.getElementById("editor2"));
+var syncView = false;
+editor2.on('syncViewChange',function(sv){
+	syncView = sv;
+})
+editor2.getToolbar().addElement(util.createBarIcon('book',function(){
+	editor2.setSyncView(!syncView);
+}));
+editor2.setSyncView(true);
+</code>
+</pre>
 <h2>自定义工具条</h2>
 <textarea id="editor3" style="display:none"></textarea>
+<pre>
+<code class="javascript">
+var editor3 = new Heather(document.getElementById("editor3"));
+var toolbar= editor3.getToolbar();
+toolbar.addElement(util.createBarIcon('save',function(){
+	alert('save');
+}))
+editor3.getCommandBar().getBarHelper().clear();
+editor3.getCommandBar().enable();
+editor3.getCommandBar().getBarHelper().addElement(util.createBarIcon('command',function(){
+	editor3.execCommand('command');
+}))
+editor3.getCommandBar().getBarHelper().addElement(util.createBarIcon('delete',function(){
+	editor3.getCommandBar().disable();
+}))
+</code>
+</pre>
 <h2>关闭行号</h2>
 <textarea id="editor4" style="display:none"></textarea>
+<pre>
+<code class="javascript">
+new Heather(document.getElementById("editor4"),{editor:{lineNumber:false}});
+</code>
+</pre>
 <h2>自定义尺寸</h2>
 <textarea id="editor5" style="display:none"></textarea>
+<pre>
+<code class="javascript">
+var editor5 = new Heather(document.getElementById("editor5"),{focused:false});
+editor5.getWrapperElement().style.backgroundColor = 'green';
+editor5.setSize(300,150);
+editor5.setSyncView(true);
+</code>
+</pre>
 <h2>文件上传</h2>
 <textarea id="editor6" style="display:none"></textarea>
+<pre>
+<code class="javascript">
+var editor6 = new Heather(document.getElementById("editor6"),{
+	upload:{
+		url:'https://putsreq.com/aPamE6UIaFogo0JwhL6N',
+		uploadFinish:function(resp){
+			return {
+				type : 'image',
+				url : 'https://www.qyh.me/image/dog/B4A2CC92-54B4-456F-89FA-A4B18822D065.jpeg/64'
+			};
+		},
+		beforeUpload:function(upload,file){
+			return true;
+		}
+	}
+});
+
+var uploadIcon = util.createBarIcon('upload');
+var input = document.createElement('input');
+input.type = 'file';
+input.style.display = 'none';
+uploadIcon.appendChild(input);
+input.addEventListener('change',function(){
+	if(this.files.length > 0)
+		editor6.upload(this.files[0]);
+})
+editor6.getToolbar().addElement(uploadIcon);
+</code>
+</pre>
 <h2>预览</h2>
 <textarea id="editor7" style="display:none"></textarea>
+<pre>
+<code class="javascript">
+var editor7 = new Heather(document.getElementById("editor7"));
+editor7.getToolbar().addElement(util.createBarIcon('eye',function(){
+	editor7.setPreview(true)
+}))
+</code>
+</pre>
 <h2>全屏模式</h2>
 <textarea id="editor8" style="display:none"></textarea>
+<pre>
+<code class="javascript">
+var fullscreen = false;
+var editor8 = new Heather(document.getElementById("editor8"));
+editor8.on('fullscreenChange',function(fs){
+	fullscreen = fs;
+});
+editor8.getToolbar().addElement(util.createBarIcon('fullscreen',function(){
+	editor8.setFullscreen(!fullscreen);
+}))
+</code>
+</pre>
 <h2>取值赋值</h2>
 <textarea id="editor9" style="display:none"></textarea>
+<pre>
+<code class="javascript">
+var editor9 = new Heather(document.getElementById("editor9"));
+var btn = document.createElement('button');
+btn.textContent = '取值';
+btn.setAttribute('style','margin-right:10px')
+btn.addEventListener('click',function(){
+	alert(editor9.getValue())
+})
+var btn1 = document.createElement('button');
+btn1.textContent = '获取HTML';
+btn1.addEventListener('click',function(){
+	var node = editor9.getHtmlNode();
+	node.querySelectorAll('[data-line]').forEach(node=>{
+		node.removeAttribute('data-line');
+		node.classList.remove('line');
+		if(node.className.trim() == '')
+			node.removeAttribute('class')
+		node.removeAttribute('data-end-line');
+	});
+	console.warn('这个html是被处理过的，最好获取markdown后自己转化下')
+	alert(node.innerHTML);
+})
+editor9.getToolbar().addElement(btn);
+editor9.getToolbar().addElement(btn1);
+editor9.setValue('# Hello World');
+</code>
+</pre>
 <script src="codemirror/lib/codemirror.js"></script>
 <script src="codemirror//addon/mode/overlay.js"></script>
 <script src="codemirror/mode/markdown/markdown.js"></script>
@@ -109,7 +234,7 @@
 	editor3.getCommandBar().getBarHelper().clear();
 	editor3.getCommandBar().enable();
 	editor3.getCommandBar().getBarHelper().addElement(util.createBarIcon('command',function(){
-		editor3.execCommand('commands');
+		editor3.execCommand('command');
 	}))
 	editor3.getCommandBar().getBarHelper().addElement(util.createBarIcon('delete',function(){
 		editor3.getCommandBar().disable();
@@ -173,20 +298,18 @@
 	var btn1 = document.createElement('button');
 	btn1.textContent = '获取HTML';
 	btn1.addEventListener('click',function(){
-		var node = editor9.getHtmlNode();
-		node.querySelectorAll('[data-line]').forEach(node=>{
-			node.removeAttribute('data-line');
-			node.classList.remove('line');
-			if(node.className.trim() == '')
-				node.removeAttribute('class')
-			node.removeAttribute('data-end-line');
-		});
-		console.warn('这个html是被处理过的，最好获取markdown后自己转化下')
-		alert(node.innerHTML);
+		alert(editor9.getHtml());
 	})
 	editor9.getToolbar().addElement(btn);
 	editor9.getToolbar().addElement(btn1);
 	editor9.setValue('# Hello World');
+	
+	
+	document.addEventListener('DOMContentLoaded', (event) => {
+	  document.querySelectorAll('pre code').forEach((block) => {
+		hljs.highlightBlock(block);
+	  });
+	});
 </script>
 </body>
 </html>

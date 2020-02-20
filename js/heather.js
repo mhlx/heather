@@ -22,7 +22,7 @@ var Heather = (function() {
         var headingTagNames = ["H1", "H2", "H3", "H4", "H5", "H6"];
 
         var isUndefined = function(o) {
-            return (typeof o == 'undefined')
+            return (typeof o === 'undefined')
         }
 
         return {
@@ -268,6 +268,10 @@ var Heather = (function() {
 		return this.rootNode;
 	}
 	
+	Heather.prototype.getHtml = function(){
+		return this.markdownParser.mdCopy.render(this.getValue());
+	}
+	
     Heather.prototype.getHtmlNode = function() {
         this.nodeUpdate.update(true);
         var node = this.node.cloneNode(true);
@@ -469,7 +473,7 @@ var Heather = (function() {
             }
             var x = e.clientX;
             var y = e.clientY;
-            changeTastListStatus(cm, x, y);
+            changeTastListStatus(cm, x, y ,e);
         })
 
         heather.on('touchstart', function(cm, e) {
@@ -479,7 +483,7 @@ var Heather = (function() {
             }
             var x = e.touches[0].clientX;
             var y = e.touches[0].clientY;
-            changeTastListStatus(cm, x, y);
+			changeTastListStatus(cm, x, y ,e);
         });
         //file upload 
         heather.on('paste', function(editor, evt) {
@@ -1127,7 +1131,7 @@ var Heather = (function() {
         function MarkdownParser(config) {
             config = config || {};
             config.highlight = function(str, lang) {
-                if (lang == 'mermaid') {
+                if (lang === 'mermaid') {
                     return createUnparsedMermaidElement(str).outerHTML;
                 }
                 if (lang && hljs.getLanguage(lang)) {
@@ -1135,10 +1139,30 @@ var Heather = (function() {
                 }
             }
             var md = window.markdownit(config);
-            if (config.callback)
+			var mdCopy = window.markdownit(config);
+			var fenceRule =  mdCopy.renderer.rules.fence;
+			var newFenceRule = function(tokens, idx, options, env, slf){
+				var token = tokens[idx],
+                    info = token.info ? md.utils.unescapeAll(token.info).trim() : '',
+                    langName = '';
+                if (info) {
+                    langName = info.split(/\s+/g)[0];
+                }
+				if(langName === 'mermaid'){
+					return '<div class="mermaid">'+token.content+'</div>'
+				}
+				return fenceRule.call(null,tokens, idx, options, env, slf);
+			}
+			mdCopy.renderer.rules.fence = newFenceRule;
+			mdCopy.copy = true;
+			
+            if (config.callback){
                 config.callback(md);
+                config.callback(mdCopy);
+			}
             addLineNumberAttribute(md);
             this.md = md;
+			this.mdCopy = mdCopy;
         }
 
         MarkdownParser.prototype.render = function(markdown) {
@@ -3113,7 +3137,7 @@ var Heather = (function() {
         }
     }
 
-    function changeTastListStatus(cm, x, y) {
+    function changeTastListStatus(cm, x, y ,e) {
         var cursor = cm.coordsChar({
             left: x,
             top: y
@@ -3133,11 +3157,11 @@ var Heather = (function() {
                 break;
             }
         }
-        if (Util.isUndefined(startCh) || Util.isUndefined(endCh)) return;
+        if (Util.isUndefined(startCh) || Util.isUndefined(endCh)) return ;
         var lineStr = lineHandle.text;
-        if (cursor.ch <= startCh || cursor.ch >= endCh) return;
+        if (cursor.ch <= startCh || cursor.ch >= endCh) return ;
         var text = lineStr.substring(startCh, endCh);
-        if (text !== '[ ]' && text !== '[x]' && text !== '[X]') return;
+        if (text !== '[ ]' && text !== '[x]' && text !== '[X]') return ;
         cm.setSelection({
             line: cursor.line,
             ch: startCh + 1
@@ -3150,6 +3174,9 @@ var Heather = (function() {
         } else {
             cm.replaceSelection("x");
         }
+		e.preventDefault();
+		e.stopPropagation();
+		return;
     }
 
     function createUnparsedMermaidElement(expression) {
