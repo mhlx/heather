@@ -167,16 +167,9 @@ btn.addEventListener('click',function(){
 var btn1 = document.createElement('button');
 btn1.textContent = '获取HTML';
 btn1.addEventListener('click',function(){
-	var node = editor9.getHtmlNode();
-	node.querySelectorAll('[data-line]').forEach(node=>{
-		node.removeAttribute('data-line');
-		node.classList.remove('line');
-		if(node.className.trim() == '')
-			node.removeAttribute('class')
-		node.removeAttribute('data-end-line');
-	});
-	console.warn('这个html是被处理过的，最好获取markdown后自己转化下')
-	alert(node.innerHTML);
+	editor9.getHtml(function(html){
+		alert(html);
+	})
 })
 editor9.getToolbar().addElement(btn);
 editor9.getToolbar().addElement(btn1);
@@ -298,7 +291,9 @@ editor9.setValue('# Hello World');
 	var btn1 = document.createElement('button');
 	btn1.textContent = '获取HTML';
 	btn1.addEventListener('click',function(){
-		alert(editor9.getHtml());
+		editor9.getHtml(function(html){
+			alert(html);
+		});
 	})
 	editor9.getToolbar().addElement(btn);
 	editor9.getToolbar().addElement(btn1);

@@ -268,8 +268,28 @@ var Heather = (function() {
 		return this.rootNode;
 	}
 	
-	Heather.prototype.getHtml = function(){
-		return this.markdownParser.mdCopy.render(this.getValue());
+	Heather.prototype.getHtml = function(callback){
+		var node = Util.parseHTML(this.markdownParser.mdCopy.render(this.getValue()));
+		var inlines = node.querySelectorAll(".katex-inline");
+        var blocks = node.querySelectorAll(".katex-block");
+        if (inlines.length > 0 || blocks.length > 0) {
+            LazyLoader.loadKatex(function() {
+                for (var i = 0; i < inlines.length; i++) {
+                    var inline = inlines[i];
+                    var expression = inline.textContent;
+                    var result = parseKatex(expression, false);
+                    inline.outerHTML = result;
+                }
+                for (var i = 0; i < blocks.length; i++) {
+                    var block = blocks[i];
+                    var expression = block.textContent;
+                    var result = parseKatex(expression, true);
+                    block.outerHTML = result;
+                }
+				callback.call(null,node.innerHTML);
+            });
+        } else 
+			callback.call(null,node.innerHTML);
 	}
 	
     Heather.prototype.getHtmlNode = function() {
