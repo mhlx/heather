@@ -63,13 +63,27 @@
      '[keyword {] [atom 0x1F] [keyword }]',
      '[keyword {] [atom 0x1F00BBEA] [keyword }]');
 
-  MT('param-type-test',
+  MT('param-type-record',
+     '[keyword {@param] [def record]: [[[property foo]: [type bool], [property bar]: [type int] ]][keyword }]'
+  );
+
+  MT('param-type-map',
+     '[keyword {@param] [def unknown]: [type map]<[type string], [type bool]>[keyword }]'
+  );
+
+  MT('param-type-list',
+     '[keyword {@param] [def list]: [type list]<[type ?]>[keyword }]'
+  );
+
+  MT('param-type-any',
+     '[keyword {@param] [def unknown]: [type ?][keyword }]'
+  );
+
+  MT('param-type-nested',
      '[keyword {@param] [def a]: ' +
-         '[type list]<[[[type a]: [type int], ' +
-         '[type b]: [type map]<[type string], ' +
-         '[type bool]>]]>][keyword }]',
-      '[keyword {@param] [def unknown]: [type ?][keyword }]',
-      '[keyword {@param] [def list]: [type list]<[type ?]>[keyword }]');
+         '[type list]<[[[property a]: [type int], ' +
+         '[property b]: [type map]<[type string], ' +
+         '[type bool]>]]>][keyword }]');
 
   MT('undefined-var',
      '[keyword {][variable-2&error $var]');
@@ -151,6 +165,19 @@
      '[keyword {/template}]',
      '');
 
+  MT('param-type-and-default-value',
+     '[keyword {template] [def .foo][keyword }]',
+     '  [keyword {@param] [def bar]: [type bool] = [atom true][keyword }]',
+     '[keyword {/template}]',
+     '');
+
+   MT('state-variable-reference',
+     '[keyword {template] [def .foo][keyword }]',
+     '  [keyword {@param] [def bar]:= [atom true][keyword }]',
+     '  [keyword {@state] [def foobar]:= [variable-2 $bar][keyword }]',
+     '[keyword {/template}]',
+     '');
+
   MT('single-quote-strings',
      '[keyword {][string "foo"] [string \'bar\'][keyword }]',
      '');
@@ -188,6 +215,14 @@
      '  Old message',
      '[keyword {/msg}]');
 
+  MT('literal-indent',
+     '[keyword {template] [def .name][keyword }]',
+     '  [keyword {literal}]',
+     '    Lerum',
+     '  [keyword {/literal}]',
+     '  Ipsum',
+     '[keyword {/template}]');
+
   MT('special-chars',
      '[keyword {sp}]',
      '[keyword {nil}]',
@@ -197,8 +232,24 @@
      '[keyword {lb}]',
      '[keyword {rb}]');
 
+  MT('let-list-literal',
+     '[keyword {let] [def $test]: [[[[[string \'a\'] ], [[[string \'b\'] ] ] [keyword /}]');
+
+  MT('let-record-literal',
+     '[keyword {let] [def $test]: [keyword record]([property test]: [callee&variable bidiGlobalDir](), ' +
+         '[property foo]: [atom 5]) [keyword /}]');
+
+  MT('let-map-literal',
+     '[keyword {let] [def $test]: [keyword map]([string \'outer\']: [keyword map]([atom 5]: [atom false]), ' +
+         '[string \'foo\']: [string \'bar\']) [keyword /}]');
+
   MT('wrong-closing-tag',
      '[keyword {if] [atom true][keyword }]',
      '  Optional',
      '[keyword&error {/badend][keyword }]');
+
+  MT('list-comprehension',
+     '[keyword {let] [def $myList]: [[[[[string \'a\'] ] ] [keyword /}] ' +
+     '[keyword {let] [def $test]: [[[variable $a] [operator +] [atom 1] [keyword for] ' +
+         '[def $a] [keyword in] [variable-2 $myList] [keyword if] [variable-2 $a] [operator >=] [atom 3] ] [keyword /}]');
 })();

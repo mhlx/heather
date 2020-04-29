@@ -155,6 +155,17 @@
       cm.state.sublimeFindFullWord = cm.doc.sel;
   };
 
+  cmds.skipAndSelectNextOccurrence = function(cm) {
+    var prevAnchor = cm.getCursor("anchor"), prevHead = cm.getCursor("head");
+    cmds.selectNextOccurrence(cm);
+    if (CodeMirror.cmpPos(prevAnchor, prevHead) != 0) {
+      cm.doc.setSelections(cm.doc.listSelections()
+          .filter(function (sel) {
+            return sel.anchor != prevAnchor || sel.head != prevHead;
+          }));
+    }
+  }
+
   function addCursorToSelection(cm, dir) {
     var ranges = cm.listSelections(), newRanges = [];
     for (var i = 0; i < ranges.length; i++) {
@@ -605,6 +616,7 @@
     "Shift-Cmd-F2": "clearBookmarks",
     "Alt-F2": "selectBookmarks",
     "Backspace": "smartBackspace",
+    "Cmd-K Cmd-D": "skipAndSelectNextOccurrence",
     "Cmd-K Cmd-K": "delLineRight",
     "Cmd-K Cmd-U": "upcaseAtCursor",
     "Cmd-K Cmd-L": "downcaseAtCursor",
@@ -616,6 +628,7 @@
     "Cmd-K Cmd-C": "showInCenter",
     "Cmd-K Cmd-G": "clearBookmarks",
     "Cmd-K Cmd-Backspace": "delLineLeft",
+    "Cmd-K Cmd-1": "foldAll",
     "Cmd-K Cmd-0": "unfoldAll",
     "Cmd-K Cmd-J": "unfoldAll",
     "Ctrl-Shift-Up": "addCursorToPrevLine",
@@ -665,6 +678,7 @@
     "Shift-Ctrl-F2": "clearBookmarks",
     "Alt-F2": "selectBookmarks",
     "Backspace": "smartBackspace",
+    "Ctrl-K Ctrl-D": "skipAndSelectNextOccurrence",
     "Ctrl-K Ctrl-K": "delLineRight",
     "Ctrl-K Ctrl-U": "upcaseAtCursor",
     "Ctrl-K Ctrl-L": "downcaseAtCursor",
@@ -676,6 +690,7 @@
     "Ctrl-K Ctrl-C": "showInCenter",
     "Ctrl-K Ctrl-G": "clearBookmarks",
     "Ctrl-K Ctrl-Backspace": "delLineLeft",
+    "Ctrl-K Ctrl-1": "foldAll",
     "Ctrl-K Ctrl-0": "unfoldAll",
     "Ctrl-K Ctrl-J": "unfoldAll",
     "Ctrl-Alt-Up": "addCursorToPrevLine",
